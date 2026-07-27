@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ site_name }} — Ferramentas técnicas para DNS, SEO, SSL e servidores{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Analise DNS, SEO, SSL, servidor e segurança em um só lugar. Ferramentas técnicas gratuitas e rápidas do {{ site_name }}.{% endblock %}">
+  {% block canonical %}{% endblock %}
+  {% block robots_meta %}<meta name="robots" content="index, follow">{% endblock %}
+  <meta property="og:site_name" content="{{ site_name }}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}{{ self.meta_description() }}{% endblock %}">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2220%22 font-size=%2220%22>🔎</text></svg>">
+  <link rel="stylesheet" href="/static/dist/main.css">
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="h-full bg-slate-50 text-slate-800" x-data="{ toast: null }">
+<div x-data="sidebar()" class="flex min-h-full">
+
+  <button
+    class="fixed left-3 top-3 z-40 rounded-lg border border-slate-200 bg-white p-2 shadow-sm lg:hidden"
+    @click="drawerOpen = true"
+    aria-label="Abrir menu de ferramentas"
+  >
+    <span aria-hidden="true">☰</span>
+  </button>
+
+  <div
+    x-show="drawerOpen"
+    x-cloak
+    @click="drawerOpen = false"
+    class="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
+  ></div>
+
+  <aside
+    :class="{
+      'w-72': !collapsed,
+      'w-[4.5rem]': collapsed,
+      '-translate-x-full': !drawerOpen,
+      'translate-x-0': drawerOpen
+    }"
+    class="fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-slate-200 bg-white transition-all duration-200 lg:static lg:translate-x-0"
+  >
+    <div class="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-4">
+      <a href="{{ url_for('main.home') }}" class="flex items-center gap-2 font-semibold text-brand-900 no-underline">
+        <span class="text-xl" aria-hidden="true">🔎</span>
+        <span x-show="!collapsed" x-cloak>{{ site_name }}</span>
+      </a>
+      <button
+        class="hidden rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 lg:block"
+        @click="toggleCollapsed()"
+        :aria-label="collapsed ? 'Expandir menu' : 'Recolher menu'"
+      >
+        <span x-show="!collapsed" x-cloak aria-hidden="true">«</span>
+        <span x-show="collapsed" x-cloak aria-hidden="true">»</span>
+      </button>
+      <button class="p-1 text-slate-400 lg:hidden" @click="drawerOpen = false" aria-label="Fechar menu">✕</button>
+    </div>
+
+    <div class="border-b border-slate-100 p-3" x-show="!collapsed" x-cloak>
+      <button
+        type="button"
+        x-data
+        @click="$dispatch('analisa:open-search')"
+        class="input flex w-full items-center justify-between text-left text-slate-400"
+      >
+        <span>Buscar ferramenta…</span>
+        <kbd class="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs">Ctrl K</kbd>
+      </button>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto px-2 py-3" aria-label="Categorias de ferramentas">
+      {% for category in sidebar_categories %}
+        {% set active_tools = category.tools | selectattr('is_active') | list %}
+        {% if active_tools %}
+        <div class="mb-1" {% if request.blueprint == 'main' and category.slug == (tool_row.category.slug if tool_row is defined else '') %}data-active-category="{{ category.slug }}"{% endif %}>
+          <button
+            type="button"
+            class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-600"
+            @click="toggleCategory('{{ category.slug }}')"
+          >
+            <span x-show="!collapsed" x-cloak>{{ category.name }}</span>
+            <span x-show="collapsed" x-cloak aria-hidden="true">{{ category.name[:2] }}</span>
+            <span x-show="!collapsed" x-cloak aria-hidden="true" x-text="isCategoryOpen('{{ category.slug }}') ? '−' : '+'"></span>
+          </button>
+          <div x-show="collapsed || isCategoryOpen('{{ category.slug }}')" x-collapse>
+            <ul class="space-y-0.5 pb-2">
+              {% for tool in active_tools %}
+              <li>
+                <a
+                  href="{{ url_for('main.category_or_tool_page', slug=tool.slug) }}"
+                  class="{{ 'sidebar-link-active' if (tool_row is defined and tool_row.slug == tool.slug) else 'sidebar-link' }}"
+                  @click="registerRecent('{{ tool.slug }}')"
+                >
+                  <span x-show="!collapsed" x-cloak>{{ tool.name }}</span>
+                  <span x-show="collapsed" x-cloak aria-hidden="true" class="text-xs">{{ tool.name[:1] }}</span>
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </nav>
+
+    <div class="space-y-1 border-t border-slate-100 p-3 text-sm" x-show="!collapsed" x-cloak>
+      <a href="{{ url_for('main.home') }}" class="sidebar-link">Todas as ferramentas</a>
+      <a href="{{ url_for('main.roadmap') }}" class="sidebar-link">Roadmap e sugestões</a>
+      <a href="{{ url_for('main.docs') }}" class="sidebar-link">Documentação</a>
+    </div>
+  </aside>
+
+  <div class="flex min-h-full flex-1 flex-col lg:ml-0">
+    <main class="mx-auto w-full max-w-6xl flex-1 px-4 py-10 lg:px-8">
+      {% block content %}{% endblock %}
+    </main>
+    <footer class="border-t border-slate-200 bg-white px-4 py-6 text-center text-xs text-slate-400">
+      © {{ site_name }} — dados coletados automaticamente para fins técnicos e informativos.
+    </footer>
+  </div>
+
+  {% include "partials/command_palette.html" %}
+</div>
+
+<div
+  x-data="toast()"
+  class="pointer-events-none fixed bottom-4 right-4 z-[100] flex flex-col gap-2"
+  aria-live="polite"
+>
+  <template x-for="item in items" :key="item.id">
+    <div
+      class="pointer-events-auto rounded-lg px-4 py-2 text-sm text-white shadow-lg"
+      :class="item.variant === 'error' ? 'bg-rose-600' : 'bg-slate-900'"
+      x-text="item.message"
+    ></div>
+  </template>
+</div>
+
+<script id="analisa-tools-index" type="application/json">{{ tools_search_index | tojson }}</script>
+<script src="/static/dist/main.js" defer></script>
+{% block scripts_extra %}{% endblock %}
+</body>
+</html>

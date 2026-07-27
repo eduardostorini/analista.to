@@ -1,0 +1,71 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs %}
+
+{% block title %}Documentação | {{ site_name }}{% endblock %}
+{% block meta_description %}Entenda como as consultas do {{ site_name }} funcionam: filas, status, cache, páginas públicas e proteção contra abuso.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ site_url }}{{ url_for('main.docs') }}">{% endblock %}
+
+{% block content %}
+{{ breadcrumbs([("Início", url_for('main.home')), ("Documentação", None)]) }}
+
+<header class="mb-8 max-w-2xl">
+  <h1 class="text-3xl">Documentação</h1>
+  <p class="mt-2 text-slate-600">Como o {{ site_name }} processa uma consulta, do envio do formulário até o resultado.</p>
+</header>
+
+<div class="prose-tool space-y-10">
+  <section>
+    <h2>O ciclo de vida de uma consulta</h2>
+    <p>
+      Ao enviar o formulário de uma ferramenta, sua entrada passa por validação, verificação
+      anti-robô e limites de uso antes de ser aceita. A consulta então entra em uma fila e é
+      processada em segundo plano por um worker dedicado — isso evita que análises de rede
+      lentas travem a navegação. Enquanto isso, a página mostra uma barra de status que é
+      atualizada em tempo real (via Server-Sent Events, com fallback automático para
+      atualização periódica caso a conexão em tempo real não esteja disponível).
+    </p>
+    <p>Os estados possíveis de uma consulta são:</p>
+    <ul>
+      <li><strong>Aguardando validação / Verificando CAPTCHA</strong> — checagens antes de entrar na fila.</li>
+      <li><strong>Consulta adicionada à fila / Processando / Consultando serviços</strong> — a tarefa está na fila ou em execução.</li>
+      <li><strong>Analisando resultados / Gerando relatório</strong> — os dados coletados estão sendo organizados.</li>
+      <li><strong>Criando página pública</strong> — quando aplicável, a página compartilhável está sendo gerada.</li>
+      <li><strong>Concluído</strong> — o relatório está pronto.</li>
+      <li><strong>Falhou / Expirado / Cancelado</strong> — a consulta não pôde ser concluída; o motivo é exibido na tela.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Cache e reaproveitamento</h2>
+    <p>
+      Para não sobrecarregar os serviços consultados nem gerar relatórios duplicados, cada
+      ferramenta tem um TTL (tempo de validade) próprio. Se alguém já consultou a mesma entrada
+      recentemente, você recebe o resultado existente instantaneamente, em vez de esperar um
+      novo processamento. Passado o TTL, uma nova consulta é permitida normalmente.
+    </p>
+  </section>
+
+  <section>
+    <h2>Páginas públicas e SEO</h2>
+    <p>
+      Consultas concluídas com sucesso para recursos públicos podem gerar uma página
+      compartilhável, com URL previsível (por exemplo, <code>/dns/exemplo.com.br/</code>).
+      Nem toda consulta é indexada pelos buscadores: resultados com erro, vazios, duplicados,
+      envolvendo redes privadas ou aguardando processamento recebem a diretiva
+      <code>noindex</code> automaticamente. Você pode conferir a data da coleta e a validade
+      dos dados diretamente na página do resultado.
+    </p>
+  </section>
+
+  <section>
+    <h2>Proteção contra abuso</h2>
+    <p>
+      Antes de qualquer requisição de rede, validamos o alvo para bloquear endereços privados,
+      de loopback, link-local, multicast e de metadados de provedores de nuvem — mesmo que o
+      domínio informado resolva para um desses endereços após um redirecionamento. Também
+      aplicamos limites de requisições por IP, por sessão, por ferramenta e por entrada
+      consultada, além de um desafio anti-robô (CAPTCHA ou desafio matemático) nos formulários.
+    </p>
+  </section>
+</div>
+{% endblock %}

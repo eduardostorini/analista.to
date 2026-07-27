@@ -1,0 +1,171 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}SSL Certificate Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Verifique validade, emissor e data de expiração do certificado SSL/TLS de qualquer domínio.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">SSL Certificate Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domínio</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      <p class="text-xs text-slate-400">Conectamos na porta 443 (HTTPS padrão).</p>
+      {{ captcha_widget(captcha_provider, turnstile_site_key, hcaptcha_site_key) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Verificar certificado</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Falhou</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-lg text-brand-900">{{ data.host }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          {% if data.is_expired %}<span class="badge-danger">Certificado expirado</span>
+          {% elif data.expires_soon %}<span class="badge-warning">Expira em {{ data.days_remaining }} dia(s)</span>
+          {% else %}<span class="badge-success">Válido por mais {{ data.days_remaining }} dia(s)</span>{% endif %}
+          {% if not data.is_trusted %}<span class="badge-danger">Cadeia não confiável</span>{% endif %}
+        </div>
+
+        <dl class="grid gap-4 sm:grid-cols-2">
+          <div><dt class="text-xs text-slate-400">Nome comum (CN)</dt><dd class="font-mono text-sm text-slate-700">{{ data.common_name or "—" }}</dd></div>
+          <div><dt class="text-xs text-slate-400">Emitido por</dt><dd class="text-sm text-slate-700">{{ data.issuer_common_name or "—" }}{% if data.issuer_organization %} ({{ data.issuer_organization }}){% endif %}</dd></div>
+          <div><dt class="text-xs text-slate-400">Válido a partir de</dt><dd class="text-sm text-slate-700">{{ data.not_before }}</dd></div>
+          <div><dt class="text-xs text-slate-400">Válido até</dt><dd class="text-sm text-slate-700">{{ data.not_after }}</dd></div>
+          <div><dt class="text-xs text-slate-400">Protocolo TLS</dt><dd class="text-sm text-slate-700">{{ data.protocol or "—" }}</dd></div>
+          <div><dt class="text-xs text-slate-400">Cifra</dt><dd class="font-mono text-xs text-slate-700">{{ data.cipher or "—" }}</dd></div>
+        </dl>
+
+        {% if data.subject_alt_names %}
+        <div>
+          <dt class="mb-1 text-xs text-slate-400">Domínios cobertos (SAN)</dt>
+          <div class="flex flex-wrap gap-2">{% for san in data.subject_alt_names %}<span class="badge-neutral font-mono">{{ san }}</span>{% endfor %}</div>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>O que é um certificado SSL/TLS?</h2>
+      <p>
+        Um certificado SSL/TLS é o documento digital que permite a um navegador confirmar que está
+        realmente se conectando ao domínio esperado, e que a comunicação entre ele e o servidor é
+        criptografada. O certificado é emitido por uma Autoridade Certificadora (CA) e contém, entre
+        outros dados, o(s) domínio(s) para os quais é válido, o período de validade e a cadeia de
+        confiança até uma CA raiz reconhecida pelos navegadores. Esta ferramenta se conecta na porta
+        443 do domínio informado, obtém o certificado apresentado pelo servidor e organiza as
+        informações mais relevantes para conferência rápida.
+      </p>
+      <h2>Como interpretar o resultado</h2>
+      <p>
+        O indicador principal mostra se o certificado está <strong>válido</strong>, <strong>perto
+        de expirar</strong> (15 dias ou menos) ou <strong>expirado</strong> — certificados
+        expirados fazem os navegadores exibirem avisos de segurança bloqueantes para os
+        visitantes, então esse é um problema que exige ação imediata. O campo "Cadeia não
+        confiável" aparece quando o certificado é autoassinado, expirado, ou emitido por uma CA
+        que os navegadores não reconhecem — nesses casos, ainda mostramos os dados do certificado,
+        mas os visitantes verão avisos de segurança ao acessar o site. Os "domínios cobertos"
+        (Subject Alternative Names, ou SAN) listam todos os nomes para os quais aquele certificado
+        único é válido — é comum um certificado cobrir tanto <code>exemplo.com</code> quanto
+        <code>www.exemplo.com</code>, e certificados "wildcard" cobrem qualquer subdomínio com um
+        SAN no formato <code>*.exemplo.com</code>.
+      </p>
+      <h2>Casos de uso comuns</h2>
+      <p>
+        Times de operações usam esta ferramenta para monitorar proativamente a proximidade da
+        expiração de certificados críticos, evitando quedas inesperadas de disponibilidade
+        percebida (já que navegadores bloqueiam o acesso normal a sites com certificado vencido).
+        Também é usada para confirmar que um certificado recém-instalado cobre todos os domínios
+        necessários, para diagnosticar avisos de segurança relatados por usuários, e para auditar
+        rapidamente a configuração de TLS de fornecedores e parceiros antes de integrações.
+      </p>
+      <h2>Limitações</h2>
+      <p>
+        Esta ferramenta verifica apenas o certificado apresentado na porta 443 — não avalia outros
+        aspectos de segurança TLS mais avançados, como quais versões de protocolo e conjuntos de
+        cifras o servidor aceita além do que foi negociado nesta conexão específica, nem realiza
+        varredura de vulnerabilidades conhecidas. Para uma análise mais ampla de cabeçalhos de
+        segurança HTTP (diferente de certificado TLS), use a ferramenta Security Headers.
+      </p>
+      <h2>Automação de renovação</h2>
+      <p>
+        A maior parte das quedas relacionadas a certificados hoje em dia não acontece por falta de
+        conhecimento técnico, mas por falha de processo: certificados emitidos manualmente e
+        esquecidos até a data de expiração. Autoridades certificadoras modernas, como o Let's
+        Encrypt, emitem certificados gratuitos com validade curta (90 dias) justamente para
+        incentivar a renovação automatizada via ferramentas como o Certbot, eliminando o fator
+        humano do processo. Se a sua organização ainda depende de renovação manual, o primeiro
+        passo prático após usar esta ferramenta é configurar um alerta de monitoramento contínuo
+        — e não apenas verificações pontuais — para nunca mais ser surpreendido por um certificado
+        vencido em produção.
+      </p>
+      <h2>HTTPS além do cadeado</h2>
+      <p>
+        Ter um certificado válido é hoje um requisito mínimo, não um diferencial: navegadores
+        modernos marcam ativamente sites servidos apenas por HTTP como "não seguros", e o próprio
+        Google usa HTTPS como um fator, mesmo que pequeno, de ranqueamento de busca. Além da
+        confiança visual do cadeado, o HTTPS protege a integridade dos dados transmitidos entre
+        visitante e servidor contra interceptação e alteração por redes intermediárias — algo
+        especialmente relevante em conexões Wi-Fi públicas. Por isso, mesmo sites que não lidam
+        com senhas ou pagamentos diretamente se beneficiam de manter o certificado sempre válido e
+        corretamente configurado.
+      </p>
+    </section>
+{% endif %}
+
+    {% set faqs = [
+      ("O que acontece quando um certificado expira?", "Navegadores passam a exibir avisos de segurança bloqueantes, o que costuma afastar visitantes e pode impactar SEO."),
+      ("O que é um certificado wildcard?", "Um certificado que cobre qualquer subdomínio de um domínio, usando um SAN no formato *.exemplo.com, em vez de listar cada subdomínio individualmente."),
+      ("Por que aparece \"cadeia não confiável\" mesmo com um certificado válido?", "Isso ocorre quando o certificado é autoassinado ou emitido por uma CA que não é reconhecida pelos navegadores padrão — ainda mostramos os dados, mas os visitantes verão avisos."),
+    ] %}
+    {% if mode == "form" %}
+<section class="mt-10">
+      <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+{% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

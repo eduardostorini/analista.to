@@ -1,0 +1,35 @@
+{% extends "admin/base.html" %}
+{% block title %}Categorias{% endblock %}
+{% block content %}
+<h1 class="mb-2 text-2xl text-brand-900">Categorias</h1>
+<p class="mb-6 text-sm text-slate-500">
+  Nome, descrição, ícone e ordem vêm do código (sincronizados via <code>flask sync-tools</code>).
+  Aqui você controla apenas se a categoria fica visível no site.
+</p>
+
+<div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+  <table class="w-full text-left text-sm">
+    <thead><tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+      <th class="px-4 py-2">Nome</th><th class="px-4 py-2">Slug</th><th class="px-4 py-2">Ferramentas ativas</th><th class="px-4 py-2">Status</th><th class="px-4 py-2"></th>
+    </tr></thead>
+    <tbody>
+      {% for category in categories %}
+      <tr class="border-b border-slate-100">
+        <td class="px-4 py-2 font-medium">{{ category.name }}</td>
+        <td class="px-4 py-2 font-mono text-xs">{{ category.slug }}</td>
+        <td class="px-4 py-2">{{ category.tools | selectattr('is_active') | list | length }}</td>
+        <td class="px-4 py-2">
+          <span class="{{ 'badge-success' if category.is_active else 'badge-neutral' }}">{{ "ativa" if category.is_active else "inativa" }}</span>
+        </td>
+        <td class="px-4 py-2">
+          <form method="post" action="{{ url_for('admin.toggle_category', category_id=category.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="text-brand-600 hover:underline">{{ "Desativar" if category.is_active else "Ativar" }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

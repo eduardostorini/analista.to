@@ -1,0 +1,162 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}SPF Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Verifique o registro SPF de um domínio e o número de consultas DNS que ele exige, dentro do limite de 10 do RFC 7208.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">SPF Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domínio</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      {{ captcha_widget(captcha_provider, turnstile_site_key, hcaptcha_site_key) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Verificar SPF</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Falhou</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-lg text-brand-900">{{ data.domain }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.has_spf %}
+          <p class="badge-danger">Nenhum registro SPF encontrado</p>
+        {% else %}
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="badge-{{ 'success' if data.lookup_count <= data.max_lookups else 'danger' }}">{{ data.lookup_count }}/{{ data.max_lookups }} consultas DNS</span>
+            {% if data.all_qualifier %}<span class="badge-neutral">{{ data.all_qualifier_label }}</span>{% endif %}
+          </div>
+          <p class="break-all rounded-lg bg-slate-50 p-3 font-mono text-xs text-slate-600">{{ data.record }}</p>
+          <div>
+            <p class="mb-1 text-xs text-slate-400">Mecanismos</p>
+            <div class="flex flex-wrap gap-2">{% for m in data.mechanisms %}<span class="badge-neutral font-mono">{{ m }}</span>{% endfor %}</div>
+          </div>
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Pontos de atenção</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>O que é o SPF?</h2>
+      <p>
+        SPF (Sender Policy Framework) é um padrão de autenticação de e-mail que permite ao dono de
+        um domínio publicar, via registro TXT, uma lista de servidores autorizados a enviar
+        e-mail em seu nome. Quando um servidor de e-mail recebe uma mensagem, ele pode consultar o
+        SPF do domínio remetente para verificar se o servidor de origem está na lista autorizada —
+        se não estiver, a mensagem pode ser marcada como suspeita, movida para spam, ou rejeitada,
+        dependendo da política do destinatário. O SPF Checker do {{ site_name }} localiza o
+        registro SPF do domínio, decompõe seus mecanismos e calcula quantas consultas DNS
+        adicionais aquele registro exige — um detalhe técnico frequentemente esquecido, mas capaz
+        de invalidar o SPF inteiro se ultrapassar o limite do protocolo.
+      </p>
+      <h2>Como interpretar o resultado</h2>
+      <p>
+        O RFC 7208 define um limite rígido de <strong>10 consultas DNS</strong> para avaliar um
+        registro SPF (contando mecanismos como <code>a</code>, <code>mx</code>,
+        <code>include</code>, <code>exists</code>, <code>redirect</code> e <code>ptr</code> —
+        mecanismos como <code>ip4</code> e <code>ip6</code> não contam, pois não exigem consulta
+        adicional). Se esse limite for excedido, servidores de recebimento devem tratar o resultado
+        como <code>permerror</code>, o que na prática invalida a proteção do SPF — é um erro
+        comum em domínios que acumulam múltiplos serviços de e-mail via <code>include:</code> ao
+        longo do tempo sem revisão. O qualificador do mecanismo final <code>all</code> define o
+        que fazer com remetentes não listados: <code>-all</code> (fail) rejeita, <code>~all</code>
+        (softfail) marca como suspeito mas geralmente aceita, <code>?all</code> (neutral) não
+        define política, e <code>+all</code> (pass) autoriza qualquer servidor — configuração
+        perigosa que praticamente anula o propósito do SPF.
+      </p>
+      <h2>Casos de uso comuns</h2>
+      <p>
+        Esta ferramenta é essencial ao adicionar um novo provedor de e-mail transacional ou
+        marketing (como um serviço de disparo de newsletters) à infraestrutura de e-mail de um
+        domínio — cada novo <code>include:</code> adicionado aproxima o registro do limite de 10
+        lookups. Também é usada para diagnosticar por que e-mails legítimos estão caindo em spam
+        (um SPF ausente, mal configurado ou com <code>+all</code> aumenta a chance disso), e para
+        auditar periodicamente registros SPF acumulados ao longo de anos, removendo includes de
+        serviços não usados.
+      </p>
+      <h2>Limitações</h2>
+      <p>
+        Esta ferramenta calcula a contagem de lookups do nível superior do registro, mas mecanismos
+        <code>include:</code> podem, por sua vez, apontar para outros registros SPF que também
+        consomem lookups adicionais em cascata — uma análise completa exigiria resolver
+        recursivamente cada include, o que pode ser feito manualmente combinando o resultado desta
+        ferramenta com o TXT Lookup para cada domínio incluído. SPF sozinho também não garante
+        entregabilidade — ele funciona melhor combinado com DKIM e uma política DMARC bem
+        configurada.
+      </p>
+      <h2>SPF sozinho não é suficiente</h2>
+      <p>
+        Um erro conceitual comum é tratar o SPF como uma proteção completa contra falsificação de
+        e-mail. Na prática, o SPF valida apenas o servidor que enviou a mensagem (o "envelope
+        from" técnico), não o endereço que aparece visualmente para o destinatário no campo "De".
+        É perfeitamente possível um remetente malicioso enviar uma mensagem que passa no SPF de um
+        domínio diferente do que aparece no cabeçalho visível ao usuário — esse é exatamente o
+        cenário que o DMARC foi criado para fechar, exigindo alinhamento entre o domínio
+        autenticado e o domínio exibido. Por isso, a recomendação de mercado é sempre implementar
+        SPF, DKIM e DMARC em conjunto, nunca apenas um isoladamente.
+      </p>
+    </section>
+{% endif %}
+
+    {% set faqs = [
+      ("O que acontece se meu SPF ultrapassar 10 consultas DNS?", "O registro é considerado inválido (permerror) pelos servidores receptores, o que pode comprometer a entregabilidade dos seus e-mails."),
+      ("Devo usar -all ou ~all?", "-all (fail) é mais rígido e recomendado quando você tem certeza de que listou todos os remetentes autorizados; ~all (softfail) é uma transição mais segura ao configurar SPF pela primeira vez."),
+      ("Posso ter mais de um registro SPF?", "Não. Ter mais de um registro TXT começando com v=spf1 é inválido segundo o RFC 7208 e pode causar falha na verificação."),
+    ] %}
+    {% if mode == "form" %}
+<section class="mt-10">
+      <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+{% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

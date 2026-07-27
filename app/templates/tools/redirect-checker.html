@@ -1,0 +1,143 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Redirect Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Veja a cadeia completa de redirecionamentos HTTP de uma URL até o destino final.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<header class="mb-8 max-w-2xl text-center mx-auto">
+  <h1 class="text-3xl">Redirect Checker</h1>
+  <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+</header>
+
+{{ form_error_banner(form_error) }}
+
+{% if mode == "form" %}
+<form method="post" class="card mx-auto mb-10 max-w-xl space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">URL</label>
+  <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+  {{ captcha_widget(captcha_provider, turnstile_site_key, hcaptcha_site_key) }}
+  <button type="submit" class="btn-primary w-full">Rastrear redirecionamentos</button>
+</form>
+{% endif %}
+
+{% if mode == "pending" %}<div class="mx-auto mb-10 max-w-xl">{{ status_bar(search) }}</div>{% endif %}
+
+{% if mode == "failed" %}
+<div class="card mx-auto mb-10 max-w-xl border-rose-200 bg-rose-50">
+  <p class="badge-danger mb-2">Falhou</p>
+  <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+</div>
+{% endif %}
+
+{% if mode == "result" and result %}
+  {% set data = result.normalized_result %}
+  <div id="result-content" class="mx-auto mb-10 max-w-2xl space-y-4">
+    <div class="flex items-center justify-between">
+      <p class="text-sm text-slate-500">{{ data.redirect_count }} redirecionamento(s) · {{ "HTTPS em toda a cadeia" if data.uses_https_throughout else "cadeia usa HTTP em algum ponto" }}</p>
+      {{ copy_button("#result-content") }}
+    </div>
+    <ol class="space-y-3">
+      {% for hop in data.chain %}
+      <li class="card flex items-start gap-3">
+        <span class="badge-{{ 'success' if hop.status_code < 300 else 'neutral' }} shrink-0">{{ hop.status_code }}</span>
+        <div class="min-w-0">
+          <p class="break-all font-mono text-sm text-slate-700">{{ hop.url }}</p>
+          {% if hop.location %}<p class="mt-1 text-xs text-slate-400">→ {{ hop.location }}</p>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+{% endif %}
+
+{% if mode == "form" %}
+<section class="prose-tool mx-auto max-w-3xl space-y-4">
+  <h2>O que é o Redirect Checker?</h2>
+  <p>
+    Um redirecionamento HTTP acontece quando um servidor responde a uma requisição com um código
+    de status na faixa 3xx (como 301, 302, 307 ou 308) e um cabeçalho <code>Location</code>
+    indicando um novo endereço para onde o cliente deve seguir. É uma técnica legítima e muito
+    usada — para unificar www e sem www, forçar HTTPS, redirecionar após uma reestruturação de
+    URLs, ou encurtar links — mas cadeias de redirecionamento longas ou mal configuradas afetam a
+    velocidade de carregamento e podem confundir buscadores. O Redirect Checker segue manualmente,
+    salto a salto, toda a cadeia de redirecionamentos a partir da URL informada, até chegar a uma
+    resposta final que não seja mais um redirecionamento.
+  </p>
+  <h2>Como interpretar o resultado</h2>
+  <p>
+    Cada item da lista representa um salto: o código de status daquela etapa e, quando aplicável,
+    para qual URL ela aponta em seguida. Um redirecionamento <strong>301 (Moved Permanently)</strong>
+    sinaliza aos buscadores que a mudança é definitiva e que o valor de SEO da URL antiga deve ser
+    transferido para a nova; um <strong>302 (Found)</strong> ou <strong>307 (Temporary Redirect)</strong>
+    indica uma mudança temporária, sem essa transferência de relevância. Cadeias com três ou mais
+    saltos são um sinal de alerta: cada salto adicional soma latência de rede e, em casos extremos,
+    buscadores podem parar de seguir a cadeia antes de chegar ao destino final. O indicador de uso
+    de HTTPS em toda a cadeia é importante porque um redirecionamento que passa por HTTP em
+    qualquer ponto, mesmo que termine em HTTPS, expõe a requisição intermediária sem criptografia.
+  </p>
+  <h2>Casos de uso comuns</h2>
+  <p>
+    Esta ferramenta é usada para validar que uma migração de domínio ou de HTTP para HTTPS está
+    redirecionando corretamente e sem saltos desnecessários, para depurar por que um link
+    compartilhado está demorando para carregar, e para auditar encurtadores de link ou campanhas
+    de marketing antes de divulgá-los amplamente, garantindo que o destino final é o esperado e
+    seguro. Times de SEO também usam para confirmar que redirecionamentos 301 (e não 302) estão
+    sendo aplicados corretamente após reestruturações de URL, preservando a relevância acumulada
+    das páginas antigas.
+  </p>
+  <h2>Limitações</h2>
+  <p>
+    Por proteção contra abuso (SSRF), o número de redirecionamentos seguidos é limitado, e cada
+    salto tem seu destino revalidado antes de ser seguido — se algum endereço na cadeia apontar
+    para uma rede privada ou interna, o rastreamento é interrompido nesse ponto por segurança.
+    Redirecionamentos baseados em JavaScript (não em cabeçalhos HTTP reais) não são detectados por
+    esta ferramenta, já que ela não executa scripts no navegador.
+  </p>
+  <h2>Redirecionamentos e SEO</h2>
+  <p>
+    Redirecionamentos bem planejados são parte essencial de qualquer reestruturação de site: ao
+    migrar de HTTP para HTTPS, unificar versões www e sem www, ou reorganizar URLs após um
+    redesign, é o redirecionamento 301 que preserva o valor acumulado de SEO das páginas antigas,
+    direcionando tanto usuários quanto buscadores para o novo endereço correto. Erros comuns
+    incluem redirecionar tudo para a página inicial em vez do conteúdo equivalente mais próximo
+    (o que prejudica a experiência do usuário e desperdiça relevância acumulada), criar loops de
+    redirecionamento (A aponta para B, que aponta de volta para A), e encadear múltiplos
+    redirecionamentos desnecessários que poderiam ser resolvidos com um único salto direto da
+    origem ao destino final.
+  </p>
+</section>
+{% endif %}
+
+{% set faqs = [
+  ("Qual a diferença entre redirecionamento 301 e 302?", "301 é permanente e transfere o valor de SEO para a nova URL; 302 é temporário e não transfere esse valor."),
+  ("Quantos redirecionamentos são considerados demais?", "Como regra prática, mais de 2 ou 3 saltos já começam a impactar velocidade e podem fazer alguns rastreadores desistirem antes do destino final."),
+  ("A ferramenta segue redirecionamentos feitos por JavaScript?", "Não. Apenas redirecionamentos reais via cabeçalho HTTP Location são detectados."),
+] %}
+{% if mode == "form" %}
+<section class="mx-auto mt-10 max-w-3xl">
+  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
+  {{ faq_accordion(faqs) }}
+</section>
+{% endif %}
+
+<section class="mx-auto mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
+  <div>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+    {{ related_tools_list(related_tools) }}
+  </div>
+  <div>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+    {{ recent_searches_list(tool, recent_searches) }}
+  </div>
+</section>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

@@ -1,0 +1,153 @@
+{# Macros reutilizáveis pelas páginas de ferramenta. Cada ferramenta decide
+   livremente quais usar e em que ordem — não é uma herança de layout fixa. #}
+
+{% macro breadcrumbs(items) %}
+<nav aria-label="Breadcrumb" class="mb-6 text-sm text-slate-500">
+  <ol class="flex flex-wrap items-center gap-1">
+    {% for label, href in items %}
+      <li class="flex items-center gap-1">
+        {% if href %}<a href="{{ href }}" class="text-slate-500 hover:text-brand-600">{{ label }}</a>{% else %}<span class="text-slate-700">{{ label }}</span>{% endif %}
+        {% if not loop.last %}<span aria-hidden="true">/</span>{% endif %}
+      </li>
+    {% endfor %}
+  </ol>
+</nav>
+{% endmacro %}
+
+{% macro breadcrumbs_schema(items, site_url) %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {% for label, href in items %}
+    {"@type": "ListItem", "position": {{ loop.index }}, "name": {{ label | tojson }}{% if href %}, "item": {{ (site_url + href) | tojson }}{% endif %}}{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ]
+}
+</script>
+{% endmacro %}
+
+{% macro captcha_widget(provider, turnstile_site_key, hcaptcha_site_key) %}
+  {% if provider == "turnstile" %}
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}"></div>
+  {% elif provider == "hcaptcha" %}
+    <script src="https://hcaptcha.com/1/api.js" async defer></script>
+    <div class="h-captcha" data-sitekey="{{ hcaptcha_site_key }}"></div>
+  {% elif provider == "math" %}
+    <div x-data="mathCaptcha()" class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <label class="mb-1 block text-xs font-medium text-slate-600" :for="'math-answer'">
+        Verificação anti-robô: <span x-text="question"></span>
+      </label>
+      <input type="hidden" name="math_token" :value="token">
+      <input
+        id="math-answer" name="math_answer" type="number" inputmode="numeric" required
+        x-model="answer" class="input" placeholder="Sua resposta" aria-describedby="math-captcha-help"
+      >
+      <p id="math-captcha-help" class="mt-1 text-xs text-slate-400">Resolva a conta para confirmar que você não é um robô.</p>
+      <button type="button" @click="fetchChallenge()" class="mt-1 text-xs text-brand-600 hover:underline">Gerar outro desafio</button>
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro status_bar(search) %}
+<div
+  x-data="jobStatus()"
+  data-job-id="{{ search.public_id }}"
+  data-initial-status="{{ search.status.value }}"
+  @analisa:job-complete.window="window.location.reload()"
+  class="card-highlight"
+  role="status"
+  aria-live="polite"
+>
+  <div class="mb-2 flex items-center justify-between text-sm font-medium text-brand-800">
+    <span x-text="label"></span>
+    <span x-text="progress + '%'"></span>
+  </div>
+  <div class="h-2 w-full overflow-hidden rounded-full bg-brand-100">
+    <div class="h-full rounded-full bg-brand-600 transition-all duration-500" :style="`width: ${progress}%`"></div>
+  </div>
+  <p x-show="usingPolling" x-cloak class="mt-2 text-xs text-slate-400">Atualizando por polling (conexão em tempo real indisponível).</p>
+</div>
+{% endmacro %}
+
+{% macro faq_accordion(items) %}
+<div class="space-y-2">
+  {% for question, answer in items %}
+  <details class="card group">
+    <summary class="cursor-pointer list-none font-medium text-brand-900 marker:content-none">
+      {{ question }}
+    </summary>
+    <p class="mt-2 text-sm text-slate-600">{{ answer }}</p>
+  </details>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro faq_schema(items) %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for question, answer in items %}
+    {"@type": "Question", "name": {{ question | tojson }}, "acceptedAnswer": {"@type": "Answer", "text": {{ answer | tojson }}}}{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ]
+}
+</script>
+{% endmacro %}
+
+{% macro related_tools_list(tools) %}
+{% if tools %}
+<ul class="grid gap-2 sm:grid-cols-2">
+  {% for tool in tools %}
+  <li>
+    <a href="{{ url_for('main.category_or_tool_page', slug=tool.slug) }}" class="card block no-underline hover:border-brand-300">
+      <span class="block text-sm font-medium text-brand-800">{{ tool.name }}</span>
+      <span class="block text-xs text-slate-500">{{ tool.short_description }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endmacro %}
+
+{% macro recent_searches_list(tool, searches) %}
+{% if searches %}
+<ul class="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
+  {% for search in searches %}
+  <li>
+    <a href="{{ canonical_search_url(search) }}" class="flex items-center justify-between px-4 py-2.5 text-sm no-underline hover:bg-brand-50">
+      <span class="truncate font-mono text-slate-700">{{ search.normalized_input }}</span>
+      <span class="ml-3 shrink-0 text-xs text-slate-400">{{ search.created_at.strftime('%d/%m/%Y') }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="text-sm text-slate-400">Ainda não há consultas públicas para esta ferramenta.</p>
+{% endif %}
+{% endmacro %}
+
+{% macro copy_button(target_selector, label="Copiar resultado") %}
+<button
+  type="button"
+  x-data="copyButton()"
+  data-copy-target="{{ target_selector }}"
+  @click="copy()"
+  class="btn-secondary"
+>
+  <span x-show="!copied">{{ label }}</span>
+  <span x-show="copied" x-cloak>Copiado!</span>
+</button>
+{% endmacro %}
+
+{% macro form_error_banner(message) %}
+{% if message %}
+<div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">
+  {{ message }}
+</div>
+{% endif %}
+{% endmacro %}

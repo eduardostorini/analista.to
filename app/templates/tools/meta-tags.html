@@ -1,0 +1,205 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Title e Meta Tags{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Analise title, meta description, canonical, Open Graph e Twitter Cards de qualquer página em segundos.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<header class="mb-8 max-w-2xl">
+  <h1 class="text-3xl">Title e Meta Tags</h1>
+  <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+</header>
+
+{{ form_error_banner(form_error) }}
+
+{% if mode == "form" %}
+<form method="post" class="card mb-8 max-w-xl space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">URL da página</label>
+  <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+  {{ captcha_widget(captcha_provider, turnstile_site_key, hcaptcha_site_key) }}
+  <button type="submit" class="btn-primary w-full sm:w-auto">Analisar página</button>
+</form>
+{% endif %}
+
+{% if mode == "pending" %}<div class="mb-8 max-w-xl">{{ status_bar(search) }}</div>{% endif %}
+
+{% if mode == "failed" %}
+<div class="card mb-8 max-w-xl border-rose-200 bg-rose-50">
+  <p class="badge-danger mb-2">Falhou</p>
+  <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+</div>
+{% endif %}
+
+{% if mode == "result" and result %}
+  {% set data = result.normalized_result %}
+  <div id="result-content" class="mb-10 space-y-6">
+    <div class="flex items-center justify-between">
+      <p class="truncate font-mono text-sm text-brand-900">{{ data.url }}</p>
+      {{ copy_button("#result-content") }}
+    </div>
+
+    <div class="card">
+      <p class="mb-1 text-xs text-slate-400">Snippet aproximado no Google</p>
+      <p class="truncate text-lg text-brand-700">{{ data.title or "(sem title)" }}</p>
+      <p class="text-sm text-emerald-700">{{ data.url }}</p>
+      <p class="text-sm text-slate-600">{{ data.meta_description or "(sem meta description)" }}</p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div class="card">
+        <div class="mb-2 flex items-center justify-between">
+          <span class="text-sm font-medium text-slate-700">Title</span>
+          <span class="badge-{{ 'success' if 30 <= data.title_length <= 60 else 'warning' }}">{{ data.title_length }} caracteres</span>
+        </div>
+        <p class="text-sm text-slate-600">{{ data.title or "—" }}</p>
+      </div>
+      <div class="card">
+        <div class="mb-2 flex items-center justify-between">
+          <span class="text-sm font-medium text-slate-700">Meta description</span>
+          <span class="badge-{{ 'success' if 70 <= data.meta_description_length <= 160 else 'warning' }}">{{ data.meta_description_length }} caracteres</span>
+        </div>
+        <p class="text-sm text-slate-600">{{ data.meta_description or "—" }}</p>
+      </div>
+      <div class="card">
+        <span class="mb-1 block text-sm font-medium text-slate-700">Canonical</span>
+        <p class="break-all font-mono text-xs text-slate-600">{{ data.canonical or "não definido" }}</p>
+      </div>
+      <div class="card">
+        <span class="mb-1 block text-sm font-medium text-slate-700">Meta robots / idioma</span>
+        <p class="text-sm text-slate-600">{{ data.meta_robots or "index, follow (padrão)" }} · {{ data.lang or "não declarado" }}</p>
+      </div>
+      <div class="card">
+        <span class="mb-1 block text-sm font-medium text-slate-700">Headings H1</span>
+        <p class="text-sm text-slate-600">{{ data.h1_count }} encontrado(s){% if data.h1_list %}: {{ data.h1_list | join(" · ") }}{% endif %}</p>
+      </div>
+      <div class="card">
+        <span class="mb-1 block text-sm font-medium text-slate-700">Contagem de palavras</span>
+        <p class="text-sm text-slate-600">~{{ data.word_count }} palavras · favicon {{ "presente" if data.has_favicon else "ausente" }}</p>
+      </div>
+    </div>
+
+    {% if data.open_graph or data.twitter_card %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div class="card">
+        <span class="mb-2 block text-sm font-medium text-slate-700">Open Graph</span>
+        {% if data.open_graph %}
+        <dl class="space-y-1 text-xs">
+          {% for key, value in data.open_graph.items() %}<div><dt class="inline font-medium text-slate-500">{{ key }}:</dt> <dd class="inline text-slate-600">{{ value }}</dd></div>{% endfor %}
+        </dl>
+        {% else %}<p class="text-xs text-slate-400">Nenhuma tag og: encontrada.</p>{% endif %}
+      </div>
+      <div class="card">
+        <span class="mb-2 block text-sm font-medium text-slate-700">Twitter Card</span>
+        {% if data.twitter_card %}
+        <dl class="space-y-1 text-xs">
+          {% for key, value in data.twitter_card.items() %}<div><dt class="inline font-medium text-slate-500">{{ key }}:</dt> <dd class="inline text-slate-600">{{ value }}</dd></div>{% endfor %}
+        </dl>
+        {% else %}<p class="text-xs text-slate-400">Nenhuma tag twitter: encontrada.</p>{% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if data.issues %}
+    <div class="card border-amber-200 bg-amber-50">
+      <p class="mb-2 text-sm font-semibold text-amber-800">Pontos de atenção</p>
+      <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">
+        {% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% if mode == "form" %}
+<section class="prose-tool max-w-3xl space-y-4">
+  <h2>O que são title e meta tags?</h2>
+  <p>
+    A tag <code>&lt;title&gt;</code> e a meta description são os dois elementos mais visíveis de
+    uma página nos resultados de busca: o title vira o link clicável azul, e a description
+    normalmente aparece como o resumo abaixo dele. Junto com o canonical (que informa qual é a
+    versão "oficial" de uma URL quando existem duplicatas), o meta robots (que controla se a
+    página pode ser indexada e seguida) e as tags Open Graph/Twitter Card (que controlam como o
+    link aparece ao ser compartilhado em redes sociais), esses elementos formam a base do SEO
+    on-page de qualquer página. Esta ferramenta busca a página informada e extrai todos esses
+    elementos de uma vez, junto com um resumo de headings H1 e contagem aproximada de palavras.
+  </p>
+  <h2>Como interpretar o resultado</h2>
+  <p>
+    A faixa recomendada para o title é de 30 a 60 caracteres — abaixo disso, o título pode não
+    aproveitar todo o espaço disponível nos resultados de busca; acima, corre risco de ser cortado
+    com reticências. Para a meta description, a faixa recomendada é de 70 a 160 caracteres. Essas
+    faixas não são regras rígidas do Google, mas aproximações práticas amplamente usadas pela
+    indústria de SEO para evitar truncamento visual. O canonical ausente não é necessariamente um
+    erro — páginas simples sem risco de duplicação podem prescindir dele — mas em sites com
+    parâmetros de URL, paginação ou HTTP/HTTPS duplicados, a ausência de canonical pode causar
+    diluição de relevância entre versões da mesma página. Mais de uma tag H1 na página é
+    tecnicamente permitido pelo HTML5, mas a prática recomendada de SEO ainda é usar apenas uma H1
+    por página, representando o tópico principal do conteúdo.
+  </p>
+  <h2>Casos de uso comuns</h2>
+  <p>
+    Profissionais de SEO usam esta ferramenta antes de publicar uma página nova, para conferir se
+    todos os elementos essenciais foram preenchidos corretamente pelo CMS ou pelo time de
+    conteúdo. Também é útil para auditar rapidamente páginas de concorrentes, para depurar por que
+    um link compartilhado no WhatsApp ou LinkedIn não está mostrando a imagem/título esperados
+    (checando as tags Open Graph), e para identificar páginas com title ou description ausentes em
+    um levantamento manual rápido antes de uma auditoria mais completa com ferramentas de
+    rastreamento.
+  </p>
+  <h2>Limitações</h2>
+  <p>
+    Esta ferramenta lê o HTML retornado diretamente pelo servidor, sem executar JavaScript — sites
+    que montam o title, meta tags ou conteúdo via JavaScript no navegador (client-side rendering
+    sem pré-renderização) podem não refletir corretamente aqui, já que os buscadores também têm
+    comportamento variável ao processar esse tipo de conteúdo. A contagem de palavras é aproximada,
+    baseada no texto visível extraído do HTML bruto, sem diferenciar conteúdo principal de menus,
+    rodapé e outros elementos de navegação.
+  </p>
+  <h2>Título, description e a taxa de cliques</h2>
+  <p>
+    Além de influenciar a relevância percebida pelos buscadores, title e meta description afetam
+    diretamente a taxa de cliques (CTR) nos resultados de busca — eles são, na prática, o anúncio
+    da sua página. Um title genérico como "Página inicial" ou repetido em várias páginas do mesmo
+    site desperdiça uma oportunidade valiosa de diferenciação; o ideal é que cada página tenha um
+    title único, que descreva especificamente o conteúdo daquela URL. A meta description, mesmo
+    não sendo um fator direto de ranqueamento segundo o próprio Google, funciona como um "texto de
+    venda" que pode aumentar significativamente os cliques quando bem escrita, incluindo uma
+    chamada clara para o que o usuário vai encontrar. Vale lembrar que buscadores podem, a
+    critério próprio, substituir a description declarada por um trecho extraído do conteúdo da
+    página quando julgarem mais relevante para a busca específica do usuário.
+  </p>
+</section>
+{% endif %}
+
+{% set faqs = [
+  ("Qual o tamanho ideal do title?", "Recomenda-se entre 30 e 60 caracteres para evitar truncamento nos resultados de busca."),
+  ("Preciso ter uma tag canonical mesmo sem conteúdo duplicado?", "Não é obrigatório, mas é uma boa prática defensiva — evita ambiguidade caso a mesma página se torne acessível por múltiplas URLs no futuro."),
+  ("Por que minha página não mostra as tags Open Graph mesmo tendo configurado?", "Verifique se as tags estão no <head> do HTML retornado pelo servidor (não geradas apenas via JavaScript), já que esta ferramenta não executa scripts."),
+] %}
+{% if mode == "form" %}
+<section class="mt-10 max-w-3xl">
+  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
+  {{ faq_accordion(faqs) }}
+</section>
+{% endif %}
+
+<section class="mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
+  <div>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+    {{ related_tools_list(related_tools) }}
+  </div>
+  <div>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+    {{ recent_searches_list(tool, recent_searches) }}
+  </div>
+</section>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

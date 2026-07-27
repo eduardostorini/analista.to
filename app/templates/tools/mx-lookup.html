@@ -1,0 +1,152 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}MX Lookup{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Veja quais servidores recebem e-mail para um domínio e em qual ordem de prioridade, com o MX Lookup gratuito do {{ site_name }}.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<header class="mb-8 max-w-2xl">
+  <h1 class="text-3xl">MX Lookup</h1>
+  <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+</header>
+
+<div class="grid gap-8 lg:grid-cols-5">
+  <div class="lg:col-span-3 space-y-6">
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domínio</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      {{ captcha_widget(captcha_provider, turnstile_site_key, hcaptcha_site_key) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Consultar MX</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Falhou</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-lg text-brand-900">{{ data.domain }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+        {% if not data.exists %}
+          <p class="badge-warning">Domínio sem delegação DNS ativa</p>
+        {% elif data.records|length == 0 %}
+          <p class="badge-warning">Nenhum servidor de e-mail (MX) configurado para este domínio.</p>
+        {% else %}
+          <ol class="space-y-2">
+            {% for record in data.records %}
+            <li class="flex items-center justify-between rounded-lg border border-slate-100 px-4 py-2">
+              <span class="font-mono text-sm text-slate-700">{{ record.host }}</span>
+              <span class="badge-neutral">prioridade {{ record.priority }}</span>
+            </li>
+            {% endfor %}
+          </ol>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <aside class="lg:col-span-2 space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{% if mode == "form" %}
+<section class="prose-tool mt-10 max-w-3xl space-y-4">
+  <h2>O que é o MX Lookup?</h2>
+  <p>
+    Os registros MX (Mail Exchanger) são o mecanismo pelo qual o DNS informa a qualquer servidor
+    de e-mail do mundo para onde enviar mensagens destinadas a um domínio. Quando alguém envia um
+    e-mail para <code>contato@exemplo.com.br</code>, o servidor remetente primeiro consulta os
+    registros MX de <code>exemplo.com.br</code> para descobrir qual servidor está autorizado a
+    receber aquela mensagem — só depois disso a entrega efetivamente acontece. O MX Lookup do
+    {{ site_name }} consulta esses registros e os organiza por prioridade, mostrando exatamente
+    quais servidores estão configurados para receber e-mail em nome do domínio informado.
+  </p>
+  <h2>Como interpretar o resultado</h2>
+  <p>
+    Cada registro MX tem um valor de prioridade (também chamado de "preferência"): quanto
+    <strong>menor</strong> o número, maior a prioridade. Servidores de envio tentam primeiro o
+    registro com o menor valor; se ele não responder, tentam o próximo em ordem crescente. É
+    comum ver dois ou mais registros MX com prioridades diferentes — isso é justamente uma
+    configuração de redundância, para que o domínio continue recebendo e-mail mesmo se o servidor
+    principal estiver indisponível. Quando o resultado mostra "nenhum servidor de e-mail
+    configurado", significa que o domínio não pode receber e-mails diretamente — o que é normal
+    para domínios usados apenas para sites institucionais sem caixa de e-mail própria, mas é um
+    problema sério se você esperava que aquele domínio recebesse mensagens.
+  </p>
+  <h2>Casos de uso comuns</h2>
+  <p>
+    O MX Lookup é a primeira parada ao diagnosticar "meu e-mail não está chegando": ele confirma
+    rapidamente se o domínio está de fato configurado para receber mensagens e para qual provedor
+    (Google Workspace, Microsoft 365, Zoho, um servidor próprio etc.) o tráfego está sendo
+    direcionado. Também é útil ao migrar de um provedor de e-mail para outro — depois de alterar
+    os registros MX no seu provedor de DNS, você pode confirmar aqui se a mudança já está visível
+    publicamente antes de considerar a migração concluída. Além disso, saber para qual provedor um
+    domínio de terceiros aponta o e-mail ajuda em investigações de phishing e em análises de
+    concorrência (por exemplo, identificar se uma empresa usa Google Workspace ou infraestrutura
+    própria).
+  </p>
+  <h2>Limitações</h2>
+  <p>
+    Assim como qualquer consulta DNS, os valores exibidos refletem o estado atual visível pelos
+    resolvedores usados pelo {{ site_name }} e podem levar algumas horas para refletir mudanças
+    recentes, por causa do cache (TTL) dos registros. O MX Lookup não verifica se o servidor de
+    e-mail listado está de fato funcionando ou aceitando conexões — apenas que ele está declarado
+    como responsável pelo domínio. Para diagnosticar problemas de entrega mais profundos, combine
+    esta ferramenta com o SPF Checker e o DMARC Checker.
+  </p>
+  <h2>MX e a jornada de um e-mail</h2>
+  <p>
+    Vale entender o papel do MX dentro do fluxo completo de entrega de um e-mail: primeiro, o
+    servidor remetente consulta o MX do domínio de destino para saber para onde enviar; em
+    seguida, ele se conecta a esse servidor e tenta a entrega; por fim, mecanismos de autenticação
+    como SPF, DKIM e DMARC entram em ação para validar se aquele remetente estava de fato
+    autorizado a enviar em nome do domínio de origem. O MX cuida apenas da primeira etapa —
+    "para onde entregar" — e não tem relação direta com a autenticação de quem está enviando. Por
+    isso, um domínio pode ter um MX perfeitamente configurado e mesmo assim sofrer com problemas
+    de entregabilidade de e-mails enviados a partir dele, caso SPF, DKIM ou DMARC estejam ausentes
+    ou malconfigurados nos domínios remetentes.
+  </p>
+</section>
+{% endif %}
+
+{% set faqs = [
+  ("O que significa prioridade no registro MX?", "É a ordem de preferência de uso: quanto menor o número, mais prioritário. Servidores tentam entregar e-mail primeiro no MX de menor prioridade."),
+  ("Posso ter mais de um provedor de e-mail no mesmo domínio?", "Tecnicamente sim, com múltiplos registros MX, mas normalmente isso é usado apenas para redundância do mesmo provedor, não para dividir caixas de entrada entre serviços diferentes."),
+  ("Por que meu domínio não tem MX mas recebo e-mail em um subdomínio?", "Registros MX são específicos por nome. Um subdomínio como mail.exemplo.com.br pode ter seus próprios registros MX independentes do domínio raiz."),
+] %}
+{% if mode == "form" %}
+<section class="mt-10 max-w-3xl">
+  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
+  {{ faq_accordion(faqs) }}
+</section>
+{% endif %}
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

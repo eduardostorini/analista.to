@@ -1,0 +1,156 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}HTTP Headers{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Veja todos os cabeçalhos HTTP retornados por uma URL, organizados e com os mais relevantes destacados.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<header class="mb-8 max-w-2xl">
+  <h1 class="text-3xl">HTTP Headers</h1>
+  <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+</header>
+
+{{ form_error_banner(form_error) }}
+
+{% if mode == "form" %}
+<form method="post" class="card mb-8 max-w-xl space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">URL</label>
+  <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+  {{ captcha_widget(captcha_provider, turnstile_site_key, hcaptcha_site_key) }}
+  <button type="submit" class="btn-primary w-full sm:w-auto">Ver cabeçalhos</button>
+</form>
+{% endif %}
+
+{% if mode == "pending" %}<div class="mb-8 max-w-xl">{{ status_bar(search) }}</div>{% endif %}
+
+{% if mode == "failed" %}
+<div class="card mb-8 max-w-xl border-rose-200 bg-rose-50">
+  <p class="badge-danger mb-2">Falhou</p>
+  <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+</div>
+{% endif %}
+
+{% if mode == "result" and result %}
+  {% set data = result.normalized_result %}
+  <div id="result-content" class="mb-10 space-y-4">
+    <div class="flex items-center justify-between">
+      <p class="truncate font-mono text-sm text-brand-900">{{ data.url }}</p>
+      <div class="flex items-center gap-3">
+        <span class="badge-{{ 'success' if data.status_code < 400 else 'danger' }}">HTTP {{ data.status_code }}</span>
+        {{ copy_button("#result-content") }}
+      </div>
+    </div>
+    <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <table class="w-full text-left text-sm">
+        <tbody>
+          {% for header in data.headers %}
+          <tr class="border-b border-slate-100 last:border-0">
+            <td class="w-1/3 px-4 py-2 font-medium text-slate-700">{{ header.name }}</td>
+            <td class="break-all px-4 py-2 font-mono text-xs text-slate-600">{{ header.value }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+
+{% if mode == "form" %}
+<section class="prose-tool max-w-3xl space-y-4">
+  <h2>O que são cabeçalhos HTTP?</h2>
+  <p>
+    Toda resposta de um servidor web carrega, além do conteúdo da página, um conjunto de
+    metadados chamados cabeçalhos HTTP (HTTP headers). Eles informam ao navegador (ou a qualquer
+    cliente HTTP) coisas como o tipo de conteúdo retornado, se a resposta pode ser armazenada em
+    cache e por quanto tempo, qual tecnologia de servidor está processando a requisição, se
+    cookies devem ser definidos, e diversas diretivas de segurança. Esta ferramenta faz uma
+    requisição à URL informada e lista todos os cabeçalhos retornados, destacando com uma cor
+    diferente o código de status HTTP da resposta.
+  </p>
+  <h2>Como interpretar o resultado</h2>
+  <p>
+    O código de status no topo (200, 301, 404, 500 etc.) indica o resultado geral da requisição —
+    200 significa sucesso, códigos da faixa 3xx indicam redirecionamento (veja o Redirect
+    Checker para acompanhar a cadeia completa), 4xx indica erro do lado do cliente (como página
+    não encontrada) e 5xx indica erro no servidor. Entre os cabeçalhos, vale prestar atenção
+    especial ao <code>Server</code> e <code>X-Powered-By</code> (podem revelar a tecnologia por
+    trás do site), ao <code>Cache-Control</code> (define por quanto tempo navegadores e CDNs podem
+    reutilizar a resposta sem buscar novamente no servidor), ao <code>Content-Type</code> (define
+    como o conteúdo deve ser interpretado) e a cabeçalhos de segurança como
+    <code>Strict-Transport-Security</code> e <code>Content-Security-Policy</code> — para uma
+    análise dedicada e com pontuação desses últimos, use a ferramenta Security Headers.
+  </p>
+  <h2>Casos de uso comuns</h2>
+  <p>
+    Desenvolvedores usam esta ferramenta para depurar problemas de cache (por que uma página não
+    está atualizando após um deploy, por exemplo), para confirmar que um cabeçalho customizado
+    configurado no servidor ou CDN está realmente sendo enviado, e para investigar rapidamente a
+    stack tecnológica de um site de terceiros antes de uma integração. Também é útil para
+    confirmar o `Content-Type` correto de APIs e arquivos estáticos, um erro comum que pode
+    quebrar o comportamento esperado no navegador.
+  </p>
+  <h2>Limitações</h2>
+  <p>
+    Os cabeçalhos podem variar entre requisições devido a balanceamento de carga, CDNs com
+    múltiplos nós, ou personalização baseada em cookies/geolocalização — o resultado mostrado
+    reflete apenas a resposta obtida no momento exato da consulta. Esta ferramenta usa o método
+    GET com um User-Agent próprio e identificado; alguns servidores podem retornar cabeçalhos
+    diferentes para outros métodos (HEAD, POST) ou para navegadores reais.
+  </p>
+  <h2>Cabeçalhos de cache em detalhe</h2>
+  <p>
+    Entre os cabeçalhos mais influentes na experiência do usuário está o Cache-Control, que aceita
+    diretivas como max-age (por quantos segundos a resposta pode ser reaproveitada sem nova
+    checagem), no-cache (permite guardar, mas exige revalidação a cada uso) e no-store (proíbe
+    qualquer armazenamento). Um Cache-Control mal configurado é uma causa comum de dois problemas
+    opostos: páginas que não atualizam para os visitantes mesmo após um deploy (cache agressivo
+    demais) ou sites lentos que buscam o mesmo recurso repetidamente do servidor sem necessidade
+    (cache ausente ou tempo de vida curto demais). Cabeçalhos como ETag e Last-Modified trabalham
+    junto com o cache para permitir revalidação eficiente: o navegador pode perguntar "isso ainda
+    é válido?" com uma requisição leve, em vez de baixar o conteúdo inteiro novamente quando nada
+    mudou.
+  </p>
+  <h2>Cabeçalhos personalizados</h2>
+  <p>
+    É comum encontrar cabeçalhos prefixados com X-, uma convenção histórica ainda amplamente usada
+    para identificar cabeçalhos não padronizados criados por uma aplicação, CDN ou balanceador
+    específico, como X-Request-Id, útil para rastrear uma requisição em sistemas de log
+    distribuídos, ou X-Cache, que indica se uma CDN serviu a resposta a partir do cache ou buscou
+    novamente na origem. Esses cabeçalhos costumam ser valiosos durante depuração de performance e
+    incidentes, revelando detalhes internos da infraestrutura que não apareceriam de outra forma.
+  </p>
+</section>
+{% endif %}
+
+{% set faqs = [
+  ("Por que o Server não aparece na resposta?", "Alguns servidores e CDNs, por segurança, omitem ou ofuscam propositalmente o cabeçalho Server para dificultar a identificação da tecnologia usada."),
+  ("O que significa Cache-Control: no-store?", "Indica que a resposta não deve ser armazenada em cache algum, nem pelo navegador nem por proxies intermediários — comum em páginas com dados sensíveis ou muito dinâmicos."),
+  ("Os cabeçalhos mudam a cada consulta?", "Podem mudar, especialmente Date, Set-Cookie e cabeçalhos relacionados a balanceamento de carga ou CDN."),
+] %}
+{% if mode == "form" %}
+<section class="mt-10 max-w-3xl">
+  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
+  {{ faq_accordion(faqs) }}
+</section>
+{% endif %}
+
+<section class="mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
+  <div>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+    {{ related_tools_list(related_tools) }}
+  </div>
+  <div>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+    {{ recent_searches_list(tool, recent_searches) }}
+  </div>
+</section>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

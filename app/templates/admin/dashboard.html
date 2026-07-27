@@ -1,0 +1,40 @@
+{% extends "admin/base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1 class="mb-6 text-2xl text-brand-900">Dashboard</h1>
+
+<div class="mb-8 grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
+  <div class="card"><p class="text-2xl font-semibold text-brand-800">{{ total_searches }}</p><p class="text-xs text-slate-500">Consultas totais</p></div>
+  <div class="card"><p class="text-2xl font-semibold text-emerald-600">{{ completed }}</p><p class="text-xs text-slate-500">Concluídas</p></div>
+  <div class="card"><p class="text-2xl font-semibold text-rose-600">{{ failed }}</p><p class="text-xs text-slate-500">Falhas</p></div>
+  <div class="card"><p class="text-2xl font-semibold text-amber-600">{{ pending }}</p><p class="text-xs text-slate-500">Em andamento</p></div>
+  <div class="card"><p class="text-2xl font-semibold text-brand-800">{{ indexed_pages }}/{{ total_pages }}</p><p class="text-xs text-slate-500">Páginas indexadas</p></div>
+  <div class="card"><p class="text-2xl font-semibold text-brand-800">{{ success_rate }}%</p><p class="text-xs text-slate-500">Taxa de sucesso</p></div>
+</div>
+
+{% if abuse_count %}
+<div class="mb-8 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+  {{ abuse_count }} evento(s) de abuso registrados. <a href="{{ url_for('admin.abuse_events') }}" class="underline">Ver eventos</a>.
+</div>
+{% endif %}
+
+<h2 class="mb-3 text-lg text-brand-900">Últimas consultas</h2>
+<div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+  <table class="w-full text-left text-sm">
+    <thead><tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+      <th class="px-4 py-2">Ferramenta</th><th class="px-4 py-2">Entrada</th><th class="px-4 py-2">Status</th><th class="px-4 py-2">Criada em</th>
+    </tr></thead>
+    <tbody>
+      {% for search in recent_searches %}
+      <tr class="border-b border-slate-100">
+        <td class="px-4 py-2">{{ search.tool.name }}</td>
+        <td class="px-4 py-2 font-mono text-xs">{{ search.normalized_input }}</td>
+        <td class="px-4 py-2"><span class="badge-neutral">{{ search.status.value }}</span></td>
+        <td class="px-4 py-2 text-xs text-slate-400">{{ search.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+        <td class="px-4 py-2"><a href="{{ url_for('admin.job_detail', public_id=search.public_id) }}" class="text-brand-600 hover:underline">Ver</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

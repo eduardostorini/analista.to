@@ -1,0 +1,83 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema %}
+
+{% block title %}{{ category.name }} — Ferramentas de {{ category.name }} | {{ site_name }}{% endblock %}
+{% block meta_description %}{{ category.description }}{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ site_url }}{{ url_for('main.category_or_tool_page', slug=category.slug) }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'noindex, follow' if recent_page > 1 else 'index, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Início", url_for('main.home')), (category.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<header class="mb-8">
+  <h1 class="text-3xl">{{ category.name }}</h1>
+  <p class="mt-2 max-w-2xl text-slate-600">{{ category.description }}</p>
+</header>
+
+<section class="mb-12">
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {% for tool in tools %}
+    <a href="{{ url_for('main.category_or_tool_page', slug=tool.slug) }}" class="card block no-underline hover:border-brand-300">
+      {% if tool.is_featured %}<span class="badge-success mb-2">Destaque</span>{% endif %}
+      <h2 class="text-base font-semibold text-brand-900">{{ tool.name }}</h2>
+      <p class="mt-1 text-sm text-slate-600">{{ tool.short_description }}</p>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="mb-12">
+  <h2 class="mb-4 text-xl">Consultas recentes nesta categoria</h2>
+  {% if recent_searches %}
+  <ul class="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
+    {% for search in recent_searches %}
+    <li>
+      <a href="{{ canonical_search_url(search) }}" class="flex items-center justify-between px-4 py-2.5 text-sm no-underline hover:bg-brand-50">
+        <span class="font-mono text-slate-700">{{ search.normalized_input }}</span>
+        <span class="text-xs text-slate-400">{{ search.tool.name }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-sm text-slate-400">Ainda não há consultas públicas nesta categoria.</p>
+  {% endif %}
+
+  {% if recent_total_pages > 1 %}
+  <nav class="mt-4 flex items-center justify-between text-sm" aria-label="Paginação de consultas recentes">
+    {% if recent_page > 1 %}
+    <a href="{{ url_for('main.category_or_tool_page', slug=category.slug, page=recent_page - 1) }}" class="btn-secondary">← Anterior</a>
+    {% else %}
+    <span></span>
+    {% endif %}
+    <span class="text-slate-400">Página {{ recent_page }} de {{ recent_total_pages }}</span>
+    {% if recent_page < recent_total_pages %}
+    <a href="{{ url_for('main.category_or_tool_page', slug=category.slug, page=recent_page + 1) }}" class="btn-secondary">Próxima →</a>
+    {% else %}
+    <span></span>
+    {% endif %}
+  </nav>
+  {% endif %}
+</section>
+
+<section>
+  <h2 class="mb-4 text-xl">Outras categorias</h2>
+  <div class="flex flex-wrap gap-2">
+    {% for other in sidebar_categories if other.slug != category.slug %}
+    <a href="{{ url_for('main.category_or_tool_page', slug=other.slug) }}" class="badge-neutral no-underline hover:bg-brand-50">{{ other.name }}</a>
+    {% endfor %}
+  </div>
+</section>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": {{ category.name | tojson }},
+  "description": {{ category.description | tojson }},
+  "url": {{ (site_url + url_for('main.category_or_tool_page', slug=category.slug)) | tojson }}
+}
+</script>
+{% endblock %}

@@ -1,0 +1,35 @@
+# Carregado automaticamente pelo `docker compose up` quando nenhum `-f` é
+# passado explicitamente (comportamento padrão do Docker Compose) — ou seja,
+# só entra em efeito em desenvolvimento. Produção usa exclusivamente
+# `docker-compose.yml` (veja o comentário no topo daquele arquivo).
+services:
+  analisa_postgres:
+    ports:
+      - "${POSTGRES_DEV_PORT:-15439}:5432"
+
+  analisa_redis:
+    ports:
+      - "${REDIS_DEV_PORT:-16389}:6379"
+
+  analisa_assets:
+    image: node:20-slim
+    container_name: analisa_assets
+    working_dir: /build
+    command: sh -c "npm install && npm run watch"
+    volumes:
+      - .:/build
+      - analisa_node_modules:/build/node_modules
+    restart: unless-stopped
+
+  analisa_web:
+    command: flask --app wsgi:app run --host 0.0.0.0 --port 5000 --debug
+    volumes:
+      - .:/app
+
+  analisa_worker:
+    volumes:
+      - .:/app
+
+  analisa_scheduler:
+    volumes:
+      - .:/app

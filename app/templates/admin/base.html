@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Painel administrativo{% endblock %} — {{ site_name }}</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="/static/dist/main.css">
+</head>
+<body class="h-full bg-slate-100 text-slate-800">
+{% if current_user.is_authenticated %}
+<div class="flex min-h-full">
+  <aside class="w-60 shrink-0 border-r border-slate-200 bg-brand-950 text-slate-200">
+    <div class="px-5 py-5 text-lg font-semibold text-white">{{ site_name }} · Admin</div>
+    <nav class="space-y-1 px-3 text-sm">
+      <a href="{{ url_for('admin.dashboard') }}" class="block rounded-lg px-3 py-2 hover:bg-white/10">Dashboard</a>
+      <a href="{{ url_for('admin.categories') }}" class="block rounded-lg px-3 py-2 hover:bg-white/10">Categorias</a>
+      <a href="{{ url_for('admin.tools') }}" class="block rounded-lg px-3 py-2 hover:bg-white/10">Ferramentas</a>
+      <a href="{{ url_for('admin.jobs') }}" class="block rounded-lg px-3 py-2 hover:bg-white/10">Consultas</a>
+      <a href="{{ url_for('admin.pages') }}" class="block rounded-lg px-3 py-2 hover:bg-white/10">Páginas geradas</a>
+      <a href="{{ url_for('admin.abuse_events') }}" class="block rounded-lg px-3 py-2 hover:bg-white/10">Eventos de abuso</a>
+      <a href="{{ url_for('main.home') }}" class="block rounded-lg px-3 py-2 text-slate-400 hover:bg-white/10">Ver site público</a>
+    </nav>
+    <form method="post" action="{{ url_for('admin.logout') }}" class="px-3 pt-6">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-300 hover:bg-white/10">Sair</button>
+    </form>
+  </aside>
+  <main class="flex-1 px-8 py-8">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mb-6 space-y-2">
+        {% for category, message in messages %}
+          <div class="rounded-lg px-4 py-2 text-sm {{ 'bg-emerald-100 text-emerald-700' if category == 'success' else 'bg-rose-100 text-rose-700' }}">{{ message }}</div>
+        {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% else %}
+  {% block guest_content %}{% endblock %}
+{% endif %}
+</body>
+</html>

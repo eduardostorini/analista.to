@@ -1,0 +1,42 @@
+{% extends "admin/base.html" %}
+{% block title %}Eventos de abuso{% endblock %}
+{% block content %}
+<h1 class="mb-2 text-2xl text-brand-900">Eventos de abuso</h1>
+<p class="mb-6 max-w-2xl text-sm text-slate-500">
+  O IP nunca é armazenado em texto puro — apenas um hash com salt rotativo (seção 13).
+  Bloquear uma origem bloqueia o hash: qualquer requisição futura da mesma origem gera o
+  mesmo hash e é recusada, sem nunca precisarmos reverter o hash para descobrir o IP.
+</p>
+
+<div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+  <table class="w-full text-left text-sm">
+    <thead><tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+      <th class="px-4 py-2">Tipo</th><th class="px-4 py-2">Origem (hash)</th><th class="px-4 py-2">Ferramenta</th><th class="px-4 py-2">Detalhes</th><th class="px-4 py-2">Quando</th><th class="px-4 py-2"></th>
+    </tr></thead>
+    <tbody>
+      {% for event in events %}
+      <tr class="border-b border-slate-100">
+        <td class="px-4 py-2"><span class="badge-warning">{{ event.event_type.value }}</span></td>
+        <td class="px-4 py-2 font-mono text-xs">{{ event.ip_hash[:16] }}…</td>
+        <td class="px-4 py-2">{{ event.tool.name if event.tool else "—" }}</td>
+        <td class="px-4 py-2 font-mono text-xs text-slate-500">{{ event.details }}</td>
+        <td class="px-4 py-2 text-xs text-slate-400">{{ event.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+        <td class="px-4 py-2">
+          {% if event.ip_hash in blocked %}
+          <form method="post" action="{{ url_for('admin.unblock_ip_hash', ip_hash=event.ip_hash) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="text-brand-600 hover:underline">Desbloquear</button>
+          </form>
+          {% else %}
+          <form method="post" action="{{ url_for('admin.block_ip_hash', ip_hash=event.ip_hash) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="text-rose-600 hover:underline">Bloquear origem</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

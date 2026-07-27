@@ -1,0 +1,152 @@
+{% extends "layout/base.html" %}
+
+{% block title %}{{ site_name }} — Analise DNS, SEO, SSL, servidor e segurança em um só lugar{% endblock %}
+{% block meta_description %}Ferramentas técnicas gratuitas para analisar DNS, WHOIS, SSL, cabeçalhos HTTP, SPF/DMARC e SEO técnico. Resultados rápidos, explicados e prontos para compartilhar.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ site_url }}/">{% endblock %}
+
+{% block content %}
+<section class="mb-14 text-center">
+  <p class="badge-neutral mx-auto mb-4">Toolkit técnico gratuito</p>
+  <h1 class="mx-auto max-w-3xl text-4xl leading-tight sm:text-5xl">
+    Analise DNS, SEO, SSL, servidor e segurança em um só lugar
+  </h1>
+  <p class="mx-auto mt-4 max-w-2xl text-lg text-slate-600">
+    Digite um domínio, URL ou IP, escolha a ferramenta e receba um relatório técnico
+    completo em segundos — sem cadastro e sem custo.
+  </p>
+
+  <form
+    x-data
+    @submit.prevent="window.location.href = $refs.toolSelect.value + '?value=' + encodeURIComponent($refs.valueInput.value)"
+    class="card mx-auto mt-8 flex max-w-2xl flex-col gap-3 text-left sm:flex-row sm:items-end"
+  >
+    <div class="flex-1">
+      <label for="quick-value" class="mb-1 block text-xs font-medium text-slate-500">Domínio, URL ou IP</label>
+      <input id="quick-value" x-ref="valueInput" type="text" required class="input" placeholder="exemplo.com.br">
+    </div>
+    <div class="sm:w-56">
+      <label for="quick-tool" class="mb-1 block text-xs font-medium text-slate-500">Ferramenta</label>
+      <select id="quick-tool" x-ref="toolSelect" class="input">
+        {% for category in categories %}
+          {% set active_tools = category.tools | selectattr('is_active') | list %}
+          {% if active_tools %}
+          <optgroup label="{{ category.name }}">
+            {% for tool in active_tools %}
+            <option value="{{ url_for('main.category_or_tool_page', slug=tool.slug) }}">{{ tool.name }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn-primary sm:w-auto">Analisar</button>
+  </form>
+</section>
+
+{% if featured_tools %}
+<section class="mb-14">
+  <h2 class="mb-4 text-xl">Ferramentas mais usadas</h2>
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {% for tool in featured_tools %}
+    <a href="{{ url_for('main.category_or_tool_page', slug=tool.slug) }}" class="card block no-underline hover:border-brand-300">
+      <span class="badge-neutral mb-2">{{ tool.category.name }}</span>
+      <h3 class="text-base font-semibold text-brand-900">{{ tool.name }}</h3>
+      <p class="mt-1 text-sm text-slate-600">{{ tool.short_description }}</p>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="mb-14">
+  <h2 class="mb-4 text-xl">Categorias disponíveis</h2>
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {% for category in categories %}
+    <a href="{{ url_for('main.category_or_tool_page', slug=category.slug) }}" class="card block no-underline hover:border-brand-300">
+      <h3 class="text-base font-semibold text-brand-900">{{ category.name }}</h3>
+      <p class="mt-1 text-sm text-slate-600">{{ category.description }}</p>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<div class="mb-14 grid gap-10 lg:grid-cols-2">
+  <section>
+    <h2 class="mb-4 text-xl">Últimas análises públicas</h2>
+    {% if recent_searches %}
+    <ul class="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
+      {% for search in recent_searches %}
+      <li>
+        <a href="{{ canonical_search_url(search) }}" class="flex items-center justify-between px-4 py-2.5 text-sm no-underline hover:bg-brand-50">
+          <span class="truncate">
+            <span class="font-mono text-slate-700">{{ search.normalized_input }}</span>
+            <span class="ml-2 text-xs text-slate-400">{{ search.tool.name }}</span>
+          </span>
+          <span class="ml-3 shrink-0 text-xs text-slate-400">{{ search.created_at.strftime('%d/%m/%Y') }}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-400">Ainda não há análises públicas — seja o primeiro a rodar uma consulta.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2 class="mb-4 text-xl">Ferramentas recém-adicionadas</h2>
+    <ul class="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
+      {% for tool in newest_tools %}
+      <li>
+        <a href="{{ url_for('main.category_or_tool_page', slug=tool.slug) }}" class="flex items-center justify-between px-4 py-2.5 text-sm no-underline hover:bg-brand-50">
+          <span>{{ tool.name }}</span>
+          <span class="text-xs text-slate-400">{{ tool.category.name }}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+
+<section class="mb-14">
+  <h2 class="mb-4 text-xl">Como funciona</h2>
+  <div class="grid gap-4 sm:grid-cols-4">
+    <div class="card"><span class="badge-neutral mb-2">1</span><p class="text-sm">Escolha uma ferramenta e informe um domínio, URL ou IP.</p></div>
+    <div class="card"><span class="badge-neutral mb-2">2</span><p class="text-sm">Resolvemos um pequeno desafio anti-robô para proteger o serviço contra abuso.</p></div>
+    <div class="card"><span class="badge-neutral mb-2">3</span><p class="text-sm">A análise roda em segundo plano com barra de progresso em tempo real.</p></div>
+    <div class="card"><span class="badge-neutral mb-2">4</span><p class="text-sm">Você recebe um relatório explicado, com link para compartilhar o resultado.</p></div>
+  </div>
+</section>
+
+<section class="mb-14">
+  <h2 class="mb-4 text-xl">Por que usar o {{ site_name }}</h2>
+  <ul class="grid gap-4 sm:grid-cols-2">
+    <li class="card"><strong class="text-brand-900">Rápido:</strong> resultados em segundos, processados de forma assíncrona.</li>
+    <li class="card"><strong class="text-brand-900">Sem cadastro:</strong> use qualquer ferramenta gratuitamente, sem criar conta.</li>
+    <li class="card"><strong class="text-brand-900">Explicado:</strong> cada resultado vem com contexto sobre como interpretá-lo.</li>
+    <li class="card"><strong class="text-brand-900">Seguro:</strong> bloqueamos automaticamente consultas a redes internas e protegemos contra abuso.</li>
+  </ul>
+</section>
+
+<section>
+  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
+  <div class="space-y-2">
+    <details class="card"><summary class="cursor-pointer font-medium text-brand-900">O {{ site_name }} é gratuito?</summary><p class="mt-2 text-sm text-slate-600">Sim, todas as ferramentas listadas podem ser usadas sem custo e sem cadastro.</p></details>
+    <details class="card"><summary class="cursor-pointer font-medium text-brand-900">Os resultados ficam públicos?</summary><p class="mt-2 text-sm text-slate-600">Consultas bem-sucedidas para recursos públicos podem gerar uma página pública compartilhável. Não publicamos endereço IP, dados pessoais ou consultas com erro.</p></details>
+    <details class="card"><summary class="cursor-pointer font-medium text-brand-900">Vocês guardam meus dados?</summary><p class="mt-2 text-sm text-slate-600">Não armazenamos IP em texto puro — apenas um hash com salt rotativo, usado somente para controle de abuso.</p></details>
+  </div>
+</section>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": {{ site_name | tojson }},
+  "url": {{ site_url | tojson }},
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": "{{ site_url }}/?q={search_term_string}",
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>
+{% endblock %}

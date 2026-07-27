@@ -1,0 +1,170 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}DNS Lookup{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Consulte de uma vez os registros A, AAAA, MX, TXT, NS, CNAME e SOA de qualquer domínio, gratuitamente e sem cadastro.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">DNS Lookup</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domínio</label>
+        <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+        <p class="mt-1 text-xs text-slate-400">Exemplos: exemplo.com.br, google.com, minhaempresa.dev</p>
+      </div>
+      {{ captcha_widget(captcha_provider, turnstile_site_key, hcaptcha_site_key) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Consultar DNS</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}
+      {{ status_bar(search) }}
+    {% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Falhou</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs text-slate-400">Domínio consultado</p>
+            <p class="font-mono text-lg text-brand-900">{{ data.domain }}</p>
+          </div>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.exists %}
+        <p class="badge-warning">Domínio sem delegação DNS ativa</p>
+        {% else %}
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                <th class="py-2 pr-4">Tipo</th>
+                <th class="py-2">Valores</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for record_type, values in data.records.items() %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">{{ record_type }}</td>
+                <td class="py-2 font-mono text-xs text-slate-600">
+                  {% if values %}
+                    {% for v in values %}<div>{{ v }}</div>{% endfor %}
+                  {% else %}
+                    <span class="text-slate-300">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>O que é o DNS Lookup?</h2>
+      <p>
+        O DNS (Domain Name System) é o sistema que traduz nomes de domínio legíveis por humanos,
+        como <code>exemplo.com.br</code>, em informações que servidores e aplicações usam para
+        se comunicar — o mais conhecido é o endereço IP, mas o DNS carrega muito mais do que isso.
+        O DNS Lookup do {{ site_name }} consulta, em uma única análise, os sete tipos de registro
+        mais usados no dia a dia de quem administra um domínio: <strong>A</strong> (endereço IPv4),
+        <strong>AAAA</strong> (endereço IPv6), <strong>MX</strong> (servidores de e-mail),
+        <strong>TXT</strong> (verificações, SPF e outras strings arbitrárias), <strong>NS</strong>
+        (servidores de nomes responsáveis pelo domínio), <strong>CNAME</strong> (apelidos para
+        outro nome) e <strong>SOA</strong> (dados administrativos da zona, como o servidor primário
+        e o intervalo de atualização). Em vez de rodar sete comandos <code>dig</code> ou
+        <code>nslookup</code> separados, você recebe tudo organizado em uma única tabela.
+      </p>
+      <h2>Como interpretar o resultado</h2>
+      <p>
+        Se o domínio não tiver nenhum servidor de nomes (NS) respondendo, ele é tratado como sem
+        delegação DNS ativa — o que normalmente significa que o domínio não está registrado, foi
+        removido, ou a zona ainda não foi publicada pelo registrador. Quando o domínio existe,
+        cada linha da tabela mostra o tipo de registro e os valores encontrados; tipos sem nenhum
+        registro aparecem com um traço, o que é normal — nem todo domínio precisa ter, por
+        exemplo, um registro AAAA (IPv6) ou MX (e-mail) configurado. Preste atenção especial ao
+        NS: se os nameservers exibidos não forem os que você esperava (por exemplo, ainda
+        apontando para o registrador em vez do seu provedor de hospedagem), isso costuma indicar
+        que a migração de DNS não foi concluída ou que a propagação ainda está em andamento.
+        Múltiplos registros A geralmente indicam balanceamento de carga entre vários servidores;
+        um CNAME nunca deve coexistir com outros registros no mesmo nome, por isso, se você
+        esperava ver um CNAME e não o encontrou junto de outros tipos, vale revisar a configuração
+        na zona.
+      </p>
+      <h2>Casos de uso comuns</h2>
+      <p>
+        Esta ferramenta é útil para confirmar que uma migração de hospedagem ou de provedor de
+        e-mail já propagou, para diagnosticar por que um site não está acessível, para auditar
+        rapidamente a configuração DNS de um domínio de terceiros antes de uma integração, ou
+        simplesmente para entender como um domínio está estruturado sem precisar instalar
+        ferramentas de linha de comando. Times de suporte também usam o DNS Lookup como primeiro
+        passo ao investigar reclamações de "o site não abre" ou "o e-mail não chega", já que
+        muitos desses problemas têm raiz em registros DNS incorretos ou desatualizados.
+      </p>
+      <h2>Limitações</h2>
+      <p>
+        Os resultados refletem o que os servidores DNS públicos consultados pelo {{ site_name }}
+        enxergam no momento da consulta. Como o DNS é distribuído e usa cache (TTL) em múltiplas
+        camadas, é possível que resolvedores diferentes ao redor do mundo ainda mostrem valores
+        antigos por algumas horas após uma alteração — esse fenômeno é chamado de propagação DNS.
+        Se você acabou de alterar um registro e ele ainda não aparece atualizado aqui, aguarde o
+        TTL configurado na zona (geralmente entre alguns minutos e algumas horas) e tente
+        novamente.
+      </p>
+    </section>
+{% endif %}
+
+    {% set faqs = [
+      ("Por que meu domínio não mostra nenhum registro?", "Provavelmente o domínio não está registrado, expirou, ou ainda não tem servidores de nomes (NS) configurados apontando para uma zona publicada."),
+      ("O DNS Lookup mostra subdomínios automaticamente?", "Não. Cada consulta é específica para o nome exato informado. Para checar um subdomínio, informe-o diretamente, por exemplo blog.exemplo.com.br."),
+      ("Por que vejo valores diferentes em outra ferramenta?", "Cada ferramenta pode consultar resolvedores DNS diferentes, e o cache (TTL) faz com que mudanças recentes demorem para propagar de forma uniforme."),
+    ] %}
+    {% if mode == "form" %}
+<section class="mt-10">
+      <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+{% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

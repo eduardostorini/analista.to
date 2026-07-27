@@ -1,0 +1,152 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}IP Lookup{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Descubra o DNS reverso, provedor e geolocalização aproximada de qualquer endereço IP.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">IP Lookup</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Endereço IP</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      <p class="text-xs text-slate-400">Aceita IPv4 e IPv6.</p>
+      {{ captcha_widget(captcha_provider, turnstile_site_key, hcaptcha_site_key) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Consultar IP</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Falhou</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-lg text-brand-900">{{ data.ip }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+        {% if data.is_private %}
+          <p class="badge-warning">Este é um endereço IP privado/reservado — não é roteável na internet pública.</p>
+        {% else %}
+          <dl class="grid gap-4 sm:grid-cols-2">
+            <div><dt class="text-xs text-slate-400">DNS reverso (PTR)</dt><dd class="font-mono text-sm text-slate-700">{{ data.reverse_dns or "—" }}</dd></div>
+            {% if data.geolocation %}
+            <div><dt class="text-xs text-slate-400">Provedor / Organização</dt><dd class="text-sm text-slate-700">{{ data.geolocation.org or "—" }}</dd></div>
+            <div><dt class="text-xs text-slate-400">ASN</dt><dd class="text-sm text-slate-700">{{ data.geolocation.asn or "—" }}</dd></div>
+            <div><dt class="text-xs text-slate-400">Localização aproximada</dt><dd class="text-sm text-slate-700">{{ [data.geolocation.city, data.geolocation.region, data.geolocation.country] | select | join(", ") }}</dd></div>
+            {% else %}
+            <div class="sm:col-span-2"><p class="text-sm text-slate-400">Dados de geolocalização indisponíveis no momento.</p></div>
+            {% endif %}
+          </dl>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>O que é o IP Lookup?</h2>
+      <p>
+        Todo dispositivo conectado diretamente à internet possui um endereço IP público, que
+        funciona como seu "endereço postal" na rede. O IP Lookup do {{ site_name }} reúne duas
+        informações complementares sobre um endereço IP: o <strong>DNS reverso</strong> (registro
+        PTR), que é o nome de domínio associado oficialmente àquele IP pelo seu operador, e dados
+        aproximados de <strong>geolocalização e provedor</strong> (ASN, organização responsável e
+        localização estimada), obtidos a partir de bases públicas de roteamento e geolocalização
+        de IP.
+      </p>
+      <h2>Como interpretar o resultado</h2>
+      <p>
+        O DNS reverso costuma revelar pistas sobre a infraestrutura por trás de um IP — servidores
+        de grandes provedores de nuvem, por exemplo, frequentemente têm nomes reversos
+        padronizados que identificam o provedor (Amazon, Google, Cloudflare etc.), enquanto
+        conexões residenciais normalmente mostram um nome genérico atribuído pelo provedor de
+        internet. A ausência de um registro PTR não é incomum e não indica necessariamente
+        problema — é apenas um registro opcional. Os dados de organização e ASN (Autonomous System
+        Number) identificam a rede responsável por anunciar aquele bloco de IP na internet, o que é
+        mais confiável tecnicamente do que a geolocalização, que é sempre uma <strong>estimativa</strong>
+        baseada em bases de dados de terceiros e pode estar imprecisa, especialmente para IPs
+        móveis, VPNs e serviços de nuvem, cuja localização física real pode ser bem diferente da
+        região comercialmente registrada.
+      </p>
+      <h2>Casos de uso comuns</h2>
+      <p>
+        Administradores usam o IP Lookup para investigar a origem de tráfego suspeito em logs de
+        acesso, identificar se uma requisição vem de um provedor de nuvem (possível bot/scraper) ou
+        de uma conexão residencial, confirmar o DNS reverso de servidores próprios (importante para
+        reputação de envio de e-mail, já que muitos servidores de recebimento verificam o PTR),
+        ou simplesmente entender de onde vem uma conexão ao investigar um incidente de segurança.
+      </p>
+      <h2>Limitações</h2>
+      <p>
+        Dados de geolocalização de IP são estimativas comerciais, não têm precisão de GPS e podem
+        estar desatualizados ou incorretos, principalmente para blocos de IP recém-realocados. Por
+        motivos de segurança (proteção contra SSRF), esta ferramenta não realiza nenhuma conexão
+        direta ao IP informado — apenas consultas de DNS reverso e a uma base pública de
+        geolocalização, então indisponibilidades momentâneas dessas fontes externas podem deixar
+        alguns campos em branco.
+      </p>
+      <h2>ASN e a estrutura da internet</h2>
+      <p>
+        A internet é dividida em milhares de "sistemas autônomos" — redes independentes, cada uma
+        identificada por um número ASN, operadas por provedores de internet, empresas de nuvem,
+        universidades e grandes organizações. Cada sistema autônomo anuncia publicamente quais
+        blocos de IP ele controla através do protocolo BGP, e é justamente essa informação de
+        anúncio que ferramentas de geolocalização e consulta de ASN utilizam para determinar a
+        quem pertence um endereço IP. Saber o ASN e a organização responsável por um IP costuma
+        ser mais confiável do que a geolocalização em si, porque reflete quem efetivamente opera
+        aquele bloco de endereços — informação registrada formalmente junto aos registros
+        regionais de internet (como LACNIC na América Latina), diferente da localização física
+        estimada, que depende de bases de dados comerciais de terceiros nem sempre atualizadas.
+      </p>
+    </section>
+{% endif %}
+
+    {% set faqs = [
+      ("A geolocalização mostrada é exata?", "Não. É uma estimativa baseada em bases públicas de roteamento, que pode estar desatualizada ou imprecisa, principalmente para IPs móveis e de nuvem."),
+      ("Por que o IP não tem DNS reverso?", "O registro PTR é opcional. Muitos provedores não configuram um nome reverso para blocos de IP residenciais ou dinâmicos."),
+      ("Posso consultar um IP privado, como 192.168.0.1?", "Sim, mas o resultado apenas indica que se trata de um endereço privado/reservado, já que ele não é roteável publicamente e não tem dados de geolocalização."),
+    ] %}
+    {% if mode == "form" %}
+<section class="mt-10">
+      <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+{% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

@@ -1,0 +1,162 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Robots.txt Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Veja as regras de rastreamento e os sitemaps declarados no robots.txt de qualquer domínio.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<header class="mb-8 max-w-2xl">
+  <h1 class="text-3xl">Robots.txt Checker</h1>
+  <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+</header>
+
+<div class="grid gap-8 lg:grid-cols-5">
+  <div class="lg:col-span-3 space-y-6">
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domínio</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      {{ captcha_widget(captcha_provider, turnstile_site_key, hcaptcha_site_key) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Verificar robots.txt</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Falhou</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-lg text-brand-900">{{ data.domain }}/robots.txt</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.exists %}
+          <p class="badge-warning">Nenhum robots.txt encontrado — todos os rastreadores são bem-vindos por padrão.</p>
+        {% else %}
+          {% if data.blocks_all_crawlers %}<p class="badge-danger mb-2">Este arquivo bloqueia todos os rastreadores (Disallow: / para User-agent: *)</p>{% endif %}
+
+          {% for group in data.groups %}
+          <div class="card">
+            <p class="mb-2 font-mono text-sm text-brand-800">User-agent: {{ group.user_agents | join(", ") }}</p>
+            {% if group.disallow %}<p class="text-xs text-rose-600">Disallow: {{ group.disallow | join(", ") }}</p>{% endif %}
+            {% if group.allow %}<p class="text-xs text-emerald-600">Allow: {{ group.allow | join(", ") }}</p>{% endif %}
+            {% if group.crawl_delay %}<p class="text-xs text-slate-500">Crawl-delay: {{ group.crawl_delay }}</p>{% endif %}
+          </div>
+          {% endfor %}
+
+          {% if data.sitemaps %}
+          <div class="card">
+            <p class="mb-2 text-sm font-medium text-slate-700">Sitemaps declarados</p>
+            <ul class="space-y-1">
+              {% for sm in data.sitemaps %}<li class="break-all font-mono text-xs text-brand-700">{{ sm }}</li>{% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <aside class="lg:col-span-2 space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{% if mode == "form" %}
+<section class="prose-tool mt-10 max-w-3xl space-y-4">
+  <h2>O que é o robots.txt?</h2>
+  <p>
+    O arquivo <code>robots.txt</code>, publicado na raiz de um domínio (por exemplo,
+    <code>exemplo.com.br/robots.txt</code>), é a forma padronizada de um site comunicar a
+    rastreadores automáticos — como o Googlebot — quais áreas podem ou não ser visitadas. Ele
+    segue o Robots Exclusion Protocol: cada bloco começa com uma ou mais linhas
+    <code>User-agent</code> (identificando a qual rastreador as regras seguintes se aplicam,
+    sendo <code>*</code> um coringa para todos) seguidas de diretivas <code>Disallow</code>
+    (caminhos bloqueados) e <code>Allow</code> (exceções dentro de um caminho bloqueado). O
+    arquivo também pode declarar a localização de um ou mais sitemaps XML, ajudando buscadores a
+    descobrir todas as URLs importantes do site mais rapidamente.
+  </p>
+  <h2>Como interpretar o resultado</h2>
+  <p>
+    Se o domínio não tiver um robots.txt, isso não é um erro — significa apenas que não há
+    restrição declarada, e rastreadores assumem que podem visitar qualquer caminho público. Cada
+    grupo exibido no resultado corresponde a um bloco <code>User-agent</code> do arquivo; preste
+    atenção especial a blocos com <code>User-agent: *</code> e <code>Disallow: /</code>, que
+    bloqueiam o site inteiro para todos os rastreadores — geralmente um erro de configuração
+    grave se o site deveria estar sendo indexado normalmente, mas também uma configuração
+    intencional em ambientes de staging/homologação. Diretivas <code>Allow</code> dentro de um
+    bloco funcionam como exceções a um <code>Disallow</code> mais amplo, permitindo liberar um
+    subcaminho específico dentro de uma área bloqueada.
+  </p>
+  <h2>Casos de uso comuns</h2>
+  <p>
+    Esta ferramenta é usada para confirmar que um ambiente de produção não está acidentalmente
+    bloqueando os rastreadores (um erro comum ao promover configurações de staging), para verificar
+    se o sitemap está corretamente declarado e apontando para a URL certa, para auditar rapidamente
+    quais áreas de um site concorrente estão fechadas para indexação, e para diagnosticar por que
+    páginas específicas não aparecem no Google mesmo estando publicadas — um Disallow mal
+    configurado é uma das causas mais comuns.
+  </p>
+  <h2>Limitações</h2>
+  <p>
+    O robots.txt é uma convenção respeitada voluntariamente pela grande maioria dos rastreadores
+    de boa reputação, mas não é um mecanismo de segurança — ele não impede acesso humano direto
+    nem rastreadores maliciosos que optam por ignorá-lo. Bloquear uma página via robots.txt também
+    não garante que ela não apareça no índice do Google: se outras páginas linkarem para ela, o
+    Google pode ainda listar a URL (sem descrição) nos resultados. Para impedir indexação de forma
+    garantida, combine ou substitua o bloqueio no robots.txt por uma tag <code>meta
+    robots="noindex"</code> na própria página.
+  </p>
+  <h2>Erros comuns de configuração</h2>
+  <p>
+    Um dos erros mais custosos envolvendo robots.txt acontece durante a promoção de um ambiente de
+    homologação para produção: é comum que ambientes de teste tenham um bloqueio total
+    (Disallow: /) para evitar que buscadores indexem conteúdo ainda não pronto, e esse arquivo
+    acaba sendo copiado sem alteração para o ambiente de produção, bloqueando acidentalmente o
+    site inteiro. Outro erro frequente é bloquear caminhos que hospedam recursos necessários para
+    a renderização da página, como pastas de CSS ou JavaScript — isso pode impedir que buscadores
+    processem corretamente o layout e o conteúdo real da página. Por isso, sempre que uma página
+    importante parar de aparecer nos resultados de busca, checar o robots.txt deveria ser um dos
+    primeiros passos do diagnóstico.
+  </p>
+</section>
+{% endif %}
+
+{% set faqs = [
+  ("robots.txt impede que uma página apareça no Google?", "Não totalmente. Ele impede o rastreamento, mas a URL ainda pode aparecer no índice (sem descrição) se houver links externos apontando para ela. Para bloquear indexação de forma garantida, use a meta tag robots noindex."),
+  ("Preciso ter um robots.txt mesmo sem restrições?", "Não é obrigatório. Sem o arquivo, rastreadores assumem acesso livre a todo o conteúdo público."),
+  ("Por que meu sitemap não aparece no robots.txt?", "A diretiva Sitemap é opcional. Você pode declarar o sitemap diretamente no Google Search Console mesmo sem citá-lo no robots.txt."),
+] %}
+{% if mode == "form" %}
+<section class="mt-10 max-w-3xl">
+  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
+  {{ faq_accordion(faqs) }}
+</section>
+{% endif %}
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

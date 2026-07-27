@@ -1,0 +1,45 @@
+{% extends "admin/base.html" %}
+{% block title %}Consulta {{ search.public_id }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('admin.jobs') }}" class="mb-4 inline-block text-sm text-brand-600 hover:underline">← Voltar</a>
+<h1 class="mb-2 text-2xl text-brand-900">{{ search.tool.name }}: {{ search.normalized_input }}</h1>
+<p class="mb-6 font-mono text-xs text-slate-400">{{ search.public_id }}</p>
+
+<div class="mb-6 flex flex-wrap gap-3">
+  <span class="badge-neutral">status: {{ search.status.value }}</span>
+  <span class="badge-neutral">visibilidade: {{ search.visibility.value }}</span>
+  <span class="badge-neutral">criada: {{ search.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+  {% if search.completed_at %}<span class="badge-neutral">concluída: {{ search.completed_at.strftime('%d/%m/%Y %H:%M') }}</span>{% endif %}
+</div>
+
+<div class="mb-6 flex gap-3">
+  <form method="post" action="{{ url_for('admin.reprocess_job', public_id=search.public_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn-secondary">Reprocessar</button>
+  </form>
+  <form method="post" action="{{ url_for('admin.delete_job', public_id=search.public_id) }}" onsubmit="return confirm('Excluir esta consulta e seus resultados?');">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn-secondary text-rose-600">Excluir</button>
+  </form>
+</div>
+
+{% if search.result %}
+<div class="card mb-6">
+  <h2 class="mb-2 text-sm font-semibold text-slate-500">Resultado</h2>
+  <p class="mb-2 text-sm">{{ search.result.summary }}</p>
+  {% if search.result.error_message %}<p class="text-sm text-rose-600">{{ search.result.error_code }}: {{ search.result.error_message }}</p>{% endif %}
+  <pre class="mt-2 overflow-x-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-100">{{ search.result.normalized_result | tojson(indent=2) }}</pre>
+</div>
+{% endif %}
+
+<h2 class="mb-3 text-sm font-semibold text-slate-500">Linha do tempo</h2>
+<ol class="space-y-2">
+  {% for event in events %}
+  <li class="card flex items-center justify-between">
+    <span class="badge-neutral">{{ event.status.value }}</span>
+    <span class="text-sm text-slate-600">{{ event.message }}</span>
+    <span class="text-xs text-slate-400">{{ event.created_at.strftime('%H:%M:%S') }}</span>
+  </li>
+  {% endfor %}
+</ol>
+{% endblock %}
