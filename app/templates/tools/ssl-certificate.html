@@ -25,7 +25,7 @@
       <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domínio</label>
       <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
       <p class="text-xs text-slate-400">Conectamos na porta 443 (HTTPS padrão).</p>
-      {{ captcha_widget(captcha_provider, turnstile_site_key, hcaptcha_site_key) }}
+      {{ captcha_widget(captcha_provider, cap_public_url, cap_site_key) }}
       <button type="submit" class="btn-primary w-full sm:w-auto">Verificar certificado</button>
     </form>
     {% endif %}

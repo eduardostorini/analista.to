@@ -95,6 +95,7 @@ class IpLookupTool(BaseTool):
         if payload.get("status") != "success":
             return None
 
+        lat, lon = payload.get("lat"), payload.get("lon")
         return {
             "country": payload.get("country"),
             "country_code": payload.get("countryCode"),
@@ -103,4 +104,6 @@ class IpLookupTool(BaseTool):
             "isp": payload.get("isp"),
             "org": payload.get("org") or payload.get("isp"),
             "asn": payload.get("as"),
+            "lat": lat if isinstance(lat, (int, float)) else None,
+            "lon": lon if isinstance(lon, (int, float)) else None,
         }

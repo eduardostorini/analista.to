@@ -120,6 +120,46 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # CAPTCHA self-hosted (Cap — https://trycap.dev). Ao contrário de
+  # Postgres/Redis, este serviço PRECISA ficar publicamente acessível: é o
+  # navegador do visitante que fala com ele diretamente para resolver o
+  # desafio (proof-of-work), então a porta é publicada mesmo no compose de
+  # produção — troque `CAP_PUBLIC_URL` por um domínio/TLS próprio nesse caso.
+  analisa_cap_store:
+    image: valkey/valkey:8-alpine
+    container_name: analisa_cap_store
+    volumes:
+      - analisa_cap_store_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  analisa_cap:
+    image: tiago2/cap:latest
+    container_name: analisa_cap
+    environment:
+      ADMIN_KEY: ${CAP_ADMIN_KEY:-change-me-cap-admin-key-min-32-characters}
+      REDIS_URL: redis://analisa_cap_store:6379
+      # Serve o JS/WASM do widget a partir do próprio analisa_cap (em vez do
+      # navegador buscar em cdn.jsdelivr.net) — mantém tudo self-hosted.
+      ENABLE_ASSETS_SERVER: "true"
+    ports:
+      - "${CAP_HTTP_PORT:-3010}:3000"
+    depends_on:
+      analisa_cap_store:
+        condition: service_healthy
+    healthcheck:
+      # A imagem não tem curl/wget; usa o fetch nativo do bun (runtime desta imagem).
+      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
 volumes:
   analisa_postgres_data:
   analisa_redis_data:
@@ -128,3 +168,4 @@ volumes:
   analisa_logs:
   analisa_backups:
   analisa_node_modules:
+  analisa_cap_store_data:

@@ -19,7 +19,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 - Deduplicação/cache por TTL configurável por ferramenta.
 - Geração de páginas HTML estáticas para resultados públicos elegíveis, com
   regras de indexabilidade (`index`/`noindex`) e sitemaps segmentados.
-- Proteção contra SSRF, CAPTCHA (Turnstile/hCaptcha/matemático), rate
+- Proteção contra SSRF, CAPTCHA (Cap self-hosted/matemático), rate
   limiting em múltiplas camadas, hash de IP com salt rotativo, bloqueio de
   origens abusivas.
 - Painel administrativo: categorias, ferramentas, consultas (com

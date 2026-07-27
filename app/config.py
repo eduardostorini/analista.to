@@ -89,11 +89,11 @@ class BaseConfig:
     IP_HASH_CURRENT_SALT_ID = os.environ.get("IP_HASH_CURRENT_SALT_ID", "1")
 
     # --- CAPTCHA ------------------------------------------------------------
-    CAPTCHA_PROVIDER = os.environ.get("CAPTCHA_PROVIDER", "math")
-    TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY", "")
-    TURNSTILE_SECRET_KEY = os.environ.get("TURNSTILE_SECRET_KEY", "")
-    HCAPTCHA_SITE_KEY = os.environ.get("HCAPTCHA_SITE_KEY", "")
-    HCAPTCHA_SECRET_KEY = os.environ.get("HCAPTCHA_SECRET_KEY", "")
+    CAPTCHA_PROVIDER = os.environ.get("CAPTCHA_PROVIDER", "cap")
+    CAP_PUBLIC_URL = os.environ.get("CAP_PUBLIC_URL", "http://localhost:3010")
+    CAP_INTERNAL_URL = os.environ.get("CAP_INTERNAL_URL", "http://analisa_cap:3000")
+    CAP_SITE_KEY = os.environ.get("CAP_SITE_KEY", "")
+    CAP_SECRET_KEY = os.environ.get("CAP_SECRET_KEY", "")
     MATH_CHALLENGE_TTL_SECONDS = _int(os.environ.get("MATH_CHALLENGE_TTL_SECONDS"), 300)
     MATH_CHALLENGE_MAX_ATTEMPTS = _int(os.environ.get("MATH_CHALLENGE_MAX_ATTEMPTS"), 5)
 
@@ -115,7 +115,7 @@ class BaseConfig:
     # --- Fontes de dados de ferramentas específicas -----------------------------
     IP_GEOLOCATION_API_URL = os.environ.get(
         "IP_GEOLOCATION_API_URL",
-        "http://ip-api.com/json/{ip}?fields=status,message,country,countryCode,regionName,city,isp,org,as,query",
+        "http://ip-api.com/json/{ip}?fields=status,message,country,countryCode,regionName,city,lat,lon,isp,org,as,query",
     )
 
     # --- Admin ------------------------------------------------------------------

@@ -1,0 +1,158 @@
+{% extends "admin/base.html" %}
+{% block title %}Gráficos{% endblock %}
+
+{% macro bar_row(label, count, max_value, tone='brand') %}
+{% set tone_classes = {
+  'brand': 'bg-brand-600',
+  'good': 'bg-emerald-600',
+  'critical': 'bg-rose-600',
+  'warning': 'bg-amber-600',
+  'muted': 'bg-slate-400',
+} %}
+{% set pct = ((count / max_value) * 100) if max_value else 0 %}
+<div class="flex items-center gap-3">
+  <div class="w-40 shrink-0 truncate text-sm text-slate-600" title="{{ label }}">{{ label }}</div>
+  <div class="h-5 flex-1 rounded-full bg-slate-100" title="{{ label }}: {{ count }}">
+    <div class="h-5 rounded-full {{ tone_classes.get(tone, 'bg-brand-600') }}" style="width: {{ pct }}%"></div>
+  </div>
+  <div class="w-10 shrink-0 text-right text-sm font-medium tabular-nums text-slate-700">{{ count }}</div>
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+  <h1 class="text-2xl text-brand-900">Gráficos</h1>
+  <div class="flex items-center gap-2 text-sm">
+    <span class="text-slate-500">Período:</span>
+    {% for choice in period_choices %}
+    <a href="{{ url_for('admin.charts', days=choice) }}"
+       class="{{ 'btn-primary' if choice == days else 'btn-secondary' }} px-3 py-1.5 text-xs">Últimos {{ choice }} dias</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="card"><p class="text-2xl font-semibold text-brand-800">{{ kpis.total_period }}</p><p class="text-xs text-slate-500">Consultas no período</p></div>
+  <div class="card"><p class="text-2xl font-semibold text-emerald-600">{{ kpis.success_rate_period }}%</p><p class="text-xs text-slate-500">Taxa de sucesso</p></div>
+  <div class="card"><p class="text-2xl font-semibold text-brand-800">{{ kpis.avg_duration_label }}</p><p class="text-xs text-slate-500">Tempo médio de processamento</p></div>
+  <div class="card"><p class="text-2xl font-semibold text-brand-800">{{ kpis.indexed_pages_period }}/{{ kpis.pages_period }}</p><p class="text-xs text-slate-500">Páginas indexadas no período</p></div>
+  <div class="card"><p class="truncate text-2xl font-semibold text-brand-800" title="{{ kpis.top_tool_label }}">{{ kpis.top_tool_label }}</p><p class="text-xs text-slate-500">Ferramenta mais usada</p></div>
+  <div class="card"><p class="text-2xl font-semibold {{ 'text-rose-600' if kpis.abuse_total_period else 'text-brand-800' }}">{{ kpis.abuse_total_period }}</p><p class="text-xs text-slate-500">Eventos de abuso no período</p></div>
+</div>
+
+<div class="mb-8 card" x-data="chartTimeline()" data-points='{{ timeline | tojson }}'>
+  <div class="mb-3 flex items-baseline justify-between">
+    <h2 class="text-lg text-brand-900">Evolução das consultas</h2>
+    <span class="text-xs text-slate-400">consultas por dia · últimos {{ days }} dias</span>
+  </div>
+  {% if kpis.total_period %}
+  <div class="relative h-28" @mousemove="onMove" @mouseleave="onLeave">
+    <svg x-ref="plot" viewBox="0 0 100 100" preserveAspectRatio="none" class="h-full w-full overflow-visible">
+      <line x1="0" y1="99.5" x2="100" y2="99.5" stroke="#e2e8f0" stroke-width="1" vector-effect="non-scaling-stroke" />
+      <path :d="areaPath" fill="#2563eb" fill-opacity="0.1" stroke="none"></path>
+      <path :d="linePath" fill="none" stroke="#2563eb" stroke-width="2" vector-effect="non-scaling-stroke"
+            stroke-linejoin="round" stroke-linecap="round"></path>
+      <g x-show="hoverIndex !== null">
+        <line :x1="hoverXPercent" :x2="hoverXPercent" y1="0" y2="100" stroke="#cbd5e1" stroke-width="1" vector-effect="non-scaling-stroke" />
+        <circle :cx="hoverXPercent" :cy="hoverYPercent" r="4" fill="#2563eb" stroke="#ffffff" stroke-width="2" vector-effect="non-scaling-stroke"></circle>
+      </g>
+    </svg>
+    <div
+      x-show="hovered"
+      class="pointer-events-none absolute z-10 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs shadow-lg"
+      :style="`left: ${hoverXPercent}%; top: ${hoverYPercent}%; transform: translate(${tooltipAlign === 'right' ? '-100%' : tooltipAlign === 'left' ? '0%' : '-50%'}, calc(-100% - 10px));`"
+    >
+      <p class="font-semibold text-slate-800" x-text="hovered ? hovered.count + ' consulta(s)' : ''"></p>
+      <p class="text-slate-400" x-text="hovered ? hovered.label : ''"></p>
+    </div>
+  </div>
+  <div class="mt-2 flex justify-between text-xs text-slate-400">
+    <span x-text="points.length ? points[0].label : ''"></span>
+    <span x-text="points.length ? points[points.length - 1].label : ''"></span>
+  </div>
+  {% else %}
+  <p class="text-sm text-slate-400">Nenhuma consulta registrada neste período.</p>
+  {% endif %}
+</div>
+
+<div class="mb-8 grid gap-6 lg:grid-cols-2">
+  <div class="card">
+    <h2 class="mb-4 text-lg text-brand-900">Tipos de consultas por ferramenta</h2>
+    {% if tools_breakdown %}
+    <div class="space-y-2.5">
+      {% set max_tool = tools_breakdown[0].count %}
+      {% for row in tools_breakdown %}
+      {{ bar_row(row.label, row.count, max_tool, 'brand') }}
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-slate-400">Nenhuma consulta registrada neste período.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2 class="mb-4 text-lg text-brand-900">Consultas por categoria</h2>
+    {% if categories_breakdown %}
+    <div class="space-y-2.5">
+      {% set max_category = categories_breakdown[0].count %}
+      {% for row in categories_breakdown %}
+      {{ bar_row(row.label, row.count, max_category, 'brand') }}
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-slate-400">Nenhuma consulta registrada neste período.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2 class="mb-4 text-lg text-brand-900">Status das consultas</h2>
+    {% if status_breakdown %}
+    <div class="space-y-2.5">
+      {% set max_status = status_breakdown | map(attribute='count') | max %}
+      {% for row in status_breakdown %}
+      {{ bar_row(row.label, row.count, max_status, row.tone) }}
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-slate-400">Nenhuma consulta registrada neste período.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2 class="mb-4 text-lg text-brand-900">Eventos de abuso por tipo</h2>
+    {% if abuse_breakdown %}
+    <div class="space-y-2.5">
+      {% set max_abuse = abuse_breakdown[0].count %}
+      {% for row in abuse_breakdown %}
+      {{ bar_row(row.label, row.count, max_abuse, 'critical') }}
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-slate-400">Nenhum evento de abuso neste período.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2 class="mb-4 text-lg text-brand-900">Domínios/entradas mais consultados</h2>
+  {% if top_inputs %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead><tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+        <th class="px-3 py-2">Entrada</th><th class="px-3 py-2 text-right">Consultas</th>
+      </tr></thead>
+      <tbody>
+        {% for row in top_inputs %}
+        <tr class="border-b border-slate-100">
+          <td class="px-3 py-2 font-mono text-xs">{{ row.input }}</td>
+          <td class="px-3 py-2 text-right tabular-nums">{{ row.count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-sm text-slate-400">Nenhuma consulta registrada neste período.</p>
+  {% endif %}
+</div>
+{% endblock %}

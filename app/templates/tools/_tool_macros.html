@@ -28,13 +28,10 @@
 </script>
 {% endmacro %}
 
-{% macro captcha_widget(provider, turnstile_site_key, hcaptcha_site_key) %}
-  {% if provider == "turnstile" %}
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-    <div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}"></div>
-  {% elif provider == "hcaptcha" %}
-    <script src="https://hcaptcha.com/1/api.js" async defer></script>
-    <div class="h-captcha" data-sitekey="{{ hcaptcha_site_key }}"></div>
+{% macro captcha_widget(provider, cap_public_url, cap_site_key) %}
+  {% if provider == "cap" %}
+    <cap-widget required data-cap-api-endpoint="{{ cap_public_url }}/{{ cap_site_key }}/"></cap-widget>
+    <script src="{{ cap_public_url }}/assets/widget.js" defer></script>
   {% elif provider == "math" %}
     <div x-data="mathCaptcha()" class="rounded-lg border border-slate-200 bg-slate-50 p-3">
       <label class="mb-1 block text-xs font-medium text-slate-600" :for="'math-answer'">

@@ -35,9 +35,12 @@ Toda requisição de rede feita a partir de uma entrada do usuário passa por
 
 ### CAPTCHA (`app/security/captcha.py`)
 
-Turnstile, hCaptcha ou desafio matemático (gerado no servidor, token
-assinado com validade curta via `itsdangerous`, resposta nunca enviada ao
-client, uso único controlado via Redis, limite de tentativas).
+[Cap](https://trycap.dev) (self-hosted, proof-of-work + verificação de
+instrumentação do navegador, sem Google e sem telemetria — serviço
+`analisa_cap` deste compose) ou desafio matemático de fallback (gerado no
+servidor, token assinado com validade curta via `itsdangerous`, resposta
+nunca enviada ao client, uso único controlado via Redis, limite de
+tentativas).
 
 ### Rate limiting (`app/security/rate_limit.py`)
 
@@ -61,7 +64,7 @@ CSRF (Flask-WTF) em todos os formulários, Content-Security-Policy,
 
 > `script-src` inclui `'unsafe-eval'`, exigido pelo build padrão do
 > Alpine.js para avaliar expressões de diretiva. Isso é mitigado por
-> `script-src` continuar restrito a `'self'` + domínios de CAPTCHA (sem
+> `script-src` continuar restrito a `'self'` + origem do serviço Cap (sem
 > `'unsafe-inline'` nem origens arbitrárias). Migrar para o build
 > `@alpinejs/csp` elimina essa necessidade — ver issue de hardening futuro.
 

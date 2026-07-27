@@ -114,6 +114,28 @@ docker compose up -d
 O painel fica em `http://localhost:18473${ADMIN_URL_PREFIX}` (padrão
 `/gestor-x7f2` — troque isso em produção).
 
+### CAPTCHA (Cap, self-hosted)
+
+O CAPTCHA padrão é o [Cap](https://trycap.dev) (`CAPTCHA_PROVIDER=cap`),
+rodando 100% self-hosted nos serviços `analisa_cap`/`analisa_cap_store`
+deste mesmo compose — sem Google, sem telemetria. É preciso gerar uma
+site key uma única vez, pelo dashboard do Cap:
+
+1. Acesse `http://localhost:${CAP_HTTP_PORT}` (padrão `3010`) e entre com o
+   valor de `CAP_ADMIN_KEY` do seu `.env`.
+2. Clique em **New key**, dê um nome (ex.: `analista-to`) e copie a **site
+   key** e a **secret key** geradas.
+3. Cole em `CAP_SITE_KEY`/`CAP_SECRET_KEY` no `.env` e reinicie:
+   ```bash
+   docker compose up -d
+   ```
+
+Em produção, publique o `analisa_cap` atrás de um domínio/HTTPS próprio e
+ajuste `CAP_PUBLIC_URL` de acordo — o navegador do visitante fala
+diretamente com essa URL para resolver o desafio. Sem uma site key
+configurada, o CAPTCHA rejeita todas as submissões; troque
+`CAPTCHA_PROVIDER=math` temporariamente se quiser testar sem o Cap.
+
 ### Produção
 
 ```bash

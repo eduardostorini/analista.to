@@ -1,9 +1,12 @@
 """Abstração de CAPTCHA com múltiplos providers (seção 19).
 
-Selecionado por `CAPTCHA_PROVIDER`: turnstile | hcaptcha | math | none.
-O desafio matemático é gerado no servidor, com token assinado (itsdangerous)
-de curta validade; a resposta correta nunca é enviada ao client e o token é
-invalidado após o uso (marcado em Redis) ou depois de N tentativas erradas.
+Selecionado por `CAPTCHA_PROVIDER`: cap | math | none. Cap (https://trycap.dev)
+é o provider self-hosted padrão (proof-of-work + verificação de instrumentação
+do navegador, sem Google e sem telemetria) — validado no backend contra o
+próprio serviço `analisa_cap` deste compose. O desafio matemático é gerado no
+servidor, com token assinado (itsdangerous) de curta validade; a resposta
+correta nunca é enviada ao client e o token é invalidado após o uso (marcado
+em Redis) ou depois de N tentativas erradas.
 """
 from __future__ import annotations
 
@@ -37,47 +40,33 @@ class NoopCaptchaProvider(CaptchaProvider):
         return None
 
 
-class TurnstileCaptchaProvider(CaptchaProvider):
-    _VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+class CapCaptchaProvider(CaptchaProvider):
+    """Cap (https://trycap.dev) — proof-of-work + verificação de
+    instrumentação do navegador, validado contra o serviço `analisa_cap`
+    self-hosted deste compose (compatível com o formato `siteverify` do
+    reCAPTCHA/hCaptcha)."""
 
     def verify(self, payload: dict) -> None:
-        token = payload.get("turnstile_token")
+        token = payload.get("cap-token")
         if not token:
-            raise CaptchaError("Token do Turnstile ausente", "missing_token")
+            raise CaptchaError("Token do Cap ausente", "missing_token")
 
-        secret = current_app.config["TURNSTILE_SECRET_KEY"]
+        cfg = current_app.config
+        site_key = cfg["CAP_SITE_KEY"]
+        secret = cfg["CAP_SECRET_KEY"]
+        if not site_key or not secret:
+            raise CaptchaError("Cap não está configurado (CAP_SITE_KEY/CAP_SECRET_KEY ausentes)", "provider_error")
+
+        verify_url = f"{cfg['CAP_INTERNAL_URL'].rstrip('/')}/{site_key}/siteverify"
         try:
             response = httpx.post(
-                self._VERIFY_URL,
-                data={"secret": secret, "response": token},
+                verify_url,
+                json={"secret": secret, "response": token},
                 timeout=5,
             )
             result = response.json()
         except httpx.HTTPError as exc:
-            raise CaptchaError(f"Falha ao validar Turnstile: {exc}", "provider_error") from exc
-
-        if not result.get("success"):
-            raise CaptchaError("CAPTCHA inválido", "invalid_captcha")
-
-
-class HCaptchaProvider(CaptchaProvider):
-    _VERIFY_URL = "https://hcaptcha.com/siteverify"
-
-    def verify(self, payload: dict) -> None:
-        token = payload.get("hcaptcha_token")
-        if not token:
-            raise CaptchaError("Token do hCaptcha ausente", "missing_token")
-
-        secret = current_app.config["HCAPTCHA_SECRET_KEY"]
-        try:
-            response = httpx.post(
-                self._VERIFY_URL,
-                data={"secret": secret, "response": token},
-                timeout=5,
-            )
-            result = response.json()
-        except httpx.HTTPError as exc:
-            raise CaptchaError(f"Falha ao validar hCaptcha: {exc}", "provider_error") from exc
+            raise CaptchaError(f"Falha ao validar Cap: {exc}", "provider_error") from exc
 
         if not result.get("success"):
             raise CaptchaError("CAPTCHA inválido", "invalid_captcha")
@@ -139,8 +128,7 @@ class MathCaptchaProvider(CaptchaProvider):
 
 
 _PROVIDERS: dict[str, type[CaptchaProvider]] = {
-    "turnstile": TurnstileCaptchaProvider,
-    "hcaptcha": HCaptchaProvider,
+    "cap": CapCaptchaProvider,
     "math": MathCaptchaProvider,
     "none": NoopCaptchaProvider,
 }

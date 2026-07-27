@@ -5,11 +5,13 @@ import datetime as dt
 
 from flask import abort, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
+from sqlalchemy import cast, func
+from sqlalchemy.types import Date
 
 from app.blueprints.admin import admin_bp
 from app.extensions import db
 from app.models import AbuseEvent, GeneratedPage, JobEvent, Search, SearchResult, Tool, ToolCategory
-from app.models.enums import IndexStatus, SearchStatus
+from app.models.enums import AbuseEventType, IndexStatus, SearchStatus
 from app.security.admin_auth import verify_admin_credentials
 from app.security.blocklist import block, is_blocked, list_blocked, unblock
 from app.tasks.task_names import GENERATE_PAGE_TASK, REGENERATE_SITEMAPS_TASK, RUN_SEARCH_TASK
@@ -80,6 +82,188 @@ def dashboard():
         abuse_count=abuse_count,
         success_rate=success_rate,
         recent_searches=recent_searches,
+    )
+
+
+# --- Gráficos ----------------------------------------------------------------------
+
+_CHART_PERIOD_CHOICES = (7, 30, 90)
+
+_ABUSE_EVENT_LABELS = {
+    AbuseEventType.RATE_LIMIT_EXCEEDED: "Limite de requisições excedido",
+    AbuseEventType.CAPTCHA_FAILED: "CAPTCHA falhou",
+    AbuseEventType.SSRF_BLOCKED: "Bloqueio SSRF",
+    AbuseEventType.INVALID_INPUT: "Entrada inválida",
+    AbuseEventType.SUSPICIOUS_PATTERN: "Padrão suspeito",
+    AbuseEventType.BLOCKED_ORIGIN: "Origem bloqueada",
+}
+
+def _status_group_label(status: SearchStatus) -> str:
+    if status == SearchStatus.COMPLETED:
+        return "Concluídas"
+    if status == SearchStatus.FAILED:
+        return "Falharam"
+    if status in (SearchStatus.EXPIRED, SearchStatus.CANCELLED):
+        return "Expiradas/canceladas"
+    return "Em andamento"
+
+
+def _format_duration(seconds: float | None) -> str:
+    if not seconds or seconds <= 0:
+        return "—"
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    minutes, rem = divmod(int(seconds), 60)
+    return f"{minutes}m {rem}s"
+
+
+@admin_bp.get("/graficos/")
+@login_required
+def charts():
+    days = request.args.get("days", 30, type=int)
+    if days not in _CHART_PERIOD_CHOICES:
+        days = 30
+
+    now = dt.datetime.now(dt.timezone.utc)
+    since = now - dt.timedelta(days=days)
+    since_date = (now - dt.timedelta(days=days - 1)).date()
+
+    # --- Evolução das consultas (série diária) ---
+    day_col = cast(Search.created_at, Date)
+    daily_rows = (
+        db.session.query(day_col.label("day"), func.count(Search.id))
+        .filter(Search.created_at >= since)
+        .group_by("day")
+        .all()
+    )
+    counts_by_day = {row[0]: row[1] for row in daily_rows}
+    timeline = []
+    for offset in range(days):
+        day = since_date + dt.timedelta(days=offset)
+        timeline.append(
+            {
+                "date": day.isoformat(),
+                "label": day.strftime("%d/%m"),
+                "count": counts_by_day.get(day, 0),
+            }
+        )
+
+    # --- Tipos de consultas por ferramenta ---
+    tool_rows = (
+        db.session.query(Tool.name, func.count(Search.id).label("n"))
+        .join(Search, Search.tool_id == Tool.id)
+        .filter(Search.created_at >= since)
+        .group_by(Tool.id, Tool.name)
+        .order_by(func.count(Search.id).desc())
+        .all()
+    )
+    tools_breakdown = [{"label": name, "count": n} for name, n in tool_rows]
+
+    # --- Consultas por categoria ---
+    category_rows = (
+        db.session.query(ToolCategory.name, func.count(Search.id).label("n"))
+        .join(Tool, Tool.category_id == ToolCategory.id)
+        .join(Search, Search.tool_id == Tool.id)
+        .filter(Search.created_at >= since)
+        .group_by(ToolCategory.id, ToolCategory.name)
+        .order_by(func.count(Search.id).desc())
+        .all()
+    )
+    categories_breakdown = [{"label": name, "count": n} for name, n in category_rows]
+
+    # --- Status das consultas ---
+    status_rows = (
+        db.session.query(Search.status, func.count(Search.id))
+        .filter(Search.created_at >= since)
+        .group_by(Search.status)
+        .all()
+    )
+    status_counts: dict[str, int] = {}
+    for status, n in status_rows:
+        label = _status_group_label(status)
+        status_counts[label] = status_counts.get(label, 0) + n
+    tone_by_label = {
+        "Concluídas": "good",
+        "Falharam": "critical",
+        "Em andamento": "warning",
+        "Expiradas/canceladas": "muted",
+    }
+    status_breakdown = [
+        {"label": label, "count": status_counts[label], "tone": tone_by_label[label]}
+        for label in ("Concluídas", "Falharam", "Em andamento", "Expiradas/canceladas")
+        if status_counts.get(label)
+    ]
+
+    # --- Eventos de abuso por tipo ---
+    abuse_rows = (
+        db.session.query(AbuseEvent.event_type, func.count(AbuseEvent.id))
+        .filter(AbuseEvent.created_at >= since)
+        .group_by(AbuseEvent.event_type)
+        .order_by(func.count(AbuseEvent.id).desc())
+        .all()
+    )
+    abuse_breakdown = [
+        {"label": _ABUSE_EVENT_LABELS.get(event_type, event_type.value), "count": n}
+        for event_type, n in abuse_rows
+    ]
+
+    # --- Domínios/entradas mais consultados ---
+    top_input_rows = (
+        db.session.query(Search.normalized_input, func.count(Search.id).label("n"))
+        .filter(Search.created_at >= since)
+        .group_by(Search.normalized_input)
+        .order_by(func.count(Search.id).desc())
+        .limit(10)
+        .all()
+    )
+    top_inputs = [{"input": value, "count": n} for value, n in top_input_rows]
+
+    # --- KPIs do período ---
+    total_period = sum(row["count"] for row in timeline)
+    completed_period = status_counts.get("Concluídas", 0)
+    success_rate_period = round((completed_period / total_period) * 100, 1) if total_period else 0.0
+
+    avg_duration_seconds = (
+        db.session.query(func.avg(func.extract("epoch", Search.completed_at - Search.started_at)))
+        .filter(
+            Search.status == SearchStatus.COMPLETED,
+            Search.created_at >= since,
+            Search.started_at.isnot(None),
+            Search.completed_at.isnot(None),
+        )
+        .scalar()
+    )
+
+    pages_period = db.session.query(GeneratedPage).filter(GeneratedPage.generated_at >= since).count()
+    indexed_pages_period = (
+        db.session.query(GeneratedPage)
+        .filter(GeneratedPage.generated_at >= since, GeneratedPage.index_status == IndexStatus.INDEX)
+        .count()
+    )
+    abuse_total_period = sum(row["count"] for row in abuse_breakdown)
+    top_tool_label = tools_breakdown[0]["label"] if tools_breakdown else "—"
+
+    kpis = {
+        "total_period": total_period,
+        "success_rate_period": success_rate_period,
+        "avg_duration_label": _format_duration(avg_duration_seconds),
+        "pages_period": pages_period,
+        "indexed_pages_period": indexed_pages_period,
+        "abuse_total_period": abuse_total_period,
+        "top_tool_label": top_tool_label,
+    }
+
+    return render_template(
+        "admin/charts.html",
+        days=days,
+        period_choices=_CHART_PERIOD_CHOICES,
+        timeline=timeline,
+        tools_breakdown=tools_breakdown,
+        categories_breakdown=categories_breakdown,
+        status_breakdown=status_breakdown,
+        abuse_breakdown=abuse_breakdown,
+        top_inputs=top_inputs,
+        kpis=kpis,
     )
 
 

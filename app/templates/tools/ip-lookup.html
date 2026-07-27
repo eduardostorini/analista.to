@@ -25,7 +25,7 @@
       <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Endereço IP</label>
       <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
       <p class="text-xs text-slate-400">Aceita IPv4 e IPv6.</p>
-      {{ captcha_widget(captcha_provider, turnstile_site_key, hcaptcha_site_key) }}
+      {{ captcha_widget(captcha_provider, cap_public_url, cap_site_key) }}
       <button type="submit" class="btn-primary w-full sm:w-auto">Consultar IP</button>
     </form>
     {% endif %}
@@ -61,6 +61,29 @@
           </dl>
         {% endif %}
       </div>
+
+      {% if not data.is_private and data.geolocation and data.geolocation.get('lat') is not none and data.geolocation.get('lon') is not none %}
+      {% set lat = data.geolocation.get('lat') %}
+      {% set lon = data.geolocation.get('lon') %}
+      {% set d = 0.09 %}
+      <div class="card space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-400">Mapa da localização aproximada</h2>
+          <a href="https://www.openstreetmap.org/?mlat={{ lat }}&amp;mlon={{ lon }}#map=11/{{ lat }}/{{ lon }}"
+             target="_blank" rel="noopener noreferrer" class="text-xs text-brand-600 hover:underline">Ver mapa maior ↗</a>
+        </div>
+        <div class="overflow-hidden rounded-lg border border-slate-200">
+          <iframe
+            title="Mapa da localização aproximada de {{ data.ip }}"
+            src="https://www.openstreetmap.org/export/embed.html?bbox={{ lon - d }},{{ lat - d }},{{ lon + d }},{{ lat + d }}&amp;layer=mapnik&amp;marker={{ lat }},{{ lon }}"
+            class="h-72 w-full" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+        </div>
+        <p class="text-xs text-slate-400">
+          Localização estimada por geolocalização de IP — representa a região do provedor de rede,
+          não o endereço físico exato. Mapa © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" class="hover:underline">colaboradores do OpenStreetMap</a>.
+        </p>
+      </div>
+      {% endif %}
     {% endif %}
 
     {% if mode == "form" %}
