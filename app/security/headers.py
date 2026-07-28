@@ -7,12 +7,25 @@ from flask import Flask, Response
 def _build_csp() -> str:
     return (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-eval'; "
+        # www.googletagmanager.com: carrega o container do GTM e o gtag.js.
+        # www.google-analytics.com: SDK legado do Universal Analytics/gtag.
+        # Liberados especificamente para permitir Google Analytics/Tag
+        # Manager (injetados via code/head.txt e code/body.txt) sem abrir
+        # 'unsafe-inline'/scripts de qualquer origem.
+        "script-src 'self' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com; "
         "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data:; "
+        # https: (além de 'self'/data:) é necessário para o preview de imagem
+        # do Open Graph Checker, que por natureza aponta para um domínio
+        # externo arbitrário informado pelo usuário — sem isso o navegador
+        # bloqueia a própria imagem que a ferramenta existe para mostrar.
+        # Também cobre os pixels de fallback do Google Analytics.
+        "img-src 'self' data: https:; "
         "font-src 'self' data:; "
-        "frame-src https://www.openstreetmap.org; "
-        "connect-src 'self'; "
+        "frame-src https://www.openstreetmap.org https://www.googletagmanager.com; "
+        # *.google-analytics.com / *.analytics.google.com: os endpoints de
+        # coleta do GA4 usam subdomínios regionais (ex.: region1.google-
+        # analytics.com), daí o wildcard em vez de listar cada um.
+        "connect-src 'self' https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; "
         "worker-src 'self' blob:; "
         "object-src 'none'; "
         "base-uri 'self'; "

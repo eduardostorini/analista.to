@@ -42,6 +42,7 @@ class BaseConfig:
     SITE_URL = os.environ.get("SITE_URL", "http://localhost:18473").rstrip("/")
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-insecure-key")
     ADMIN_URL_PREFIX = os.environ.get("ADMIN_URL_PREFIX", "/admin")
+    VERSION = os.environ.get("VERSION", "0.0.0")
 
     # --- Banco de dados ---------------------------------------------------
     SQLALCHEMY_DATABASE_URI = os.environ.get(

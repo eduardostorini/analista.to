@@ -22,6 +22,7 @@ from __future__ import annotations
 import ipaddress
 import socket
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
 import dns.exception
@@ -176,16 +177,38 @@ class SafeHTTPClient:
         return self.request("GET", url, headers=headers, max_response_bytes=max_response_bytes)
 
     def request(
-        self, method: str, url: str, *, headers: dict[str, str] | None = None, max_response_bytes: int | None = None
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        max_response_bytes: int | None = None,
+        json: Any = None,
+        content: bytes | str | None = None,
     ) -> httpx.Response:
-        response, _history = self.request_with_history(method, url, headers=headers, max_response_bytes=max_response_bytes)
+        response, _history = self.request_with_history(
+            method, url, headers=headers, max_response_bytes=max_response_bytes, json=json, content=content
+        )
         return response
 
     def request_with_history(
-        self, method: str, url: str, *, headers: dict[str, str] | None = None, max_response_bytes: int | None = None
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        max_response_bytes: int | None = None,
+        json: Any = None,
+        content: bytes | str | None = None,
     ) -> tuple[httpx.Response, list[dict]]:
         """Como `request()`, mas também devolve a cadeia de redirecionamentos
-        seguidos manualmente (usado pelo Redirect Checker)."""
+        seguidos manualmente (usado pelo Redirect Checker).
+
+        `json`/`content` permitem enviar corpo (ex.: POST de criação de
+        medição no GlobalPing, usado pelo Traceroute) — mantidos como
+        parâmetros opcionais para não afetar as ferramentas GET-only
+        existentes. Um eventual redirect reenvia o mesmo corpo.
+        """
         remaining_redirects = self._max_redirects
         current_url = url
         limit = max_response_bytes if max_response_bytes is not None else self._max_bytes
@@ -198,7 +221,9 @@ class SafeHTTPClient:
             timeout = httpx.Timeout(connect=self._connect_timeout, read=self._read_timeout, write=self._read_timeout, pool=self._connect_timeout)
 
             with httpx.Client(transport=transport, timeout=timeout, follow_redirects=False) as client:
-                response = self._send_with_size_limit(client, method, target.url, request_headers, limit=limit)
+                response = self._send_with_size_limit(
+                    client, method, target.url, request_headers, limit=limit, json=json, content=content
+                )
 
             if response.is_redirect and remaining_redirects > 0:
                 location = response.headers.get("location")
@@ -215,9 +240,17 @@ class SafeHTTPClient:
             return response, history
 
     def _send_with_size_limit(
-        self, client: httpx.Client, method: str, url: str, headers: dict[str, str], *, limit: int
+        self,
+        client: httpx.Client,
+        method: str,
+        url: str,
+        headers: dict[str, str],
+        *,
+        limit: int,
+        json: Any = None,
+        content: bytes | str | None = None,
     ) -> httpx.Response:
-        with client.stream(method, url, headers=headers) as response:
+        with client.stream(method, url, headers=headers, json=json, content=content) as response:
             content_length = response.headers.get("content-length")
             if content_length and int(content_length) > limit:
                     raise ResponseTooLargeError(

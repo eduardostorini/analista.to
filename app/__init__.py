@@ -1,6 +1,8 @@
 """App factory do Analista.to."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from flask import Flask, render_template
 
 from app.celery_app import celery_init_app
@@ -81,10 +83,28 @@ def _register_error_handlers(app: Flask) -> None:
         return render_template("errors/429.html"), 429
 
 
+_CUSTOM_CODE_DIR = Path(__file__).resolve().parent.parent / "code"
+
+
+def _read_custom_snippet(filename: str) -> str:
+    """Lê `code/head.txt` ou `code/body.txt` (scripts de terceiros, ex.:
+    Google Analytics/GTM, mantidos fora do controle de versão) — lido a
+    cada request para refletir edições sem precisar reiniciar a aplicação.
+    Nunca deve derrubar o carregamento da página: arquivo ausente/vazio
+    apenas resulta em nada sendo injetado."""
+    try:
+        return (_CUSTOM_CODE_DIR / filename).read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
 def _register_template_globals(app: Flask) -> None:
     @app.context_processor
     def inject_globals():
         return {
             "site_name": app.config["SITE_NAME"],
             "site_url": app.config["SITE_URL"],
+            "app_version": app.config["VERSION"],
+            "head_scripts": _read_custom_snippet("head.txt"),
+            "body_scripts": _read_custom_snippet("body.txt"),
         }

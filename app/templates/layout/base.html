@@ -35,8 +35,10 @@
     });
   </script>
   {% block head_extra %}{% endblock %}
+  {% if head_scripts %}{{ head_scripts | safe }}{% endif %}
 </head>
 <body class="h-full bg-slate-50 text-slate-800" x-data="{ toast: null }">
+  {% if body_scripts %}{{ body_scripts | safe }}{% endif %}
 <div x-data="sidebar()" class="flex min-h-full">
 
   <button
@@ -176,6 +178,7 @@
     </main>
     <footer class="border-t border-slate-200 bg-white px-4 py-6 text-center text-xs text-slate-400">
       © {{ site_name }} — data collected automatically for technical and informational purposes.
+      <span class="text-slate-300">·</span> v{{ app_version }}
     </footer>
   </div>
 

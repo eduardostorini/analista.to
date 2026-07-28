@@ -70,6 +70,16 @@ def _sse_stream(public_id: str, initial_snapshot: dict):
     if initial_snapshot.get("status") in _TERMINAL_VALUES or extensions.redis_pubsub is None:
         return
 
+    # Redis pub/sub não reenvia mensagens publicadas antes do `subscribe()`
+    # abaixo terminar — numa tarefa rápida (várias ferramentas novas
+    # terminam em poucos segundos), o evento "completed" pode ser publicado
+    # exatamente nessa janela e nunca chegar a este stream. Por isso, a cada
+    # iteração sem mensagem nova, também revalidamos o snapshot em Redis
+    # (sempre atualizado por `JobService._publish`, independente de haver
+    # subscriber) como rede de segurança — sem isso, o cliente só percebe a
+    # conclusão ao esgotar `_SSE_MAX_DURATION_SECONDS` e cair no fallback de
+    # polling, parecendo "travado" por até um minuto.
+    last_status = initial_snapshot.get("status")
     pubsub = extensions.redis_pubsub.pubsub()
     pubsub.subscribe(f"job:{public_id}")
     started = time.monotonic()
@@ -78,11 +88,19 @@ def _sse_stream(public_id: str, initial_snapshot: dict):
             message = pubsub.get_message(timeout=_SSE_POLL_INTERVAL_SECONDS, ignore_subscribe_messages=True)
             if message and message.get("type") == "message":
                 payload = json.loads(message["data"])
+                last_status = payload.get("status")
                 yield _format_sse(payload)
-                if payload.get("status") in _TERMINAL_VALUES:
+                if last_status in _TERMINAL_VALUES:
                     return
             else:
-                yield ": keep-alive\n\n"
+                snapshot = JobService.get_snapshot(public_id)
+                if snapshot and snapshot.get("status") != last_status:
+                    last_status = snapshot.get("status")
+                    yield _format_sse(snapshot)
+                    if last_status in _TERMINAL_VALUES:
+                        return
+                else:
+                    yield ": keep-alive\n\n"
     finally:
         pubsub.close()
 

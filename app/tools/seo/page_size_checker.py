@@ -63,13 +63,20 @@ class PageSizeCheckerTool(BaseTool):
             except (TypeError, ValueError):
                 transfer_size = None
 
-        if transfer_size is None and status_code == 200:
+        if transfer_size is None:
+            # Alguns servidores (Apache sem Content-Length em HEAD, CDNs com
+            # bot-detection que só permite GET, etc.) não dão para confiar
+            # apenas no HEAD — refeito com GET real, valendo o tamanho e o
+            # status code dessa resposta (que é o que um navegador veria de
+            # fato), mesmo quando não é 200 (ex.: uma página de erro 403/404
+            # ainda tem um tamanho real que vale reportar).
             try:
                 get_response = SafeHTTPClient().request("GET", normalized_input, max_response_bytes=10 * 1024 * 1024)
-                if get_response.status_code == 200:
-                    body = get_response.content
-                    if body:
-                        transfer_size = len(body)
+                status_code = get_response.status_code
+                content_type = get_response.headers.get("content-type", content_type)
+                body = get_response.content
+                if body:
+                    transfer_size = len(body)
             except Exception:
                 transfer_size = None
 

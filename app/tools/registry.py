@@ -65,7 +65,6 @@ def load_tools() -> ToolRegistry:
     from app.tools.domain.website_hosting import WebsiteHostingTool
     from app.tools.domain.whois_rdap import WhoisRdapTool
     from app.tools.email.blocklist_lookup import BlocklistLookupTool
-    from app.tools.dns.dmarc_lookup import DmarcLookupTool
     from app.tools.email.spf_checker import SpfCheckerTool
     from app.tools.http.brotli_checker import BrotliCheckerTool
     from app.tools.http.http_headers import HttpHeadersTool
@@ -75,7 +74,6 @@ def load_tools() -> ToolRegistry:
     from app.tools.seo.meta_tags import MetaTagsTool
     from app.tools.seo.robots_checker import RobotsCheckerTool
     from app.tools.seo.sitemap_checker import SitemapCheckerTool
-    from app.tools.seo.google_index_checker import GoogleIndexCheckerTool
     from app.tools.seo.page_size_checker import PageSizeCheckerTool
     from app.tools.seo.open_graph_checker import OpenGraphCheckerTool
     from app.tools.ssl.security_headers import SecurityHeadersTool
@@ -99,7 +97,6 @@ def load_tools() -> ToolRegistry:
         MetaTagsTool,
         RobotsCheckerTool,
         SitemapCheckerTool,
-        GoogleIndexCheckerTool,
         PageSizeCheckerTool,
         OpenGraphCheckerTool,
         HttpHeadersTool,
@@ -110,7 +107,6 @@ def load_tools() -> ToolRegistry:
         SslCertificateTool,
         SecurityHeadersTool,
         SpfCheckerTool,
-        DmarcLookupTool,
         BlocklistLookupTool,
         QrCodeGeneratorTool,
         HashGeneratorTool,

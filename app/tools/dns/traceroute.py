@@ -76,7 +76,7 @@ class TracerouteTool(BaseTool):
                 data={"domain": normalized_input, "hops": [], "status": "error"},
             )
 
-        if create_response.status_code not in (200, 201):
+        if create_response.status_code not in (200, 201, 202):
             return ToolResult(
                 success=True,
                 summary=f"GlobalPing returned HTTP {create_response.status_code} for {normalized_input}.",
@@ -128,7 +128,7 @@ class TracerouteTool(BaseTool):
                 data = {}
 
             status = (data.get("status") or "").lower()
-            if status not in ("in_progress", "pending", "queued"):
+            if status not in ("in-progress", "in_progress", "pending", "queued"):
                 hops, probe, raw_output = self._parse_globalping_result(data)
                 domain = self._extract_target(data) or normalized_input
 
@@ -181,20 +181,22 @@ class TracerouteTool(BaseTool):
         raw_output = trace_result.get("rawOutput")
 
         hops: list[dict[str, Any]] = []
-        for hop in hops_data:
-            parsed: dict[str, Any] = {"raw": hop}
-            if "hop" in hop:
-                parsed["hop_number"] = hop["hop"]
-            if "host" in hop:
-                parsed["hostname"] = hop["host"]
-            if "ip" in hop:
-                parsed["ip_address"] = hop["ip"]
-            if "rtt" in hop:
-                rtt = hop["rtt"]
-                if isinstance(rtt, (int, float)):
-                    parsed["response_times_ms"] = [float(rtt)]
-                elif isinstance(rtt, list):
-                    parsed["response_times_ms"] = [float(v) for v in rtt if isinstance(v, (int, float))]
+        for index, hop in enumerate(hops_data, start=1):
+            parsed: dict[str, Any] = {"raw": hop, "hop_number": index}
+            hostname = hop.get("resolvedHostname")
+            address = hop.get("resolvedAddress")
+            if hostname:
+                parsed["hostname"] = hostname
+            if address:
+                parsed["ip_address"] = address
+            timings = hop.get("timings") or []
+            rtts = [
+                float(timing["rtt"])
+                for timing in timings
+                if isinstance(timing, dict) and isinstance(timing.get("rtt"), (int, float))
+            ]
+            if rtts:
+                parsed["response_times_ms"] = rtts
             hops.append(parsed)
 
         probe_info: dict[str, Any] = {}

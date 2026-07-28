@@ -47,3 +47,8 @@ dist/
 build/
 *.log
 celerybeat-schedule*
+
+# Scripts de terceiros injetados em todo <head>/<body> (Google Analytics,
+# GTM, etc.) — específicos de cada ambiente/cliente, nunca versionados.
+code/head.txt
+code/body.txt
