@@ -1,0 +1,193 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Hash Generator | {{ site_name }}{% endblock %}
+{% block meta_description %}Generate MD5, SHA-1, SHA-2, SHA-3, BLAKE2 and other hashes from text, URLs, or files.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Hash Generator</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Text, URL or file content</label>
+        <textarea
+          id="input_value" name="input_value" rows="4" required class="input"
+          placeholder="{{ tool.input_placeholder }}"
+        >{{ submitted_value.split('::', 1)[1] if submitted_value and '::' in submitted_value else submitted_value }}</textarea>
+        <p class="mt-1 text-xs text-slate-400">Paste any text, a URL, or file content. Max {{ 10000 }} characters.</p>
+      </div>
+      <div>
+        <label for="algorithm" class="mb-1 block text-sm font-medium text-slate-700">Algorithms</label>
+        <select id="algorithm" name="algorithm" multiple class="input" size="8">
+          <option value="all" selected>All algorithms</option>
+          <option value="md5">MD5</option>
+          <option value="sha1">SHA-1</option>
+          <option value="sha224">SHA-224</option>
+          <option value="sha256">SHA-256</option>
+          <option value="sha384">SHA-384</option>
+          <option value="sha512">SHA-512</option>
+          <option value="sha3-224">SHA3-224</option>
+          <option value="sha3-256">SHA3-256</option>
+          <option value="sha3-384">SHA3-384</option>
+          <option value="sha3-512">SHA3-512</option>
+          <option value="blake2s">BLAKE2s</option>
+          <option value="blake2b">BLAKE2b</option>
+        </select>
+        <p class="mt-1 text-xs text-slate-400">Hold Ctrl/Cmd to select multiple algorithms. "All algorithms" overrides individual choices.</p>
+      </div>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Generate hashes</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}
+      {{ status_bar(search) }}
+    {% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-slate-400">{{ data.algorithms_count }} algorithm(s)</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                <th class="py-2 pr-4">Algorithm</th>
+                <th class="py-2">Hash</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in data.hashes %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">{{ item.name }}</td>
+                <td class="py-2 font-mono text-xs text-slate-600 break-all">{{ item.hex }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is the Hash Generator?</h2>
+      <p>
+        A hash is a fixed-length string produced by a mathematical function that takes
+        any input — a password, a file, a JSON payload, a disk image — and turns it
+        into a short, deterministic fingerprint. The same input always produces the
+        same hash, and even a tiny change in the input completely changes the output.
+        This tool lets you compute those fingerprints for a wide range of popular
+        algorithms directly on our server, without installing anything locally or
+        trusting an unknown website. It supports legacy hashes still seen in legacy
+        systems, modern hashes used for file integrity, checksums, password storage
+        audits, and cryptographic verification, as well as newer constructions designed
+        to be faster or more resistant to collision attacks. Because hashes are one-way,
+        you cannot reverse them to recover the original text — this is exactly why they
+        are used to store passwords safely, verify downloads, and create message
+        authentication codes.
+      </p>
+      <h2>How to choose an algorithm</h2>
+      <p>
+        MD5 and SHA-1 are included for compatibility and learning purposes only. Both
+        are considered broken for security-sensitive use because researchers have
+        demonstrated practical collision attacks. For modern applications, prefer SHA-256
+        or stronger from the SHA-2 family, or SHA-3 if you want a structurally different
+        construction. SHA-224 and SHA-384 are truncated variants of SHA-2 that produce
+        shorter digests when storage or bandwidth is a concern. BLAKE2b and BLAKE2s
+        are modern alternatives designed to be faster than SHA-2 and SHA-3 on most
+        hardware while offering similar or better security margins. If you are verifying
+        a checksum published by a vendor, use the exact algorithm they specify — do not
+        substitute a different hash even if it looks stronger. If you are checking a
+        password hash extracted from a database, match the algorithm used by the
+        application rather than assuming the strongest option available.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        Developers use hash generators to verify whether a downloaded file matches the
+        checksum published by the maintainer, which protects against corrupted or
+        tampered downloads. Security teams use them to audit password storage by
+        comparing captured password hashes against known weak patterns or rainbow tables.
+        System administrators use them to create HMACs, verify container image digests,
+        or generate consistent identifiers for content that must be deduplicated without
+        exposing the original data. Support teams use them to compare the hash of a
+        configuration file before and after a change, confirming whether two versions are
+        identical without diffing the full content. QA engineers use them to generate
+        stable input for tests that require deterministic but non-reversible values. In
+        education, hash generators help illustrate why changing a single character in a
+        file produces a completely different fingerprint, making the avalanche effect
+        easy to demonstrate to students or junior developers.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        This tool does not support HMAC, PBKDF2, bcrypt, Argon2, or other password-
+        hashing functions because those are intentionally slow algorithms meant to be
+        computed once per guess, not bulk-generated in bulk. If you need to verify a
+        password hash from a modern application, look for a bcrypt, Argon2, or PBKDF2
+        prefix in the stored string — those formats cannot be compared with plain MD5 or
+        SHA-256. The input is processed entirely in memory and is not stored, logged, or
+        published; however, because the computation happens on our server, do not use
+        this tool for extremely sensitive secrets unless you trust the environment. For
+        high-security workflows, prefer a local command-line tool or a hardware security
+        module. Finally, hashes alone do not guarantee authenticity: an attacker who can
+        modify both the file and its checksum can defeat simple verification, which is
+        why software distribution relies on signed hashes or certificate chains rather
+        than bare hashes alone.
+      </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+      ("Is my input stored or logged?", "No. The input is hashed in memory and is not stored, logged, or published. This tool also does not create public result pages."),
+      ("Which algorithm should I use?", "For new applications, prefer SHA-256 or stronger. MD5 and SHA-1 are kept only for legacy compatibility and are not safe for security-sensitive uses."),
+      ("Can I hash a file?", "Yes. Paste the file content into the text area, or use a local command-line tool for very large files."),
+      ("Why are there so many SHA-2 and SHA-3 variants?", "Different variants trade off output length, performance, and security margin. Use the one required by your specification or standard."),
+    ] %}
+    {% if mode == "form" %}
+    <section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

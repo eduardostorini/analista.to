@@ -24,13 +24,13 @@ def _classify(record: str) -> str:
 class TxtLookupTool(BaseTool):
     slug = "txt-lookup"
     name = "TXT Lookup"
-    category_slug = "dns"
+    category_slug = "email"
     short_description = "List all TXT records of a domain, with type identification (SPF, verification, etc.)."
     description = "Queries the TXT records of a domain and classifies their purpose when recognizable."
     icon = "file-text"
     input_type = InputType.DOMAIN
     input_placeholder = "example.com"
-    public_url_prefix = "dns/txt"
+    public_url_prefix = "email/txt"
     ttl_seconds = 3 * 3600
     rate_limit_per_minute = 15
     analyzer_version = 1

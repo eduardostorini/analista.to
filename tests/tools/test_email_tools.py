@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.tools.email.dmarc_checker import DmarcCheckerTool
+from app.tools.dns.dmarc_lookup import DmarcLookupTool
 from app.tools.email.spf_checker import SpfCheckerTool
 
 
@@ -38,37 +38,37 @@ def test_spf_checker_flags_too_many_lookups(mocker):
     assert any("acima do limite" in issue for issue in result.data["issues"])
 
 
-def test_dmarc_checker_no_record(mocker):
-    mocker.patch("app.tools.email.dmarc_checker.domain_exists", return_value=True)
-    mocker.patch("app.tools.email.dmarc_checker.query_txt_clean", return_value=[])
+def test_dmarc_lookup_no_record(mocker):
+    mocker.patch("app.tools.dns.dmarc_lookup.domain_exists", return_value=True)
+    mocker.patch("app.tools.dns.dmarc_lookup.query_txt_clean", return_value=[])
 
-    tool = DmarcCheckerTool()
+    tool = DmarcLookupTool()
     result = tool.execute("example.com")
     assert result.data["has_dmarc"] is False
 
 
-def test_dmarc_checker_parses_tags(mocker):
-    mocker.patch("app.tools.email.dmarc_checker.domain_exists", return_value=True)
+def test_dmarc_lookup_parses_tags(mocker):
+    mocker.patch("app.tools.dns.dmarc_lookup.domain_exists", return_value=True)
     mocker.patch(
-        "app.tools.email.dmarc_checker.query_txt_clean",
+        "app.tools.dns.dmarc_lookup.query_txt_clean",
         return_value=["v=DMARC1; p=reject; pct=100; rua=mailto:dmarc@example.com"],
     )
 
-    tool = DmarcCheckerTool()
+    tool = DmarcLookupTool()
     result = tool.execute("example.com")
     assert result.data["policy"] == "reject"
     assert result.data["aggregate_reports_to"] == "mailto:dmarc@example.com"
     assert result.data["issues"] == []
 
 
-def test_dmarc_checker_flags_missing_rua_and_invalid_policy(mocker):
-    mocker.patch("app.tools.email.dmarc_checker.domain_exists", return_value=True)
+def test_dmarc_lookup_flags_missing_rua_and_invalid_policy(mocker):
+    mocker.patch("app.tools.dns.dmarc_lookup.domain_exists", return_value=True)
     mocker.patch(
-        "app.tools.email.dmarc_checker.query_txt_clean",
+        "app.tools.dns.dmarc_lookup.query_txt_clean",
         return_value=["v=DMARC1; p=invalid"],
     )
 
-    tool = DmarcCheckerTool()
+    tool = DmarcLookupTool()
     result = tool.execute("example.com")
     assert any("inválida" in issue for issue in result.data["issues"])
     assert any("rua=" in issue for issue in result.data["issues"])

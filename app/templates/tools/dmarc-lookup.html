@@ -1,7 +1,7 @@
 {% extends "layout/base.html" %}
 {% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
 
-{% block title %}DMARC Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block title %}DMARC Lookup{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
 {% block meta_description %}Check a domain's DMARC policy and where email authentication reports are sent.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
 {% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
@@ -11,7 +11,7 @@
 {{ breadcrumbs(crumbs) }}
 
 <header class="mb-8 max-w-2xl">
-  <h1 class="text-3xl">DMARC Checker</h1>
+  <h1 class="text-3xl">DMARC Lookup</h1>
   <p class="mt-2 text-slate-600">{{ tool.description }}</p>
 </header>
 
@@ -24,7 +24,7 @@
   <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
   <p class="text-xs text-slate-400">We automatically check _dmarc.{{ '{domain}' }}.</p>
   {{ captcha_widget(captcha_provider) }}
-  <button type="submit" class="btn-primary w-full sm:w-auto">Check DMARC</button>
+  <button type="submit" class="btn-primary w-full sm:w-auto">Lookup DMARC</button>
 </form>
 {% endif %}
 

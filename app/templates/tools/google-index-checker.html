@@ -1,0 +1,166 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Google Index Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Estimate how many pages Google has indexed for any domain. Free, fast, and no API key required.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Google Index Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
+        <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+        <p class="mt-1 text-xs text-slate-400">Enter a domain like example.com or https://www.example.com</p>
+      </div>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check Google index</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}
+      {{ status_bar(search) }}
+    {% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-slate-400">Domain: {{ data.domain }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        <div class="rounded-lg border border-slate-200 bg-white p-6">
+          <p class="text-xs text-slate-400">Approximate indexed pages</p>
+          <p class="text-4xl font-semibold text-brand-900">
+            {% if data.indexed_pages is not none %}
+              {{ "{:,}".format(data.indexed_pages) }}
+            {% else %}
+              <span class="text-2xl text-slate-400">Not available</span>
+            {% endif %}
+          </p>
+          {% if data.source_url %}
+          <a href="{{ data.source_url }}" target="_blank" rel="noopener" class="mt-2 inline-block text-sm text-brand-600 hover:underline">View Google search result →</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is the Google Index Checker?</h2>
+      <p>
+        Search engines maintain a massive catalog of publicly reachable web pages called
+        the index. When Google discovers a page through links, a sitemap, or a manual
+        submission, it may add it to that catalog so it can appear in search results.
+        The Google Index Checker estimates how many pages from a given domain are currently
+        in Google's index by querying the `site:` operator and reading the result count
+        Google displays on the search results page. This is useful for SEO audits, content
+        migrations, and troubleshooting situations where you expect a site to be well
+        represented in search but suspect pages are missing, excluded by robots.txt, or
+        blocked by accidental noindex tags. Because Google does not expose an exact count
+        through a public API, this tool provides the closest practical approximation
+        available without signing up for Google Search Console access.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        The number shown is the approximate count returned by Google for the query
+        `site:yourdomain.com`. A larger number generally means Google has found and
+        stored more pages from that domain, which is a positive signal for visibility.
+        A smaller number than expected can indicate crawl budget issues, thin content,
+        hosting or DNS problems, manual penalties, or recent migrations where old URLs
+        were dropped before new ones were discovered. If you see zero results, the domain
+        may be entirely new, completely blocked by a robots.txt rule, deindexed, or simply
+        unreachable by Googlebot at the time of the check. The result is also influenced
+        by regional and personalization factors, so rerunning the check from a different
+        location or after a few hours may yield a slightly different figure. Always treat
+        this number as a directional signal rather than an exact inventory, and confirm
+        suspicious changes with Google Search Console, which provides authoritative
+        coverage, crawl errors, and indexed-page history over time.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        SEO professionals use this tool during site migrations to confirm that the new
+        domain is being discovered and indexed at a healthy rate after launching new
+        content or changing CMS platforms. Agency teams use it in client reports to show
+        whether SEO efforts are expanding or shrinking a site's presence in Google's
+        catalog. Support teams use it to diagnose sudden drops in organic traffic by
+        checking whether the index count collapsed at the same time as rankings fell.
+        Developers use it after deploying a new robots.txt or noindex configuration to
+        verify that the change had the intended effect without waiting for manual checks
+        in Search Console. Marketers use it to benchmark competitors by comparing indexed
+        page counts across similar domains, which can reveal whether a rival is publishing
+        at a much higher velocity or maintaining a much larger content footprint. It is
+        also useful before buying or selling a website, because an unexpectedly low index
+        count can be an early warning of hidden penalties, orphaned URLs, or poor site
+        architecture that would require expensive cleanup after acquisition.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        Google does not provide an exact, real-time index count through its public
+        interface, so the number shown is an approximation based on the search results
+        page. The figure can change from one query to the next because of regional data
+        centers, A/B testing, logged-in personalization, and temporary crawl throttling.
+        If a domain uses a CDN, redirects, or canonical tags, the count may reflect only
+        the canonical version Google has chosen, not every URL that exists on the origin
+        server. Very large domains may show a capped or rounded number instead of a
+        precise total. Sites with aggressive anti-bot measures may return incomplete
+        results or trigger temporary challenges. Finally, this tool only checks Google;
+        it does not report indexation on Bing, Yandex, or other search engines, which
+        may have different coverage, crawl schedules, and policies. For a complete
+        picture, combine this tool with sitemap validation, robots.txt inspection, and
+        Google Search Console coverage reports.
+      </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+      ("Why is my indexed page count lower than expected?", "Possible causes include recently published pages not yet crawled, blocked resources, noindex tags, manual penalties, or a recent site migration. Verify with Google Search Console for authoritative data."),
+      ("Does this tool use the official Google API?", "No. Google does not offer a free public API for index counts. This tool estimates the number from Google's public search results page."),
+      ("Can I check Bing or other search engines?", "This version checks Google only. Other search engines have their own index sizes and may show different counts for the same domain."),
+      ("Why does the number change between checks?", "Google's index is updated continuously and can vary by region, personalization, and crawl scheduling. Treat the result as an approximate snapshot, not an exact inventory."),
+    ] %}
+    {% if mode == "form" %}
+    <section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

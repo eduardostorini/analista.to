@@ -101,6 +101,8 @@ def public_result_page(prefix: str, slug: str):
     formulário até o resultado final.
     """
     tool = next((t for t in registry.all() if t.public_url_prefix == prefix), None)
+    if tool is None and prefix == "email/dmarc":
+        return redirect(url_for("public_pages.public_result_page", prefix="dns/dmarc", slug=slug), code=301)
     if tool is None:
         abort(404)
 

@@ -25,16 +25,16 @@ def _parse_dmarc(record: str) -> dict:
     return tags
 
 
-class DmarcCheckerTool(BaseTool):
-    slug = "dmarc-checker"
-    name = "DMARC Checker"
-    category_slug = "email"
-    short_description = "Check the DMARC policy of a domain and where authentication reports are sent."
+class DmarcLookupTool(BaseTool):
+    slug = "dmarc-lookup"
+    name = "DMARC Lookup"
+    category_slug = "dns"
+    short_description = "Check a domain's DMARC policy and where email authentication reports are sent."
     description = "Queries and interprets the DMARC record published at _dmarc.<domain>."
-    icon = "shield-check"
+    icon = "mail"
     input_type = InputType.DOMAIN
     input_placeholder = "example.com"
-    public_url_prefix = "email/dmarc"
+    public_url_prefix = "dns/dmarc"
     ttl_seconds = 6 * 3600
     rate_limit_per_minute = 10
     analyzer_version = 1

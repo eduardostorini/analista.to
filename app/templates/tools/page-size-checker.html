@@ -1,0 +1,211 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Page Size Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check the transfer size of any webpage in KB and MB, plus content type, encoding, server, and cache info.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Page Size Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">URL</label>
+        <input id="input_value" name="input_value" type="url" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+        <p class="mt-1 text-xs text-slate-400">Enter the full URL of the page you want to analyze, including https://</p>
+      </div>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check page size</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}
+      {{ status_bar(search) }}
+    {% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-slate-400">{{ data.url }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        <div class="rounded-lg border border-slate-200 bg-white p-6">
+          <p class="text-xs text-slate-400">Transfer size</p>
+          <p class="text-4xl font-semibold text-brand-900">
+            {% if data.size_display %}
+              {{ data.size_display }}
+            {% else %}
+              <span class="text-2xl text-slate-400">Not available</span>
+            {% endif %}
+          </p>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                <th class="py-2 pr-4">Property</th>
+                <th class="py-2">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Status code</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.status_code }}</td>
+              </tr>
+              {% if data.content_type %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Content type</td>
+                <td class="py-2 text-slate-600">{{ data.content_type }}</td>
+              </tr>
+              {% endif %}
+              {% if data.content_encoding %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Content encoding</td>
+                <td class="py-2 text-slate-600">{{ data.content_encoding }}</td>
+              </tr>
+              {% endif %}
+              {% if data.transfer_size_bytes is not none %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Transfer size (bytes)</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ "{:,}".format(data.transfer_size_bytes) }}</td>
+              </tr>
+              {% endif %}
+              {% if data.server %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Server</td>
+                <td class="py-2 text-slate-600">{{ data.server }}</td>
+              </tr>
+              {% endif %}
+              {% if data.cache_control %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Cache control</td>
+                <td class="py-2 text-slate-600">{{ data.cache_control }}</td>
+              </tr>
+              {% endif %}
+              {% if data.x_cache != "unknown" %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Cache status</td>
+                <td class="py-2 text-slate-600">{{ data.x_cache }}</td>
+              </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is the Page Size Checker?</h2>
+      <p>
+        Page size matters because every kilobyte a browser downloads costs time, money,
+        and battery. Search engines also use performance as a ranking signal, especially
+        on mobile, where slow pages can be downgraded or buried under slower competitors.
+        The Page Size Checker fetches any URL and reports the exact transfer size the
+        server sends, along with the content type, encoding, server software, and cache
+        hints it declares. It uses a lightweight HEAD request by default, so it measures
+        what the server would send without downloading the full body unless the server
+        refuses to answer HEAD. This makes it fast and safe to run against production
+        sites without consuming much bandwidth or triggering rate limits.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        The main number to watch is the transfer size in kilobytes or megabytes. As a
+        rough rule of thumb, a simple HTML page should be under 100 KB, a typical
+        modern marketing page often lands between 200 KB and 800 KB, and anything above
+        a few megabytes for a single HTML document is a red flag that should be
+        investigated. Content type tells you whether the server is sending HTML, JSON,
+        XML, or something else; if you expected HTML but see JSON, the URL may be an
+        API endpoint rather than a page. Content encoding shows whether the server
+        compresses the response with gzip, Brotli, or nothing at all — compression can
+        cut transfer size by 60% or more, so missing compression on text-based content
+        is a common performance issue. Cache control and x-cache headers reveal whether
+        the response is cacheable and whether a CDN or reverse proxy served it from
+        cache, which affects both speed and repeat-visit experience.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        SEO professionals use this tool during audits to identify pages that are
+        unusually large for their content type, which often points to unoptimized
+        images, embedded fonts, or inline scripts that should be deferred. Developers
+        use it before and after a build to confirm that bundling, minification, and
+        image compression actually reduced payload size. DevOps teams use it to verify
+        that CDN and compression settings are working after a deployment or a cache
+        flush. Support teams use it to answer client questions about why a page feels
+        slow by pointing to concrete size numbers instead of vague guesses. Buyers use
+        it during website due diligence to check whether a site's pages are reasonably
+        sized or bloated with legacy scripts and unoptimized assets. It is also useful
+        when debugging third-party embeds or analytics tags that silently add hundreds
+        of kilobytes to a page without showing up in the main bundle.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        This tool measures only the initial HTML response, not the full page weight
+        including images, CSS, JavaScript, fonts, and XHR/fetch requests. A page that
+        reports 50 KB in this tool may still download several megabytes of assets once
+        the browser parses the HTML and starts loading subresources. For a complete
+        picture, use browser DevTools or a lab tool like Lighthouse. Some servers
+        refuse HEAD requests or return a different size for HEAD than GET; in those
+        cases the number may be inaccurate or missing. CDNs and reverse proxies may
+        compress or vary the response by user agent, language, or geography, so the
+        size you see from this tool may differ from what a real mobile browser on a
+        different continent receives. Finally, this tool does not execute JavaScript,
+        so it cannot measure client-side rendered content or dynamically injected
+        assets; for single-page applications, the initial HTML size is only a small
+        fraction of the total experience.
+      </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+      ("Why does the page size matter for SEO?", "Page speed is a ranking factor, especially on mobile. Smaller pages load faster, use less data, and provide a better user experience, which indirectly improves rankings and conversions."),
+      ("Does this tool download the full page?", "No. It sends a HEAD request by default, which asks the server for headers only. This keeps the check fast and lightweight."),
+      ("Why is my page size larger than expected?", "Large pages often contain unoptimized images, inline fonts, redundant scripts, or uncompressed text assets. Check the content type and encoding to spot obvious issues."),
+      ("What is the difference between transfer size and full page weight?", "Transfer size is just the initial HTML response. Full page weight includes images, CSS, JS, fonts, and XHR requests loaded after the HTML. Use browser DevTools or Lighthouse for the complete picture."),
+    ] %}
+    {% if mode == "form" %}
+    <section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

@@ -18,13 +18,13 @@ def _parse_mx_record(record: str) -> dict:
 class MxLookupTool(BaseTool):
     slug = "mx-lookup"
     name = "MX Lookup"
-    category_slug = "dns"
+    category_slug = "email"
     short_description = "Check which mail servers receive email for a domain, in priority order."
     description = "Queries the MX (Mail Exchanger) records of a domain."
     icon = "mail"
     input_type = InputType.DOMAIN
     input_placeholder = "example.com"
-    public_url_prefix = "dns/mx"
+    public_url_prefix = "email/mx"
     ttl_seconds = 3 * 3600
     rate_limit_per_minute = 15
     analyzer_version = 1

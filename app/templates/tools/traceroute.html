@@ -1,0 +1,189 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Traceroute Tool{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Trace the network path to any domain and see each hop's IP address, hostname, and response times.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Traceroute Tool</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
+        <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+        <p class="mt-1 text-xs text-slate-400">Enter a domain like example.com or a hostname like google.com</p>
+      </div>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Run traceroute</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}
+      {{ status_bar(search) }}
+    {% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-slate-400">Domain: {{ data.domain }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if data.hops %}
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                <th class="py-2 pr-4">Hop</th>
+                <th class="py-2 pr-4">Hostname</th>
+                <th class="py-2 pr-4">IP Address</th>
+                <th class="py-2">Response times</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for hop in data.hops %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-mono text-xs text-slate-600">{{ hop.hop_number }}</td>
+                <td class="py-2 pr-4 text-slate-600">{{ hop.hostname or "—" }}</td>
+                <td class="py-2 pr-4 font-mono text-xs text-slate-600">{{ hop.ip_address or "—" }}</td>
+                <td class="py-2 text-slate-600">
+                  {% if hop.response_times_ms %}
+                    {% for timing in hop.response_times_ms %}
+                      {{ "%.1f" % timing }} ms{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="badge-warning">No traceroute data available for this domain.</p>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is the Traceroute Tool?</h2>
+      <p>
+        Every time your computer talks to a server on the internet, the packets
+        travel through a series of intermediate devices: routers, switches, and
+        gateways operated by different networks. The Traceroute Tool maps that
+        journey hop by hop, showing exactly which networks your request crosses
+        before reaching the target domain. This is useful for understanding
+        routing paths, diagnosing connectivity problems, identifying network
+        congestion or packet loss, and verifying whether traffic is taking an
+        expected route through your ISP, a backbone provider, or a cloud
+        provider's network. Unlike a simple ping, which only measures round-trip
+        time to the final destination, traceroute reveals the entire chain and
+        highlights where delays or failures occur.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        Each row in the result represents one hop along the path from your
+        location to the target domain. The hop number increases sequentially
+        from 1 onward. The hostname column shows the reverse DNS name of the
+        router at that hop, which often includes the network operator's name
+        and city or region. The IP address column shows the actual IPv4 address
+        of that hop. The response times column shows how long it took for a
+        probe packet to reach that hop and come back, measured in milliseconds.
+        Consistently high times or timeouts at a specific hop may indicate
+        congestion, physical distance, or a misconfigured router. Some hops
+        may show asterisks instead of times, meaning the router did not respond
+        to the probe within the timeout window; this is common for security-
+        hardened infrastructure that blocks traceroute probes. The final hop
+        should be the target domain's IP address; if it is not, the trace may
+        have stopped at an intermediate device due to firewall rules.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        Network engineers use traceroute to debug slow connections between two
+        points, quickly identifying whether the slowdown happens on the local
+        ISP, a transit provider, or near the destination. Support teams use it
+        to answer customer complaints about latency by pointing to the exact hop
+        where response times spike. Security analysts use it to understand the
+        network path to a suspicious domain, identifying hosting providers or
+        countries involved in the route. DevOps teams use it during incidents to
+        check whether a cloud service is reachable and whether traffic is being
+        routed through an expected data center. Travelers and remote workers
+        use it to verify whether their VPN is routing traffic through the
+        intended country or if traffic is leaking outside the tunnel. It is also
+        used in education to teach students how internet routing works, showing
+        real examples of peering relationships, backbone providers, and last-mile
+        networks in action.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        This tool uses an external traceroute data source because raw ICMP
+        traceroute requires root privileges and raw sockets, which are not
+        available to this application inside its container. The data may be
+        sampled or delayed depending on the upstream service's load and the
+        target's network conditions. Some networks block traceroute probes
+        entirely, either by dropping the packets or by filtering ICMP time-
+        exceeded messages, which produces rows of asterisks instead of real
+        hostnames and times. Load balancers and CDNs may cause the path to
+        change between runs, so two traceroutes to the same domain minutes apart
+        can follow different routes. IPv6-only targets may not be traced
+        correctly if the upstream service only sends IPv4 probes. Finally,
+        traceroute measures the path from the data source, not from your own
+        computer; if you need the exact path from your location, run a local
+        traceroute command on your own machine instead.
+      </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+      ("What does an asterisk (*) mean in the traceroute result?", "It means the router at that hop did not respond to the probe within the timeout window. This is common for security-hardened networks that block ICMP or UDP traceroute packets."),
+      ("Why does the traceroute path change between runs?", "Networks use load balancing and dynamic routing, so packets may take different paths depending on congestion, maintenance, or routing policy changes."),
+      ("Is traceroute the same as ping?", "No. Ping measures round-trip time to a single destination. Traceroute shows every hop along the path and where delays occur."),
+      ("Can traceroute be used for security testing?", "Traceroute reveals network topology and intermediate IPs. It is a reconnaissance tool, but it is generally considered low-risk because it does not exploit vulnerabilities or bypass firewalls."),
+    ] %}
+    {% if mode == "form" %}
+    <section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

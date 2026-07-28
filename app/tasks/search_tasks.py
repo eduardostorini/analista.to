@@ -91,6 +91,7 @@ def _save_result(search: Search, tool, result, duration_ms: int) -> None:
     time_limit=60,
 )
 def run_search(self, search_id: int) -> None:
+    load_tools()
     search = db.session.get(Search, search_id)
     if search is None:
         logger.warning("run_search: search_id=%s não encontrado", search_id)

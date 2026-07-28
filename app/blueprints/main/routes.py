@@ -133,6 +133,8 @@ def category_or_tool_page(slug: str):
         return _render_category_page(category, page)
 
     tool_row = db.session.query(Tool).filter_by(slug=slug, is_active=True).one_or_none()
+    if tool_row is not None and slug == "dmarc-checker" and registry.get(slug) is None:
+        return redirect(url_for("main.category_or_tool_page", slug="dmarc-lookup"), code=301)
     if tool_row is None:
         abort(404)
     tool = registry.get(slug)

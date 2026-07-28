@@ -1,0 +1,182 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Open Graph Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Inspect the Open Graph meta tags of any page: title, description, image, type, and social sharing data.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Open Graph Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain or URL</label>
+        <input id="input_value" name="input_value" type="text" required class="input" placeholder="example.com" value="{{ submitted_value }}">
+        <p class="mt-1 text-xs text-slate-400">Enter a domain like example.com or a full URL like https://example.com</p>
+      </div>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check Open Graph</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}
+      {{ status_bar(search) }}
+    {% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      {% set og = data.open_graph %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-slate-400">{{ data.url }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if og %}
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                <th class="py-2 pr-4">Property</th>
+                <th class="py-2">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for key, value in og.items() %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">og:{{ key }}</td>
+                <td class="py-2 text-slate-600 break-all">{{ value }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="badge-warning">No Open Graph tags found on this page.</p>
+        {% endif %}
+
+        {% if data.og_image %}
+        <div class="mt-4">
+          <p class="mb-2 text-xs text-slate-400">Open Graph image preview</p>
+          <img src="{{ data.og_image }}" alt="Open Graph image" class="max-w-full rounded-lg border border-slate-200" style="max-height: 400px;" onerror="this.style.display='none'">
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is the Open Graph Checker?</h2>
+      <p>
+        Open Graph is a protocol originally created by Facebook that allows any webpage
+        to become a rich object in a social graph. When a URL is shared on Facebook,
+        Twitter, LinkedIn, WhatsApp, or other platforms, the platform looks for Open
+        Graph meta tags in the HTML to decide what title, description, image, and other
+        metadata to display in the preview card. The Open Graph Checker fetches any URL
+        and extracts every og:* tag it finds, giving you a clear view of how that page
+        will look when shared. This is essential for SEO, social media marketing, and
+        content debugging because a missing or poorly crafted Open Graph tag can make
+        a shared link look broken, generic, or unappealing, reducing click-through rates
+        and engagement even if the underlying content is excellent.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        The result shows each Open Graph property found on the page. The most important
+        ones are og:title, og:description, og:image, and og:url. og:title should be a
+        compelling headline, usually between 40 and 60 characters, that makes sense
+        out of context. og:description should summarize the content in one or two
+        sentences, typically under 200 characters, and entice the user to click.
+        og:image is the most visually impactful tag: it should be a high-quality image,
+        at least 1200 by 630 pixels for best results on most platforms, and it must be
+        accessible publicly so crawlers can fetch it. og:url should be the canonical
+        URL of the page, helping social platforms consolidate likes and shares. Other
+        useful tags include og:type, which tells the platform whether this is a website,
+        article, video, or product; og:site_name, which controls the site name shown
+        below the title; and og:locale, which sets the language and region. If any of
+        these tags are missing, platforms will fall back to guessing from the generic
+        HTML title, meta description, or images on the page, which often produces worse
+        results than providing explicit Open Graph data.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        Social media managers use this tool to audit how their content looks before
+        publishing, ensuring that every blog post, product page, or landing page has
+        the correct title, description, and image when shared. SEO professionals use
+        it during site launches or migrations to verify that Open Graph tags were
+        correctly transferred to the new CMS or template. Developers use it to debug
+        cases where a shared link shows the wrong image or an outdated description,
+        which is often caused by caching, missing tags, or incorrect image dimensions.
+        Content teams use it to preview how an article will appear on LinkedIn or
+        Twitter, adjusting the tags to match the tone and messaging of the campaign.
+        Support teams use it to answer client questions about why a page preview looks
+        broken or generic, pointing directly to missing or malformed og:tags. It is also
+        useful for competitive analysis: by checking a competitor's Open Graph setup,
+        you can see how they structure their social previews and whether their images
+        follow the recommended dimensions for maximum visibility.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        This tool only inspects the static Open Graph tags present in the HTML source.
+        It does not execute JavaScript, so it cannot see dynamically injected tags
+        added by client-side frameworks after page load. It also does not validate
+        whether the og:image URL is accessible, correctly sized, or has the right
+        aspect ratio — it only reports the URL declared in the tag. Some platforms
+        support extended namespaces like article:author or video:url, which this tool
+        may not list if they use non-standard prefixes. Finally, social platforms cache
+        shared previews aggressively, sometimes for days or weeks, so changing Open
+        Graph tags on a live page may not immediately update the preview seen by users.
+        In those cases, you may need to use platform-specific debug tools like
+        Facebook's Sharing Debugger or LinkedIn's Post Inspector to force a refresh.
+      </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+      ("Why is my shared link showing the wrong image?", "The most common causes are: missing og:image tag, image too small (under 200x200), image blocked by robots.txt, or the platform caching an old preview. Check the og:image URL and dimensions, then use the platform's debugger to refresh."),
+      ("What image size should I use for Open Graph?", "The recommended minimum is 1200x630 pixels for Facebook and LinkedIn. Twitter also supports 1200x675 for summary_large_image. Smaller images may be cropped or displayed with poor quality."),
+      ("Do I need Open Graph tags for SEO?", "Open Graph tags do not directly affect Google rankings, but they improve how your content looks when shared on social platforms, which increases click-through rates and indirect traffic. They are considered a best practice for modern SEO."),
+      ("Why does Twitter show my image but LinkedIn does not?", "Both platforms support Open Graph, but LinkedIn requires the image to be accessible without authentication and under 5MB. Twitter also supports its own twitter:card tags as a fallback. Check that the og:image URL is public and meets each platform's requirements."),
+    ] %}
+    {% if mode == "form" %}
+    <section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

@@ -55,6 +55,8 @@ def load_tools() -> ToolRegistry:
     from app.tools.dns.dns_lookup import DnsLookupTool
     from app.tools.dns.mx_lookup import MxLookupTool
     from app.tools.dns.txt_lookup import TxtLookupTool
+    from app.tools.dns.traceroute import TracerouteTool
+    from app.tools.dns.reverse_nameserver_lookup import ReverseNameserverLookupTool
     from app.tools.domain.ip_lookup import IpLookupTool
     from app.tools.domain.open_ports_lookup import OpenPortsLookupTool
     from app.tools.domain.ping import PingTool
@@ -63,7 +65,7 @@ def load_tools() -> ToolRegistry:
     from app.tools.domain.website_hosting import WebsiteHostingTool
     from app.tools.domain.whois_rdap import WhoisRdapTool
     from app.tools.email.blocklist_lookup import BlocklistLookupTool
-    from app.tools.email.dmarc_checker import DmarcCheckerTool
+    from app.tools.dns.dmarc_lookup import DmarcLookupTool
     from app.tools.email.spf_checker import SpfCheckerTool
     from app.tools.http.brotli_checker import BrotliCheckerTool
     from app.tools.http.http_headers import HttpHeadersTool
@@ -73,14 +75,20 @@ def load_tools() -> ToolRegistry:
     from app.tools.seo.meta_tags import MetaTagsTool
     from app.tools.seo.robots_checker import RobotsCheckerTool
     from app.tools.seo.sitemap_checker import SitemapCheckerTool
+    from app.tools.seo.google_index_checker import GoogleIndexCheckerTool
+    from app.tools.seo.page_size_checker import PageSizeCheckerTool
+    from app.tools.seo.open_graph_checker import OpenGraphCheckerTool
     from app.tools.ssl.security_headers import SecurityHeadersTool
     from app.tools.ssl.ssl_certificate import SslCertificateTool
     from app.tools.utils.qr_code_generator import QrCodeGeneratorTool
+    from app.tools.utils.hash_generator import HashGeneratorTool
 
     for tool_cls in (
         DnsLookupTool,
         MxLookupTool,
         TxtLookupTool,
+        TracerouteTool,
+        ReverseNameserverLookupTool,
         WhoisRdapTool,
         IpLookupTool,
         OpenPortsLookupTool,
@@ -91,6 +99,9 @@ def load_tools() -> ToolRegistry:
         MetaTagsTool,
         RobotsCheckerTool,
         SitemapCheckerTool,
+        GoogleIndexCheckerTool,
+        PageSizeCheckerTool,
+        OpenGraphCheckerTool,
         HttpHeadersTool,
         HttpVersionCheckerTool,
         BrotliCheckerTool,
@@ -99,9 +110,10 @@ def load_tools() -> ToolRegistry:
         SslCertificateTool,
         SecurityHeadersTool,
         SpfCheckerTool,
-        DmarcCheckerTool,
+        DmarcLookupTool,
         BlocklistLookupTool,
         QrCodeGeneratorTool,
+        HashGeneratorTool,
     ):
         registry.register(tool_cls())
 
