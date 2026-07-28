@@ -1,0 +1,204 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Ping{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check whether a website is online and measure its HTTP response time, status code, and server info.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Ping</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain or IP</label>
+        <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+        <p class="mt-1 text-xs text-slate-400">Examples: example.com, agenciamuvi.com.br</p>
+      </div>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Ping</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}
+      {{ status_bar(search) }}
+    {% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs text-slate-400">Domain queried</p>
+            <p class="font-mono text-lg text-brand-900">{{ data.url }}</p>
+          </div>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                <th class="py-2 pr-4">Field</th>
+                <th class="py-2">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">URL</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.url }}</td>
+              </tr>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Status</td>
+                <td class="py-2">
+                  {% if data.online %}
+                  <span class="badge-success">Online</span>
+                  {% else %}
+                  <span class="badge-danger">Offline</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% if data.online %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Response time</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.response_time_seconds }} s</td>
+              </tr>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Response status code</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.status_code }}</td>
+              </tr>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Protocol</td>
+                <td class="py-2 text-slate-600">{{ data.scheme | upper }}</td>
+              </tr>
+              {% if data.server %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Server</td>
+                <td class="py-2 text-slate-600">{{ data.server }}</td>
+              </tr>
+              {% endif %}
+              {% else %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Reason</td>
+                <td class="py-2 text-slate-600">Did not respond to HTTP or HTTPS requests within the timeout.</td>
+              </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is a website Ping Test?</h2>
+      <p>
+        This Ping tool checks whether a website is online by sending it a real HTTP or HTTPS
+        request — the same kind of request a visitor's browser would make — and measuring how
+        long the server takes to respond, along with the HTTP status code it returns. It
+        deliberately tries HTTPS first and falls back to HTTP so it works even for sites without
+        an SSL certificate. The result tells you the URL that was tested, whether the site is
+        Online or Offline, the response time in seconds, and the response status code, plus a
+        few extra details like the protocol used and the Server header when the site exposes
+        one.
+      </p>
+      <h2>HTTP ping vs. traditional ICMP ping</h2>
+      <p>
+        The classic "ping" command found in every operating system works at a lower network
+        layer: it sends ICMP echo request packets directly to an IP address and measures how
+        long the round trip takes. That is useful for diagnosing raw network connectivity, but
+        it says nothing about whether a website actually works — many servers, firewalls, and
+        cloud providers block ICMP entirely for security reasons, so a host can fail to answer
+        ICMP pings while its website works perfectly, and vice versa. This tool instead performs
+        an HTTP-level ping: it measures what actually matters for a website — whether the web
+        server accepts the connection, processes the request, and returns a valid response — which
+        is a far more accurate picture of real-world availability than an ICMP packet ever could
+        be.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        A Status of "Online" with a response status code in the 200 range means the server
+        answered normally and the page loaded successfully. Status codes in the 300 range
+        indicate a redirect (use the Redirect Checker to see the full chain), 4xx codes mean a
+        client-side error such as a missing page, and 5xx codes indicate the server itself is
+        failing — all of these still count as "Online" here, since the server did respond, just
+        not always with success. Response time reflects the full round trip: DNS resolution
+        (when not cached), the TCP/TLS handshake, and the time the server needed to generate and
+        send the response. A time under half a second is typically considered fast, one to two
+        seconds is average for many shared hosting setups, and anything consistently above three
+        or four seconds is worth investigating, since it affects both user experience and search
+        engine rankings.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        Site owners use this tool for a quick, no-fuss uptime check after a deploy, a DNS
+        change, or a hosting migration, confirming the site answers before telling customers or
+        search engines the change is complete. Developers use it to compare response times
+        before and after a performance optimization, or to check whether a slow page is caused
+        by the server itself rather than by heavy client-side scripts. It is also handy when a
+        visitor reports that "the site is down" — a quick ping distinguishes between the whole
+        site being unreachable and a problem limited to their own connection, browser, or a
+        single page.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        Because this check runs from our server rather than from the visitor's location, results
+        can differ from what an end user experiences, especially with CDNs or geo-routed
+        infrastructure that serve different regions from different data centers. A single ping is
+        a snapshot in time — brief outages, intermittent errors, or slowness under load will not
+        always show up in one request, so for continuous monitoring you would need a dedicated
+        uptime service that checks repeatedly over time. Some servers also rate-limit or block
+        automated requests identified by their User-Agent, which can produce a false "Offline"
+        reading even though real browsers can reach the site normally.
+      </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+      ("Is this the same as the ping command in my terminal?", "No. The terminal's ping command sends ICMP packets to test raw network connectivity. This tool sends a real HTTP/HTTPS request, which better reflects whether the website itself is actually working."),
+      ("Why does it say Offline if I can open the site in my browser?", "The site may be blocking automated requests based on the User-Agent, temporarily rate-limiting our server's IP, or only accepting certain HTTP methods. A single failed check does not always mean the site is down for everyone."),
+      ("What counts as a good response time?", "Under half a second is fast, one to two seconds is common on shared hosting, and consistently above three to four seconds is usually worth investigating."),
+      ("Does this tool test my server's uptime continuously?", "No, each query is a single point-in-time check. For continuous monitoring with alerts, you need a dedicated uptime monitoring service that checks at regular intervals."),
+    ] %}
+    {% if mode == "form" %}
+    <section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

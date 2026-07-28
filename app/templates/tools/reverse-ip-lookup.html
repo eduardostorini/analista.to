@@ -1,0 +1,157 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Reverse IP Lookup{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Find other domains and websites hosted on the same IP address as a given server.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Reverse IP Lookup</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">IP address</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      <p class="text-xs text-slate-400">Accepts IPv4 and IPv6.</p>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Reverse IP Lookup</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs text-slate-400">IP queried</p>
+            <p class="font-mono text-lg text-brand-900">{{ data.ip }}</p>
+          </div>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if data.note == "private_ip" %}
+        <p class="badge-warning">This is a private/reserved IP address — not routable on the public internet, so it cannot be hosting public domains.</p>
+        {% elif data.note == "unavailable" %}
+        <p class="badge-warning">Reverse IP data is temporarily unavailable for this address — the public database may be rate-limiting requests. Try again in a few minutes.</p>
+        {% elif data.domain_count == 0 %}
+        <p class="badge-warning">No other domains found sharing this IP address in the public database used by this tool.</p>
+        {% else %}
+        <p class="text-sm text-slate-600">
+          <span class="font-semibold text-brand-900">{{ data.domain_count }}</span>
+          domain{{ "s" if data.domain_count != 1 else "" }} found hosted on this IP.
+        </p>
+        <div class="max-h-96 overflow-y-auto rounded-lg border border-slate-200">
+          <ul class="divide-y divide-slate-100 text-sm">
+            {% for domain in data.domains %}
+            <li class="px-4 py-2 font-mono text-slate-700">{{ domain }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is Reverse IP Lookup?</h2>
+      <p>
+        A single IP address, especially on shared hosting, can serve dozens, hundreds, or even
+        thousands of different websites at once — the web server uses the "Host" header sent by
+        the visitor's browser to decide which site to actually deliver, even though every one of
+        those sites resolves to the very same IP. Reverse IP Lookup answers the opposite question
+        of a normal DNS lookup: instead of "what IP does this domain point to?", it asks "which
+        domains point to this IP?". It does this by querying a public database that continuously
+        tracks DNS records across the internet, since there is no protocol built into DNS itself
+        that can enumerate every domain pointing at a given address — the only way to know is to
+        have already observed those domains being registered somewhere.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        A short list, often just one or two domains, usually indicates a dedicated server or a
+        cloud instance running a single site (or a small number of related ones controlled by the
+        same owner). A long list — sometimes hundreds of entries — is the signature of shared
+        hosting, where a hosting company packs many unrelated customer websites onto the same
+        physical or virtual server to reduce costs. Neither situation is inherently good or bad:
+        shared hosting is simply cheaper and is the normal setup for small business or personal
+        sites, while a dedicated IP is more typical of larger sites that need predictable
+        performance or their own SSL certificate bound to the IP.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        Security researchers use reverse IP lookups to map out infrastructure connected to a
+        malicious domain — attackers frequently reuse the same server for multiple phishing or
+        malware domains, so finding one bad domain often reveals others hosted right alongside it.
+        Website owners use it to confirm whether they are on shared or dedicated hosting, which
+        matters for performance (a neighbor's traffic spike or a poorly optimized site sharing
+        your server can slow yours down) and for reputation (if your mail or web IP is shared with
+        a site that gets blacklisted for spam or malware, your own domain can suffer collateral
+        damage even though you did nothing wrong). It is also used during due diligence before
+        acquiring a domain or website, and by marketers and competitive researchers trying to
+        identify other properties operated by the same company on the same infrastructure.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        The result depends entirely on a third-party public database that has previously observed
+        each domain's DNS records — it is not a live, real-time scan of the server, so very recently
+        registered domains, or domains that changed IP after the database's last update, may be
+        missing or outdated. The list can also include domains that used to point to this IP in
+        the past but have since moved elsewhere, particularly on cloud providers that frequently
+        recycle IP addresses between customers. Because this is a free, publicly rate-limited
+        service, high query volumes may occasionally return a temporary "unavailable" result — in
+        that case, simply try again after a short wait. As with any tool relying on external data,
+        treat the domain list as a strong lead for further investigation rather than a definitive,
+        guaranteed-complete inventory of every site on that server.
+      </p>
+    </section>
+{% endif %}
+
+    {% set faqs = [
+      ("Why does a private IP like 192.168.0.1 return no domains?", "Private and reserved IP ranges are not routable on the public internet, so no public website can be hosted on them — the tool skips the external lookup entirely for these addresses."),
+      ("Does a long list of domains mean something is wrong?", "Not necessarily. It usually just means the IP belongs to a shared hosting server, which is completely normal and often the most cost-effective setup for small websites."),
+      ("Why is a domain I know about missing from the list?", "The result depends on a third-party database of previously observed DNS records. Very new domains, or ones that changed IP recently, may not be indexed yet."),
+      ("Can I use this to find websites related to a suspicious domain?", "Yes — this is a common technique in security research, since related malicious domains are often hosted together on the same server."),
+    ] %}
+    {% if mode == "form" %}
+<section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+{% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

@@ -1,21 +1,21 @@
 ---
-name: Sugerir uma ferramenta ou funcionalidade
-about: Proponha uma nova ferramenta ou melhoria
+name: Suggest a tool or feature
+about: Propose a new tool or improvement
 title: "[feature] "
 labels: enhancement
 ---
 
-**A sugestão está relacionada a um problema?**
-Descreva o problema ou necessidade.
+**Is this related to a problem?**
+Describe the problem or need.
 
-**Solução proposta**
-O que você gostaria que acontecesse.
+**Proposed solution**
+What you would like to happen.
 
-**Se for uma nova ferramenta**
-- Categoria (existente ou nova):
-- Que entrada o usuário forneceria (domínio/URL/IP)?
-- Que dado a ferramenta consultaria/calcularia?
-- É elegível para gerar página pública indexável?
+**If it is a new tool**
+- Category (existing or new):
+- What input would the user provide (domain/URL/IP)?
+- What data would the tool query/calculate?
+- Is it eligible to generate an indexable public page?
 
-**Alternativas consideradas**
-Outras formas de resolver o mesmo problema.
+**Alternatives considered**
+Other ways to solve the same problem.

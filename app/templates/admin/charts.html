@@ -1,5 +1,5 @@
 {% extends "admin/base.html" %}
-{% block title %}Gráficos{% endblock %}
+{% block title %}Charts{% endblock %}
 
 {% macro bar_row(label, count, max_value, tone='brand') %}
 {% set tone_classes = {
@@ -21,29 +21,29 @@
 
 {% block content %}
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-  <h1 class="text-2xl text-brand-900">Gráficos</h1>
+  <h1 class="text-2xl text-brand-900">Charts</h1>
   <div class="flex items-center gap-2 text-sm">
-    <span class="text-slate-500">Período:</span>
+    <span class="text-slate-500">Period:</span>
     {% for choice in period_choices %}
     <a href="{{ url_for('admin.charts', days=choice) }}"
-       class="{{ 'btn-primary' if choice == days else 'btn-secondary' }} px-3 py-1.5 text-xs">Últimos {{ choice }} dias</a>
+       class="{{ 'btn-primary' if choice == days else 'btn-secondary' }} px-3 py-1.5 text-xs">Last {{ choice }} days</a>
     {% endfor %}
   </div>
 </div>
 
 <div class="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-  <div class="card"><p class="text-2xl font-semibold text-brand-800">{{ kpis.total_period }}</p><p class="text-xs text-slate-500">Consultas no período</p></div>
-  <div class="card"><p class="text-2xl font-semibold text-emerald-600">{{ kpis.success_rate_period }}%</p><p class="text-xs text-slate-500">Taxa de sucesso</p></div>
-  <div class="card"><p class="text-2xl font-semibold text-brand-800">{{ kpis.avg_duration_label }}</p><p class="text-xs text-slate-500">Tempo médio de processamento</p></div>
-  <div class="card"><p class="text-2xl font-semibold text-brand-800">{{ kpis.indexed_pages_period }}/{{ kpis.pages_period }}</p><p class="text-xs text-slate-500">Páginas indexadas no período</p></div>
-  <div class="card"><p class="truncate text-2xl font-semibold text-brand-800" title="{{ kpis.top_tool_label }}">{{ kpis.top_tool_label }}</p><p class="text-xs text-slate-500">Ferramenta mais usada</p></div>
-  <div class="card"><p class="text-2xl font-semibold {{ 'text-rose-600' if kpis.abuse_total_period else 'text-brand-800' }}">{{ kpis.abuse_total_period }}</p><p class="text-xs text-slate-500">Eventos de abuso no período</p></div>
+  <div class="card"><p class="text-2xl font-semibold text-brand-800">{{ kpis.total_period }}</p><p class="text-xs text-slate-500">Searches in period</p></div>
+  <div class="card"><p class="text-2xl font-semibold text-emerald-600">{{ kpis.success_rate_period }}%</p><p class="text-xs text-slate-500">Success rate</p></div>
+  <div class="card"><p class="text-2xl font-semibold text-brand-800">{{ kpis.avg_duration_label }}</p><p class="text-xs text-slate-500">Avg processing time</p></div>
+  <div class="card"><p class="text-2xl font-semibold text-brand-800">{{ kpis.indexed_pages_period }}/{{ kpis.pages_period }}</p><p class="text-xs text-slate-500">Indexed pages in period</p></div>
+  <div class="card"><p class="truncate text-2xl font-semibold text-brand-800" title="{{ kpis.top_tool_label }}">{{ kpis.top_tool_label }}</p><p class="text-xs text-slate-500">Most used tool</p></div>
+  <div class="card"><p class="text-2xl font-semibold {{ 'text-rose-600' if kpis.abuse_total_period else 'text-brand-800' }}">{{ kpis.abuse_total_period }}</p><p class="text-xs text-slate-500">Abuse events in period</p></div>
 </div>
 
 <div class="mb-8 card" x-data="chartTimeline()" data-points='{{ timeline | tojson }}'>
   <div class="mb-3 flex items-baseline justify-between">
-    <h2 class="text-lg text-brand-900">Evolução das consultas</h2>
-    <span class="text-xs text-slate-400">consultas por dia · últimos {{ days }} dias</span>
+    <h2 class="text-lg text-brand-900">Search volume over time</h2>
+    <span class="text-xs text-slate-400">searches per day · last {{ days }} days</span>
   </div>
   {% if kpis.total_period %}
   <div class="relative h-28" @mousemove="onMove" @mouseleave="onLeave">
@@ -62,7 +62,7 @@
       class="pointer-events-none absolute z-10 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs shadow-lg"
       :style="`left: ${hoverXPercent}%; top: ${hoverYPercent}%; transform: translate(${tooltipAlign === 'right' ? '-100%' : tooltipAlign === 'left' ? '0%' : '-50%'}, calc(-100% - 10px));`"
     >
-      <p class="font-semibold text-slate-800" x-text="hovered ? hovered.count + ' consulta(s)' : ''"></p>
+      <p class="font-semibold text-slate-800" x-text="hovered ? hovered.count + ' search(es)' : ''"></p>
       <p class="text-slate-400" x-text="hovered ? hovered.label : ''"></p>
     </div>
   </div>
@@ -71,13 +71,13 @@
     <span x-text="points.length ? points[points.length - 1].label : ''"></span>
   </div>
   {% else %}
-  <p class="text-sm text-slate-400">Nenhuma consulta registrada neste período.</p>
+  <p class="text-sm text-slate-400">No searches recorded in this period.</p>
   {% endif %}
 </div>
 
 <div class="mb-8 grid gap-6 lg:grid-cols-2">
   <div class="card">
-    <h2 class="mb-4 text-lg text-brand-900">Tipos de consultas por ferramenta</h2>
+    <h2 class="mb-4 text-lg text-brand-900">Searches by tool</h2>
     {% if tools_breakdown %}
     <div class="space-y-2.5">
       {% set max_tool = tools_breakdown[0].count %}
@@ -86,12 +86,12 @@
       {% endfor %}
     </div>
     {% else %}
-    <p class="text-sm text-slate-400">Nenhuma consulta registrada neste período.</p>
+    <p class="text-sm text-slate-400">No searches recorded in this period.</p>
     {% endif %}
   </div>
 
   <div class="card">
-    <h2 class="mb-4 text-lg text-brand-900">Consultas por categoria</h2>
+    <h2 class="mb-4 text-lg text-brand-900">Searches by category</h2>
     {% if categories_breakdown %}
     <div class="space-y-2.5">
       {% set max_category = categories_breakdown[0].count %}
@@ -100,12 +100,12 @@
       {% endfor %}
     </div>
     {% else %}
-    <p class="text-sm text-slate-400">Nenhuma consulta registrada neste período.</p>
+    <p class="text-sm text-slate-400">No searches recorded in this period.</p>
     {% endif %}
   </div>
 
   <div class="card">
-    <h2 class="mb-4 text-lg text-brand-900">Status das consultas</h2>
+    <h2 class="mb-4 text-lg text-brand-900">Search status</h2>
     {% if status_breakdown %}
     <div class="space-y-2.5">
       {% set max_status = status_breakdown | map(attribute='count') | max %}
@@ -114,12 +114,12 @@
       {% endfor %}
     </div>
     {% else %}
-    <p class="text-sm text-slate-400">Nenhuma consulta registrada neste período.</p>
+    <p class="text-sm text-slate-400">No searches recorded in this period.</p>
     {% endif %}
   </div>
 
   <div class="card">
-    <h2 class="mb-4 text-lg text-brand-900">Eventos de abuso por tipo</h2>
+    <h2 class="mb-4 text-lg text-brand-900">Abuse events by type</h2>
     {% if abuse_breakdown %}
     <div class="space-y-2.5">
       {% set max_abuse = abuse_breakdown[0].count %}
@@ -128,18 +128,18 @@
       {% endfor %}
     </div>
     {% else %}
-    <p class="text-sm text-slate-400">Nenhum evento de abuso neste período.</p>
+    <p class="text-sm text-slate-400">No abuse events in this period.</p>
     {% endif %}
   </div>
 </div>
 
 <div class="card">
-  <h2 class="mb-4 text-lg text-brand-900">Domínios/entradas mais consultados</h2>
+  <h2 class="mb-4 text-lg text-brand-900">Most queried domains/inputs</h2>
   {% if top_inputs %}
   <div class="overflow-x-auto">
     <table class="w-full text-left text-sm">
       <thead><tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
-        <th class="px-3 py-2">Entrada</th><th class="px-3 py-2 text-right">Consultas</th>
+        <th class="px-3 py-2">Input</th><th class="px-3 py-2 text-right">Searches</th>
       </tr></thead>
       <tbody>
         {% for row in top_inputs %}
@@ -152,7 +152,7 @@
     </table>
   </div>
   {% else %}
-  <p class="text-sm text-slate-400">Nenhuma consulta registrada neste período.</p>
+  <p class="text-sm text-slate-400">No searches recorded in this period.</p>
   {% endif %}
 </div>
 {% endblock %}

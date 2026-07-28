@@ -34,10 +34,10 @@ def _parse_spf(record: str) -> dict:
 
 
 _QUALIFIER_LABELS = {
-    "+": "pass (permite qualquer remetente — não recomendado)",
-    "-": "fail (rejeita remetentes não autorizados)",
-    "~": "softfail (marca como suspeito remetentes não autorizados)",
-    "?": "neutral (não define política)",
+    "+": "pass (allows any sender — not recommended)",
+    "-": "fail (rejects unauthorized senders)",
+    "~": "softfail (marks unauthorized senders as suspicious)",
+    "?": "neutral (does not define policy)",
 }
 
 
@@ -45,11 +45,11 @@ class SpfCheckerTool(BaseTool):
     slug = "spf-checker"
     name = "SPF Checker"
     category_slug = "email"
-    short_description = "Verifique o registro SPF de um domínio e o número de consultas DNS que ele exige."
-    description = "Valida o registro SPF de um domínio, incluindo a contagem de lookups DNS (limite de 10 do RFC 7208)."
+    short_description = "Check the SPF record of a domain and the number of DNS queries it requires."
+    description = "Validates the SPF record of a domain, including DNS lookup count (RFC 7208 limit of 10)."
     icon = "mail-check"
     input_type = InputType.DOMAIN
-    input_placeholder = "exemplo.com.br"
+    input_placeholder = "example.com"
     public_url_prefix = "email/spf"
     ttl_seconds = 6 * 3600
     rate_limit_per_minute = 10
@@ -65,7 +65,7 @@ class SpfCheckerTool(BaseTool):
         if not domain_exists(normalized_input):
             return ToolResult(
                 success=True,
-                summary=f"{normalized_input} não está registrado ou não possui delegação DNS.",
+                summary=f"{normalized_input} is not registered or has no DNS delegation.",
                 data={"domain": normalized_input, "exists": False, "has_spf": False},
             )
 
@@ -74,22 +74,22 @@ class SpfCheckerTool(BaseTool):
 
         issues = []
         if not spf_records:
-            data = {"domain": normalized_input, "exists": True, "has_spf": False, "issues": ["Nenhum registro SPF encontrado."]}
-            return ToolResult(success=True, summary=f"{normalized_input} não possui registro SPF.", data=data)
+            data = {"domain": normalized_input, "exists": True, "has_spf": False, "issues": ["No SPF record found."]}
+            return ToolResult(success=True, summary=f"{normalized_input} has no SPF record.", data=data)
 
         if len(spf_records) > 1:
-            issues.append("Mais de um registro SPF encontrado — isso é inválido segundo o RFC 7208.")
+            issues.append("More than one SPF record found — this is invalid according to RFC 7208.")
 
         parsed = _parse_spf(spf_records[0])
 
         if parsed["lookup_count"] > _MAX_LOOKUPS:
             issues.append(
-                f"O registro realiza {parsed['lookup_count']} consultas DNS, acima do limite de {_MAX_LOOKUPS}."
+                f"The record performs {parsed['lookup_count']} DNS queries, above the limit of {_MAX_LOOKUPS}."
             )
         if parsed["all_qualifier"] is None:
-            issues.append('Registro sem mecanismo "all" — o comportamento padrão para remetentes não listados fica indefinido.')
+            issues.append('Record without "all" mechanism — the default behavior for unlisted senders is undefined.')
         elif parsed["all_qualifier"] == "+":
-            issues.append('Mecanismo "+all" permite que qualquer servidor envie e-mail em nome do domínio.')
+            issues.append('"+all" mechanism allows any server to send email on behalf of the domain.')
 
         data = {
             "domain": normalized_input,
@@ -104,9 +104,9 @@ class SpfCheckerTool(BaseTool):
             "issues": issues,
         }
 
-        summary = f"SPF de {normalized_input}: {parsed['lookup_count']}/{_MAX_LOOKUPS} lookups DNS."
+        summary = f"SPF for {normalized_input}: {parsed['lookup_count']}/{_MAX_LOOKUPS} DNS lookups."
         if issues:
-            summary += f" {len(issues)} ponto(s) de atenção."
+            summary += f" {len(issues)} point(s) of attention."
 
         return ToolResult(success=True, summary=summary, data=data)
 

@@ -48,11 +48,11 @@ class RobotsCheckerTool(BaseTool):
     slug = "robots-checker"
     name = "Robots.txt Checker"
     category_slug = "seo"
-    short_description = "Verifique as regras de rastreamento e os sitemaps declarados no robots.txt de um domínio."
-    description = "Busca e interpreta o arquivo robots.txt de um domínio."
+    short_description = "Check the crawl rules and sitemaps declared in the robots.txt of a domain."
+    description = "Fetches and parses the robots.txt file of a domain."
     icon = "file-cog"
     input_type = InputType.DOMAIN
-    input_placeholder = "exemplo.com.br"
+    input_placeholder = "example.com"
     public_url_prefix = "seo/robots-txt"
     ttl_seconds = 6 * 3600
     rate_limit_per_minute = 10
@@ -71,14 +71,14 @@ class RobotsCheckerTool(BaseTool):
         if response.status_code == 404:
             return ToolResult(
                 success=True,
-                summary=f"{normalized_input} não possui um arquivo robots.txt (404).",
+                summary=f"{normalized_input} does not have a robots.txt file (404).",
                 data={"domain": normalized_input, "exists": False, "groups": [], "sitemaps": []},
             )
 
         if response.status_code >= 400:
             return ToolResult(
                 success=True,
-                summary=f"Não foi possível obter o robots.txt de {normalized_input} (HTTP {response.status_code}).",
+                summary=f"Could not retrieve the robots.txt of {normalized_input} (HTTP {response.status_code}).",
                 data={"domain": normalized_input, "exists": False, "groups": [], "sitemaps": []},
             )
 
@@ -98,9 +98,9 @@ class RobotsCheckerTool(BaseTool):
             "raw_length": len(text),
         }
 
-        summary = f"robots.txt de {normalized_input}: {len(parsed['groups'])} grupo(s) de regras, {len(parsed['sitemaps'])} sitemap(s) declarado(s)."
+        summary = f"robots.txt of {normalized_input}: {len(parsed['groups'])} rule group(s), {len(parsed['sitemaps'])} sitemap(s) declared."
         if blocks_all:
-            summary += " Atenção: o arquivo bloqueia todos os rastreadores."
+            summary += " Attention: the file blocks all crawlers."
 
         return ToolResult(success=True, summary=summary, data=data, raw={"text": text[:20000]})
 

@@ -1,18 +1,18 @@
 {% extends "layout/base.html" %}
 
-{% block title %}{{ site_name }} — Analise DNS, SEO, SSL, servidor e segurança em um só lugar{% endblock %}
-{% block meta_description %}Ferramentas técnicas gratuitas para analisar DNS, WHOIS, SSL, cabeçalhos HTTP, SPF/DMARC e SEO técnico. Resultados rápidos, explicados e prontos para compartilhar.{% endblock %}
+{% block title %}{{ site_name }} — Analyze DNS, SEO, SSL, servers, and security in one place{% endblock %}
+{% block meta_description %}Free technical tools to analyze DNS, WHOIS, SSL, HTTP headers, SPF/DMARC, and technical SEO. Fast results, explained and ready to share.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ site_url }}/">{% endblock %}
 
 {% block content %}
 <section class="mb-14 text-center">
-  <p class="badge-neutral mx-auto mb-4">Toolkit técnico gratuito</p>
+  <p class="badge-neutral mx-auto mb-4">Free technical toolkit</p>
   <h1 class="mx-auto max-w-3xl text-4xl leading-tight sm:text-5xl">
-    Analise DNS, SEO, SSL, servidor e segurança em um só lugar
+    Analyze DNS, SEO, SSL, servers, and security in one place
   </h1>
   <p class="mx-auto mt-4 max-w-2xl text-lg text-slate-600">
-    Digite um domínio, URL ou IP, escolha a ferramenta e receba um relatório técnico
-    completo em segundos — sem cadastro e sem custo.
+    Enter a domain, URL, or IP, choose a tool, and receive a complete
+    technical report in seconds — no registration or cost.
   </p>
 
   <form
@@ -21,11 +21,11 @@
     class="card mx-auto mt-8 flex max-w-2xl flex-col gap-3 text-left sm:flex-row sm:items-end"
   >
     <div class="flex-1">
-      <label for="quick-value" class="mb-1 block text-xs font-medium text-slate-500">Domínio, URL ou IP</label>
-      <input id="quick-value" x-ref="valueInput" type="text" required class="input" placeholder="exemplo.com.br">
+      <label for="quick-value" class="mb-1 block text-xs font-medium text-slate-500">Domain, URL, or IP</label>
+      <input id="quick-value" x-ref="valueInput" type="text" required class="input" placeholder="example.com">
     </div>
     <div class="sm:w-56">
-      <label for="quick-tool" class="mb-1 block text-xs font-medium text-slate-500">Ferramenta</label>
+      <label for="quick-tool" class="mb-1 block text-xs font-medium text-slate-500">Tool</label>
       <select id="quick-tool" x-ref="toolSelect" class="input">
         {% for category in categories %}
           {% set active_tools = category.tools | selectattr('is_active') | list %}
@@ -39,13 +39,13 @@
         {% endfor %}
       </select>
     </div>
-    <button type="submit" class="btn-primary sm:w-auto">Analisar</button>
+    <button type="submit" class="btn-primary sm:w-auto">Analyze</button>
   </form>
 </section>
 
 {% if featured_tools %}
 <section class="mb-14">
-  <h2 class="mb-4 text-xl">Ferramentas mais usadas</h2>
+  <h2 class="mb-4 text-xl">Most used tools</h2>
   <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
     {% for tool in featured_tools %}
     <a href="{{ url_for('main.category_or_tool_page', slug=tool.slug) }}" class="card block no-underline hover:border-brand-300">
@@ -59,7 +59,7 @@
 {% endif %}
 
 <section class="mb-14">
-  <h2 class="mb-4 text-xl">Categorias disponíveis</h2>
+  <h2 class="mb-4 text-xl">Available categories</h2>
   <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
     {% for category in categories %}
     <a href="{{ url_for('main.category_or_tool_page', slug=category.slug) }}" class="card block no-underline hover:border-brand-300">
@@ -72,7 +72,7 @@
 
 <div class="mb-14 grid gap-10 lg:grid-cols-2">
   <section>
-    <h2 class="mb-4 text-xl">Últimas análises públicas</h2>
+    <h2 class="mb-4 text-xl">Latest public searches</h2>
     {% if recent_searches %}
     <ul class="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
       {% for search in recent_searches %}
@@ -88,12 +88,12 @@
       {% endfor %}
     </ul>
     {% else %}
-    <p class="text-sm text-slate-400">Ainda não há análises públicas — seja o primeiro a rodar uma consulta.</p>
+    <p class="text-sm text-slate-400">No public searches yet — be the first to run a query.</p>
     {% endif %}
   </section>
 
   <section>
-    <h2 class="mb-4 text-xl">Ferramentas recém-adicionadas</h2>
+    <h2 class="mb-4 text-xl">Recently added tools</h2>
     <ul class="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
       {% for tool in newest_tools %}
       <li>
@@ -108,31 +108,31 @@
 </div>
 
 <section class="mb-14">
-  <h2 class="mb-4 text-xl">Como funciona</h2>
+  <h2 class="mb-4 text-xl">How it works</h2>
   <div class="grid gap-4 sm:grid-cols-4">
-    <div class="card"><span class="badge-neutral mb-2">1</span><p class="text-sm">Escolha uma ferramenta e informe um domínio, URL ou IP.</p></div>
-    <div class="card"><span class="badge-neutral mb-2">2</span><p class="text-sm">Resolvemos um pequeno desafio anti-robô para proteger o serviço contra abuso.</p></div>
-    <div class="card"><span class="badge-neutral mb-2">3</span><p class="text-sm">A análise roda em segundo plano com barra de progresso em tempo real.</p></div>
-    <div class="card"><span class="badge-neutral mb-2">4</span><p class="text-sm">Você recebe um relatório explicado, com link para compartilhar o resultado.</p></div>
+    <div class="card"><span class="badge-neutral mb-2">1</span><p class="text-sm">Choose a tool and enter a domain, URL, or IP.</p></div>
+    <div class="card"><span class="badge-neutral mb-2">2</span><p class="text-sm">We solve a small anti-bot challenge to protect the service from abuse.</p></div>
+    <div class="card"><span class="badge-neutral mb-2">3</span><p class="text-sm">The analysis runs in the background with a real-time progress bar.</p></div>
+    <div class="card"><span class="badge-neutral mb-2">4</span><p class="text-sm">You receive an explained report, with a link to share the result.</p></div>
   </div>
 </section>
 
 <section class="mb-14">
-  <h2 class="mb-4 text-xl">Por que usar o {{ site_name }}</h2>
+  <h2 class="mb-4 text-xl">Why use {{ site_name }}</h2>
   <ul class="grid gap-4 sm:grid-cols-2">
-    <li class="card"><strong class="text-brand-900">Rápido:</strong> resultados em segundos, processados de forma assíncrona.</li>
-    <li class="card"><strong class="text-brand-900">Sem cadastro:</strong> use qualquer ferramenta gratuitamente, sem criar conta.</li>
-    <li class="card"><strong class="text-brand-900">Explicado:</strong> cada resultado vem com contexto sobre como interpretá-lo.</li>
-    <li class="card"><strong class="text-brand-900">Seguro:</strong> bloqueamos automaticamente consultas a redes internas e protegemos contra abuso.</li>
+    <li class="card"><strong class="text-brand-900">Fast:</strong> results in seconds, processed asynchronously.</li>
+    <li class="card"><strong class="text-brand-900">No sign-up:</strong> use any tool for free, without creating an account.</li>
+    <li class="card"><strong class="text-brand-900">Explained:</strong> every result comes with context on how to interpret it.</li>
+    <li class="card"><strong class="text-brand-900">Secure:</strong> we automatically block queries to internal networks and protect against abuse.</li>
   </ul>
 </section>
 
 <section>
-  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
+  <h2 class="mb-4 text-xl">Frequently asked questions</h2>
   <div class="space-y-2">
-    <details class="card"><summary class="cursor-pointer font-medium text-brand-900">O {{ site_name }} é gratuito?</summary><p class="mt-2 text-sm text-slate-600">Sim, todas as ferramentas listadas podem ser usadas sem custo e sem cadastro.</p></details>
-    <details class="card"><summary class="cursor-pointer font-medium text-brand-900">Os resultados ficam públicos?</summary><p class="mt-2 text-sm text-slate-600">Consultas bem-sucedidas para recursos públicos podem gerar uma página pública compartilhável. Não publicamos endereço IP, dados pessoais ou consultas com erro.</p></details>
-    <details class="card"><summary class="cursor-pointer font-medium text-brand-900">Vocês guardam meus dados?</summary><p class="mt-2 text-sm text-slate-600">Não armazenamos IP em texto puro — apenas um hash com salt rotativo, usado somente para controle de abuso.</p></details>
+    <details class="card"><summary class="cursor-pointer font-medium text-brand-900">Is {{ site_name }} free?</summary><p class="mt-2 text-sm text-slate-600">Yes, all listed tools can be used without cost and without registration.</p></details>
+    <details class="card"><summary class="cursor-pointer font-medium text-brand-900">Are results public?</summary><p class="mt-2 text-sm text-slate-600">Successful queries for public resources may generate a shareable public page. We do not publish IP addresses, personal data, or queries with errors.</p></details>
+    <details class="card"><summary class="cursor-pointer font-medium text-brand-900">Do you store my data?</summary><p class="mt-2 text-sm text-slate-600">We do not store IPs in plain text — only a salted rotating hash, used solely for abuse control.</p></details>
   </div>
 </section>
 

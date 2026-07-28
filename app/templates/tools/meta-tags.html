@@ -1,17 +1,17 @@
 {% extends "layout/base.html" %}
 {% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
 
-{% block title %}Title e Meta Tags{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
-{% block meta_description %}Analise title, meta description, canonical, Open Graph e Twitter Cards de qualquer página em segundos.{% endblock %}
+{% block title %}Title & Meta Tags{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Analyze title, meta description, canonical, Open Graph, and Twitter Cards for any page in seconds.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
 {% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
 
 {% block content %}
-{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
 {{ breadcrumbs(crumbs) }}
 
 <header class="mb-8 max-w-2xl">
-  <h1 class="text-3xl">Title e Meta Tags</h1>
+  <h1 class="text-3xl">Title and Meta Tags</h1>
   <p class="mt-2 text-slate-600">{{ tool.description }}</p>
 </header>
 
@@ -20,10 +20,10 @@
 {% if mode == "form" %}
 <form method="post" class="card mb-8 max-w-xl space-y-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">URL da página</label>
+  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Page URL</label>
   <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
-  {{ captcha_widget(captcha_provider, cap_public_url, cap_site_key) }}
-  <button type="submit" class="btn-primary w-full sm:w-auto">Analisar página</button>
+  {{ captcha_widget(captcha_provider) }}
+  <button type="submit" class="btn-primary w-full sm:w-auto">Analyze page</button>
 </form>
 {% endif %}
 
@@ -31,8 +31,8 @@
 
 {% if mode == "failed" %}
 <div class="card mb-8 max-w-xl border-rose-200 bg-rose-50">
-  <p class="badge-danger mb-2">Falhou</p>
-  <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+  <p class="badge-danger mb-2">Failed</p>
+  <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
 </div>
 {% endif %}
 
@@ -45,42 +45,42 @@
     </div>
 
     <div class="card">
-      <p class="mb-1 text-xs text-slate-400">Snippet aproximado no Google</p>
-      <p class="truncate text-lg text-brand-700">{{ data.title or "(sem title)" }}</p>
+      <p class="mb-1 text-xs text-slate-400">Approximate Google snippet</p>
+      <p class="truncate text-lg text-brand-700">{{ data.title or "(no title)" }}</p>
       <p class="text-sm text-emerald-700">{{ data.url }}</p>
-      <p class="text-sm text-slate-600">{{ data.meta_description or "(sem meta description)" }}</p>
+      <p class="text-sm text-slate-600">{{ data.meta_description or "(no meta description)" }}</p>
     </div>
 
     <div class="grid gap-4 sm:grid-cols-2">
       <div class="card">
         <div class="mb-2 flex items-center justify-between">
           <span class="text-sm font-medium text-slate-700">Title</span>
-          <span class="badge-{{ 'success' if 30 <= data.title_length <= 60 else 'warning' }}">{{ data.title_length }} caracteres</span>
+          <span class="badge-{{ 'success' if 30 <= data.title_length <= 60 else 'warning' }}">{{ data.title_length }} characters</span>
         </div>
         <p class="text-sm text-slate-600">{{ data.title or "—" }}</p>
       </div>
       <div class="card">
         <div class="mb-2 flex items-center justify-between">
           <span class="text-sm font-medium text-slate-700">Meta description</span>
-          <span class="badge-{{ 'success' if 70 <= data.meta_description_length <= 160 else 'warning' }}">{{ data.meta_description_length }} caracteres</span>
+          <span class="badge-{{ 'success' if 70 <= data.meta_description_length <= 160 else 'warning' }}">{{ data.meta_description_length }} characters</span>
         </div>
         <p class="text-sm text-slate-600">{{ data.meta_description or "—" }}</p>
       </div>
       <div class="card">
         <span class="mb-1 block text-sm font-medium text-slate-700">Canonical</span>
-        <p class="break-all font-mono text-xs text-slate-600">{{ data.canonical or "não definido" }}</p>
+        <p class="break-all font-mono text-xs text-slate-600">{{ data.canonical or "not defined" }}</p>
       </div>
       <div class="card">
-        <span class="mb-1 block text-sm font-medium text-slate-700">Meta robots / idioma</span>
-        <p class="text-sm text-slate-600">{{ data.meta_robots or "index, follow (padrão)" }} · {{ data.lang or "não declarado" }}</p>
+        <span class="mb-1 block text-sm font-medium text-slate-700">Meta robots / language</span>
+        <p class="text-sm text-slate-600">{{ data.meta_robots or "index, follow (default)" }} · {{ data.lang or "not declared" }}</p>
       </div>
       <div class="card">
         <span class="mb-1 block text-sm font-medium text-slate-700">Headings H1</span>
-        <p class="text-sm text-slate-600">{{ data.h1_count }} encontrado(s){% if data.h1_list %}: {{ data.h1_list | join(" · ") }}{% endif %}</p>
+        <p class="text-sm text-slate-600">{{ data.h1_count }} found{% if data.h1_list %}: {{ data.h1_list | join(" · ") }}{% endif %}</p>
       </div>
       <div class="card">
-        <span class="mb-1 block text-sm font-medium text-slate-700">Contagem de palavras</span>
-        <p class="text-sm text-slate-600">~{{ data.word_count }} palavras · favicon {{ "presente" if data.has_favicon else "ausente" }}</p>
+        <span class="mb-1 block text-sm font-medium text-slate-700">Word count</span>
+        <p class="text-sm text-slate-600">~{{ data.word_count }} words · favicon {{ "present" if data.has_favicon else "absent" }}</p>
       </div>
     </div>
 
@@ -92,7 +92,7 @@
         <dl class="space-y-1 text-xs">
           {% for key, value in data.open_graph.items() %}<div><dt class="inline font-medium text-slate-500">{{ key }}:</dt> <dd class="inline text-slate-600">{{ value }}</dd></div>{% endfor %}
         </dl>
-        {% else %}<p class="text-xs text-slate-400">Nenhuma tag og: encontrada.</p>{% endif %}
+        {% else %}<p class="text-xs text-slate-400">No og: tags found.</p>{% endif %}
       </div>
       <div class="card">
         <span class="mb-2 block text-sm font-medium text-slate-700">Twitter Card</span>
@@ -100,14 +100,14 @@
         <dl class="space-y-1 text-xs">
           {% for key, value in data.twitter_card.items() %}<div><dt class="inline font-medium text-slate-500">{{ key }}:</dt> <dd class="inline text-slate-600">{{ value }}</dd></div>{% endfor %}
         </dl>
-        {% else %}<p class="text-xs text-slate-400">Nenhuma tag twitter: encontrada.</p>{% endif %}
+        {% else %}<p class="text-xs text-slate-400">No twitter: tags found.</p>{% endif %}
       </div>
     </div>
     {% endif %}
 
     {% if data.issues %}
     <div class="card border-amber-200 bg-amber-50">
-      <p class="mb-2 text-sm font-semibold text-amber-800">Pontos de atenção</p>
+      <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
       <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">
         {% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}
       </ul>
@@ -118,84 +118,48 @@
 
 {% if mode == "form" %}
 <section class="prose-tool max-w-3xl space-y-4">
-  <h2>O que são title e meta tags?</h2>
-  <p>
-    A tag <code>&lt;title&gt;</code> e a meta description são os dois elementos mais visíveis de
-    uma página nos resultados de busca: o title vira o link clicável azul, e a description
-    normalmente aparece como o resumo abaixo dele. Junto com o canonical (que informa qual é a
-    versão "oficial" de uma URL quando existem duplicatas), o meta robots (que controla se a
-    página pode ser indexada e seguida) e as tags Open Graph/Twitter Card (que controlam como o
-    link aparece ao ser compartilhado em redes sociais), esses elementos formam a base do SEO
-    on-page de qualquer página. Esta ferramenta busca a página informada e extrai todos esses
-    elementos de uma vez, junto com um resumo de headings H1 e contagem aproximada de palavras.
-  </p>
-  <h2>Como interpretar o resultado</h2>
-  <p>
-    A faixa recomendada para o title é de 30 a 60 caracteres — abaixo disso, o título pode não
-    aproveitar todo o espaço disponível nos resultados de busca; acima, corre risco de ser cortado
-    com reticências. Para a meta description, a faixa recomendada é de 70 a 160 caracteres. Essas
-    faixas não são regras rígidas do Google, mas aproximações práticas amplamente usadas pela
-    indústria de SEO para evitar truncamento visual. O canonical ausente não é necessariamente um
-    erro — páginas simples sem risco de duplicação podem prescindir dele — mas em sites com
-    parâmetros de URL, paginação ou HTTP/HTTPS duplicados, a ausência de canonical pode causar
-    diluição de relevância entre versões da mesma página. Mais de uma tag H1 na página é
-    tecnicamente permitido pelo HTML5, mas a prática recomendada de SEO ainda é usar apenas uma H1
-    por página, representando o tópico principal do conteúdo.
-  </p>
-  <h2>Casos de uso comuns</h2>
-  <p>
-    Profissionais de SEO usam esta ferramenta antes de publicar uma página nova, para conferir se
-    todos os elementos essenciais foram preenchidos corretamente pelo CMS ou pelo time de
-    conteúdo. Também é útil para auditar rapidamente páginas de concorrentes, para depurar por que
-    um link compartilhado no WhatsApp ou LinkedIn não está mostrando a imagem/título esperados
-    (checando as tags Open Graph), e para identificar páginas com title ou description ausentes em
-    um levantamento manual rápido antes de uma auditoria mais completa com ferramentas de
-    rastreamento.
-  </p>
-  <h2>Limitações</h2>
-  <p>
-    Esta ferramenta lê o HTML retornado diretamente pelo servidor, sem executar JavaScript — sites
-    que montam o title, meta tags ou conteúdo via JavaScript no navegador (client-side rendering
-    sem pré-renderização) podem não refletir corretamente aqui, já que os buscadores também têm
-    comportamento variável ao processar esse tipo de conteúdo. A contagem de palavras é aproximada,
-    baseada no texto visível extraído do HTML bruto, sem diferenciar conteúdo principal de menus,
-    rodapé e outros elementos de navegação.
-  </p>
-  <h2>Título, description e a taxa de cliques</h2>
-  <p>
-    Além de influenciar a relevância percebida pelos buscadores, title e meta description afetam
-    diretamente a taxa de cliques (CTR) nos resultados de busca — eles são, na prática, o anúncio
-    da sua página. Um title genérico como "Página inicial" ou repetido em várias páginas do mesmo
-    site desperdiça uma oportunidade valiosa de diferenciação; o ideal é que cada página tenha um
-    title único, que descreva especificamente o conteúdo daquela URL. A meta description, mesmo
-    não sendo um fator direto de ranqueamento segundo o próprio Google, funciona como um "texto de
-    venda" que pode aumentar significativamente os cliques quando bem escrita, incluindo uma
-    chamada clara para o que o usuário vai encontrar. Vale lembrar que buscadores podem, a
-    critério próprio, substituir a description declarada por um trecho extraído do conteúdo da
-    página quando julgarem mais relevante para a busca específica do usuário.
-  </p>
+<h2>What are title and meta tags?</h2>
+   <p>
+     The <code>&lt;title&gt;</code> tag and meta description are the two most visible elements of a page in search results: the title becomes the clickable blue link, and the description typically appears as the summary below it. Together with the canonical (which informs the "official" version of a URL when duplicates exist), the meta robots (which controls whether the page can be indexed and followed), and the Open Graph/Twitter Card tags (which control how the link appears when shared on social networks), these elements form the foundation of on-page SEO for any page. This tool fetches the provided page and extracts all these elements at once, along with an H1 headings summary and approximate word count.
+   </p>
+   <h2>How to interpret the result</h2>
+   <p>
+     The recommended range for the title is 30 to 60 characters — below that, the title may not use all the available space in search results; above, it risks being truncated with ellipsis. For the meta description, the recommended range is 70 to 160 characters. These ranges are not strict Google rules but practical approximations widely used by the SEO industry to avoid visual truncation. A missing canonical is not necessarily an error — simple pages without risk of duplication can do without it — but on sites with URL parameters, pagination, or duplicate HTTP/HTTPS, the absence of canonical can cause relevance dilution between versions of the same page. More than one H1 tag per page is technically allowed by HTML5, but the recommended SEO practice is still to use only one H1 per page, representing the main topic of the content.
+   </p>
+   <h2>Common use cases</h2>
+   <p>
+     SEO professionals use this tool before publishing a new page, to check that all essential elements have been correctly filled in by the CMS or the content team. It is also useful for quickly auditing competitor pages, for debugging why a link shared on WhatsApp or LinkedIn is not showing the expected image/title (checking Open Graph tags), and for identifying pages with missing title or description in a quick manual survey before a more comprehensive crawling audit.
+   </p>
+   <h2>Limitations</h2>
+   <p>
+     This tool reads the HTML returned directly by the server, without executing JavaScript — sites that build the title, meta tags, or content via JavaScript in the browser (client-side rendering without pre-rendering) may not reflect correctly here, as search engines also have variable behavior in processing this type of content. The word count is approximate, based on visible text extracted from raw HTML, without differentiating main content from menus, footers, and other navigation elements.
+   </p>
+   <h2>Title, description, and click-through rate</h2>
+   <p>
+     Beyond influencing perceived relevance to search engines, title and meta description directly affect the click-through rate (CTR) in search results — they are, in practice, the advertisement for your page. A generic title like "Home page" or one repeated across multiple pages of the same site wastes a valuable differentiation opportunity; the ideal is for each page to have a unique title that specifically describes the content of that URL. The meta description, even though it is not a direct ranking factor according to Google itself, functions as a "sales text" that can significantly increase clicks when well written, including a clear call to action for what the user will find. It is also worth remembering that search engines may, at their own discretion, replace the declared description with a snippet extracted from the page's content when they judge it more relevant for the user's specific search.
+   </p>
 </section>
 {% endif %}
 
 {% set faqs = [
-  ("Qual o tamanho ideal do title?", "Recomenda-se entre 30 e 60 caracteres para evitar truncamento nos resultados de busca."),
-  ("Preciso ter uma tag canonical mesmo sem conteúdo duplicado?", "Não é obrigatório, mas é uma boa prática defensiva — evita ambiguidade caso a mesma página se torne acessível por múltiplas URLs no futuro."),
-  ("Por que minha página não mostra as tags Open Graph mesmo tendo configurado?", "Verifique se as tags estão no <head> do HTML retornado pelo servidor (não geradas apenas via JavaScript), já que esta ferramenta não executa scripts."),
-] %}
-{% if mode == "form" %}
-<section class="mt-10 max-w-3xl">
-  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
-  {{ faq_accordion(faqs) }}
-</section>
-{% endif %}
+   ("What is the ideal title length?", "We recommend between 30 and 60 characters to avoid truncation in search results."),
+   ("Do I need a canonical tag even without duplicate content?", "It is not mandatory, but it is a good defensive practice — it avoids ambiguity should the same page become accessible through multiple URLs in the future."),
+   ("Why isn't my page showing Open Graph tags even though I configured them?", "Check if the tags are in the <head> of the HTML returned by the server (not generated only via JavaScript), since this tool does not execute scripts."),
+ ] %}
+ {% if mode == "form" %}
+ <section class="mt-10 max-w-3xl">
+   <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+   {{ faq_accordion(faqs) }}
+ </section>
+ {% endif %}
 
 <section class="mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
     {{ related_tools_list(related_tools) }}
   </div>
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
     {{ recent_searches_list(tool, recent_searches) }}
   </div>
 </section>

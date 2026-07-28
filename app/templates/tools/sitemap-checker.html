@@ -2,12 +2,12 @@
 {% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
 
 {% block title %}Sitemap Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
-{% block meta_description %}Valide o sitemap XML de um domínio e veja quantas URLs ele declara, incluindo suporte a sitemap index.{% endblock %}
+{% block meta_description %}Validate a domain's XML sitemap and see how many URLs it declares, including sitemap index support.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
 {% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
 
 {% block content %}
-{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
 {{ breadcrumbs(crumbs) }}
 
 <header class="mb-8 max-w-2xl">
@@ -20,11 +20,11 @@
 {% if mode == "form" %}
 <form method="post" class="card mb-8 max-w-xl space-y-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domínio</label>
+  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
   <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
-  <p class="text-xs text-slate-400">Verificamos automaticamente {{ '{domínio}' }}/sitemap.xml.</p>
-  {{ captcha_widget(captcha_provider, cap_public_url, cap_site_key) }}
-  <button type="submit" class="btn-primary w-full sm:w-auto">Verificar sitemap</button>
+  <p class="text-xs text-slate-400">We automatically check {{ '{domain}' }}/sitemap.xml.</p>
+  {{ captcha_widget(captcha_provider) }}
+  <button type="submit" class="btn-primary w-full sm:w-auto">Check sitemap</button>
 </form>
 {% endif %}
 
@@ -32,8 +32,8 @@
 
 {% if mode == "failed" %}
 <div class="card mb-8 max-w-xl border-rose-200 bg-rose-50">
-  <p class="badge-danger mb-2">Falhou</p>
-  <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+  <p class="badge-danger mb-2">Failed</p>
+  <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
 </div>
 {% endif %}
 
@@ -46,17 +46,17 @@
     </div>
 
     {% if not data.exists %}
-      <p class="badge-warning">Nenhum sitemap.xml encontrado neste caminho.</p>
+      <p class="badge-warning">No sitemap.xml found at this path.</p>
     {% else %}
       <div class="grid gap-4 sm:grid-cols-3">
-        <div class="card text-center"><p class="text-2xl font-semibold text-brand-800">{{ data.url_count }}</p><p class="text-xs text-slate-500">URLs declaradas</p></div>
-        <div class="card text-center"><p class="text-2xl font-semibold text-brand-800">{{ data.type }}</p><p class="text-xs text-slate-500">Tipo de sitemap</p></div>
-        <div class="card text-center"><p class="text-2xl font-semibold text-brand-800">{{ (data.size_bytes / 1024) | round(1) }} KB</p><p class="text-xs text-slate-500">Tamanho do arquivo</p></div>
+        <div class="card text-center"><p class="text-2xl font-semibold text-brand-800">{{ data.url_count }}</p><p class="text-xs text-slate-500">Declared URLs</p></div>
+        <div class="card text-center"><p class="text-2xl font-semibold text-brand-800">{{ data.type }}</p><p class="text-xs text-slate-500">Sitemap type</p></div>
+        <div class="card text-center"><p class="text-2xl font-semibold text-brand-800">{{ (data.size_bytes / 1024) | round(1) }} KB</p><p class="text-xs text-slate-500">File size</p></div>
       </div>
 
       {% if data.issues %}
       <div class="card border-amber-200 bg-amber-50">
-        <p class="mb-2 text-sm font-semibold text-amber-800">Pontos de atenção</p>
+        <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
         <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
       </div>
       {% endif %}
@@ -65,7 +65,7 @@
       <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table class="w-full text-left text-sm">
           <thead><tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
-            <th class="px-4 py-2">URL</th><th class="px-4 py-2">Última modificação</th>
+            <th class="px-4 py-2">URL</th><th class="px-4 py-2">Last modified</th>
           </tr></thead>
           <tbody>
             {% for entry in data.sample %}
@@ -77,7 +77,7 @@
           </tbody>
         </table>
       </div>
-      <p class="text-xs text-slate-400">Amostra das primeiras entradas do arquivo.</p>
+      <p class="text-xs text-slate-400">Sample of the first entries in the file.</p>
       {% endif %}
     {% endif %}
   </div>
@@ -85,82 +85,73 @@
 
 {% if mode == "form" %}
 <section class="prose-tool max-w-3xl space-y-4">
-  <h2>O que é um sitemap XML?</h2>
-  <p>
-    Um sitemap XML é uma lista estruturada de URLs de um site, criada especificamente para ajudar
-    buscadores a descobrir e priorizar o rastreamento de páginas — especialmente útil em sites
-    grandes, novos ou com muitas páginas que têm poucos links internos apontando para elas. Um
-    sitemap pode ser do tipo <code>urlset</code> (lista direta de URLs, cada uma opcionalmente com
-    data da última modificação, frequência de mudança estimada e prioridade relativa) ou
-    <code>sitemapindex</code> (um "índice de índices", que aponta para outros arquivos de sitemap
-    — usado quando o site tem mais URLs do que cabem em um único arquivo). Esta ferramenta busca o
-    sitemap na localização padrão (<code>/sitemap.xml</code>) e identifica automaticamente qual
-    dos dois formatos está sendo usado.
-  </p>
-  <h2>Como interpretar o resultado</h2>
-  <p>
-    O número de URLs declaradas dá uma ideia rápida do tamanho do site do ponto de vista do SEO.
-    Os protocolos de sitemap estabelecem limites técnicos de <strong>50.000 URLs</strong> e
-    <strong>50 MB descomprimidos por arquivo</strong> — sites que ultrapassam esses limites devem
-    dividir as URLs em múltiplos arquivos de sitemap referenciados por um sitemap index; esta
-    ferramenta alerta quando esses limites são excedidos. A ausência do campo
-    <code>lastmod</code> em uma entrada não invalida o sitemap, mas reduz a capacidade dos
-    buscadores de priorizar corretamente o que precisa ser re-rastreado. Um sitemap do tipo
-    <code>sitemapindex</code> é normal para sites grandes; se você esperava ver URLs individuais e
-    recebeu um índice, isso é esperado — o índice aponta para os arquivos reais.
-  </p>
-  <h2>Casos de uso comuns</h2>
-  <p>
-    Esta ferramenta é usada para confirmar que o sitemap está acessível e bem formado antes de
-    submetê-lo ao Google Search Console ou Bing Webmaster Tools, para auditar rapidamente quantas
-    URLs um site concorrente declara publicamente, e para diagnosticar problemas de indexação
-    quando um sitemap está retornando erro ou excedendo os limites técnicos do protocolo. Times
-    de desenvolvimento também usam para validar que a geração automática de sitemap (comum em
-    CMS e frameworks) está funcionando corretamente após um deploy.
-  </p>
-  <h2>Limitações</h2>
-  <p>
-    Por segurança, o parser rejeita sitemaps que contenham declarações <code>DOCTYPE</code> ou
-    <code>ENTITY</code> personalizadas, uma proteção contra ataques de XML malicioso — sitemaps
-    legítimos nunca precisam dessas declarações, então isso não deve afetar arquivos gerados
-    normalmente. Esta ferramenta verifica apenas o caminho padrão <code>/sitemap.xml</code>; se o
-    seu site declara o sitemap em outra URL (algo comum, e perfeitamente válido), configure-a
-    diretamente no Google Search Console mesmo que esta verificação não a encontre automaticamente.
-  </p>
-  <h2>Sitemap não é robots.txt</h2>
-  <p>
-    É comum confundir os papéis do sitemap e do robots.txt, mas eles são complementares e opostos
-    em função: o robots.txt informa o que <strong>não</strong> deve ser rastreado, enquanto o
-    sitemap sugere ativamente o que <strong>deveria</strong> ser descoberto e considerado para
-    indexação. Ter uma URL listada no sitemap não garante que ela será indexada — o sitemap é
-    apenas um convite, e o buscador ainda aplica seus próprios critérios de qualidade e relevância
-    antes de decidir indexar cada página. Por outro lado, é contraditório e desperdiça
-    orçamento de rastreamento (crawl budget) incluir no sitemap URLs que estão bloqueadas no
-    robots.txt ou marcadas com noindex — nesses casos, o sinal correto é remover a URL do sitemap
-    também, mantendo os dois arquivos consistentes entre si.
-  </p>
-</section>
+<h2>What is an XML sitemap?</h2>
+   <p>
+     An XML sitemap is a structured list of URLs for a site, created specifically
+     to help search engines discover and prioritize pages for crawling — especially useful for large
+     sites, new sites, or sites with many pages that have few internal links pointing to them. A
+     sitemap can be of type <code>urlset</code> (a direct list of URLs, each optionally with a last modification date, estimated change frequency, and relative priority) or
+     <code>sitemapindex</code> (an "index of indexes," pointing to other sitemap
+     files — used when a site has more URLs than fit in a single file). This tool fetches the
+     sitemap at the default location (<code>/sitemap.xml</code>) and automatically identifies which of the two formats is being used.
+   </p>
+ <h2>How to interpret the result</h2>
+   <p>
+     The number of declared URLs gives a quick idea of the site's size from an SEO perspective.
+     The sitemap protocols establish technical limits of <strong>50,000 URLs</strong> and
+     <strong>50 MB uncompressed per file</strong> — sites exceeding these limits should split
+     the URLs across multiple sitemap files referenced by a sitemap index; this tool
+     alerts when these limits are exceeded. The absence of the <code>lastmod</code> field in an entry does not invalidate the sitemap, but reduces search engines' ability to correctly prioritize what
+     needs re-crawling. A sitemap of type <code>sitemapindex</code> is normal for large sites; if you expected to see individual URLs and received an index, that is expected — the index points to the actual files.
+   </p>
+ <h2>Common use cases</h2>
+   <p>
+     This tool is used to confirm that the sitemap is accessible and well-formed before
+     submitting it to Google Search Console or Bing Webmaster Tools, to quickly audit how many URLs a competing site declares publicly, and to diagnose indexing problems when a sitemap is returning an error or exceeding the sitemap protocol's technical limits. Development teams also use it to validate that automatic sitemap generation (common in CMSs and frameworks) is working correctly after a deploy.
+   </p>
+   <h2>Limitations</h2>
+   <p>
+     For security, the parser rejects sitemaps that contain custom <code>DOCTYPE</code> or
+     <code>ENTITY</code> declarations, a protection against malicious XML attacks — legitimate
+     sitemaps never need these declarations, so this should not affect files generated
+     normally. This tool checks only the standard path <code>/sitemap.xml</code>; if your
+     site declares the sitemap at another URL (common, and perfectly valid), configure it
+     directly in Google Search Console even if this check does not find it automatically.
+   </p>
+   <h2>Sitemap is not robots.txt</h2>
+   <p>
+     It is common to confuse the roles of the sitemap and robots.txt, but they are complementary and opposite
+     in function: robots.txt tells what <strong>not</strong> to crawl, while the
+     sitemap actively suggests what <strong>should</strong> be discovered and considered for
+     indexing. Having a URL listed in the sitemap does not guarantee it will be indexed — the sitemap is
+     just an invitation, and search engines still apply their own quality and relevance criteria
+     before deciding to index each page. On the other hand, it is contradictory and wastes
+     crawl budget to include in the sitemap URLs that are blocked in
+     robots.txt or marked with noindex — in these cases, the correct signal is to remove the URL from the sitemap
+     as well, keeping both files consistent with each other.
+   </p>
+ </section>
 {% endif %}
 
 {% set faqs = [
-  ("Qual o limite de URLs por arquivo de sitemap?", "50.000 URLs ou 50MB descomprimidos, o que vier primeiro. Sites maiores devem usar um sitemap index apontando para múltiplos arquivos."),
-  ("Preciso incluir a data de última modificação (lastmod)?", "Não é obrigatório, mas ajuda os buscadores a priorizar melhor o que precisa ser re-rastreado."),
-  ("Meu sitemap está em outra URL, não em /sitemap.xml. E agora?", "Esta ferramenta verifica apenas o caminho padrão. Declare a URL real do seu sitemap diretamente no Google Search Console."),
-] %}
-{% if mode == "form" %}
-<section class="mt-10 max-w-3xl">
-  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
-  {{ faq_accordion(faqs) }}
-</section>
-{% endif %}
+   ("What is the limit of URLs per sitemap file?", "50,000 URLs or 50MB uncompressed, whichever comes first. Larger sites should use a sitemap index pointing to multiple files."),
+   ("Do I need to include the last modification date (lastmod)?", "It is not mandatory, but it helps search engines better prioritize what needs re-crawling."),
+   ("My sitemap is at another URL, not /sitemap.xml. What now?", "This tool checks only the default path. Declare your sitemap's actual URL directly in Google Search Console."),
+ ] %}
+ {% if mode == "form" %}
+ <section class="mt-10 max-w-3xl">
+   <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+   {{ faq_accordion(faqs) }}
+ </section>
+ {% endif %}
 
 <section class="mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
     {{ related_tools_list(related_tools) }}
   </div>
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
     {{ recent_searches_list(tool, recent_searches) }}
   </div>
 </section>

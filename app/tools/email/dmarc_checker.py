@@ -8,9 +8,9 @@ from app.tools.validators import validate_and_normalize_domain
 _VALID_POLICIES = {"none", "quarantine", "reject"}
 
 _POLICY_LABELS = {
-    "none": "Nenhuma ação (apenas monitoramento)",
-    "quarantine": "Quarentena (mensagens suspeitas vão para spam)",
-    "reject": "Rejeição (mensagens não autenticadas são recusadas)",
+    "none": "No action (monitoring only)",
+    "quarantine": "Quarantine (suspicious messages go to spam)",
+    "reject": "Rejection (unauthenticated messages are rejected)",
 }
 
 
@@ -29,11 +29,11 @@ class DmarcCheckerTool(BaseTool):
     slug = "dmarc-checker"
     name = "DMARC Checker"
     category_slug = "email"
-    short_description = "Verifique a política DMARC de um domínio e para onde os relatórios de autenticação são enviados."
-    description = "Consulta e interpreta o registro DMARC publicado em _dmarc.<domínio>."
+    short_description = "Check the DMARC policy of a domain and where authentication reports are sent."
+    description = "Queries and interprets the DMARC record published at _dmarc.<domain>."
     icon = "shield-check"
     input_type = InputType.DOMAIN
-    input_placeholder = "exemplo.com.br"
+    input_placeholder = "example.com"
     public_url_prefix = "email/dmarc"
     ttl_seconds = 6 * 3600
     rate_limit_per_minute = 10
@@ -49,7 +49,7 @@ class DmarcCheckerTool(BaseTool):
         if not domain_exists(normalized_input):
             return ToolResult(
                 success=True,
-                summary=f"{normalized_input} não está registrado ou não possui delegação DNS.",
+                summary=f"{normalized_input} is not registered or has no DNS delegation.",
                 data={"domain": normalized_input, "exists": False, "has_dmarc": False},
             )
 
@@ -57,22 +57,22 @@ class DmarcCheckerTool(BaseTool):
         dmarc_records = [r for r in txt_records if r.lower().startswith("v=dmarc1")]
 
         if not dmarc_records:
-            data = {"domain": normalized_input, "exists": True, "has_dmarc": False, "issues": ["Nenhum registro DMARC encontrado."]}
-            return ToolResult(success=True, summary=f"{normalized_input} não possui registro DMARC.", data=data)
+            data = {"domain": normalized_input, "exists": True, "has_dmarc": False, "issues": ["No DMARC record found."]}
+            return ToolResult(success=True, summary=f"{normalized_input} has no DMARC record.", data=data)
 
         issues = []
         if len(dmarc_records) > 1:
-            issues.append("Mais de um registro DMARC encontrado — apenas o primeiro será considerado válido pelos receptores.")
+            issues.append("More than one DMARC record found — only the first will be considered valid by receivers.")
 
         tags = _parse_dmarc(dmarc_records[0])
         policy = tags.get("p")
 
         if policy not in _VALID_POLICIES:
-            issues.append(f'Política "p={policy}" inválida ou ausente.')
+            issues.append(f'Policy "p={policy}" is invalid or missing.')
         if not tags.get("rua"):
-            issues.append("Sem endereço configurado em rua= para receber relatórios agregados.")
+            issues.append("No address configured in rua= to receive aggregate reports.")
         if tags.get("pct") and tags["pct"] != "100":
-            issues.append(f"A política é aplicada a apenas {tags['pct']}% das mensagens (pct={tags['pct']}).")
+            issues.append(f"The policy is applied to only {tags['pct']}% of messages (pct={tags['pct']}).")
 
         data = {
             "domain": normalized_input,
@@ -90,9 +90,9 @@ class DmarcCheckerTool(BaseTool):
             "issues": issues,
         }
 
-        summary = f"DMARC de {normalized_input}: política \"{policy or 'ausente'}\"."
+        summary = f"DMARC for {normalized_input}: policy \"{policy or 'missing'}\"."
         if issues:
-            summary += f" {len(issues)} ponto(s) de atenção."
+            summary += f" {len(issues)} point(s) of attention."
 
         return ToolResult(success=True, summary=summary, data=data)
 

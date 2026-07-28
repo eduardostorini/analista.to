@@ -2,12 +2,12 @@
 {% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
 
 {% block title %}HTTP Headers{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
-{% block meta_description %}Veja todos os cabeçalhos HTTP retornados por uma URL, organizados e com os mais relevantes destacados.{% endblock %}
+{% block meta_description %}View all HTTP headers returned by a URL, organized with the most relevant ones highlighted.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
 {% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
 
 {% block content %}
-{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
 {{ breadcrumbs(crumbs) }}
 
 <header class="mb-8 max-w-2xl">
@@ -22,8 +22,8 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">URL</label>
   <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
-  {{ captcha_widget(captcha_provider, cap_public_url, cap_site_key) }}
-  <button type="submit" class="btn-primary w-full sm:w-auto">Ver cabeçalhos</button>
+  {{ captcha_widget(captcha_provider) }}
+  <button type="submit" class="btn-primary w-full sm:w-auto">View headers</button>
 </form>
 {% endif %}
 
@@ -31,8 +31,8 @@
 
 {% if mode == "failed" %}
 <div class="card mb-8 max-w-xl border-rose-200 bg-rose-50">
-  <p class="badge-danger mb-2">Falhou</p>
-  <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+  <p class="badge-danger mb-2">Failed</p>
+  <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
 </div>
 {% endif %}
 
@@ -63,90 +63,87 @@
 
 {% if mode == "form" %}
 <section class="prose-tool max-w-3xl space-y-4">
-  <h2>O que são cabeçalhos HTTP?</h2>
-  <p>
-    Toda resposta de um servidor web carrega, além do conteúdo da página, um conjunto de
-    metadados chamados cabeçalhos HTTP (HTTP headers). Eles informam ao navegador (ou a qualquer
-    cliente HTTP) coisas como o tipo de conteúdo retornado, se a resposta pode ser armazenada em
-    cache e por quanto tempo, qual tecnologia de servidor está processando a requisição, se
-    cookies devem ser definidos, e diversas diretivas de segurança. Esta ferramenta faz uma
-    requisição à URL informada e lista todos os cabeçalhos retornados, destacando com uma cor
-    diferente o código de status HTTP da resposta.
-  </p>
-  <h2>Como interpretar o resultado</h2>
-  <p>
-    O código de status no topo (200, 301, 404, 500 etc.) indica o resultado geral da requisição —
-    200 significa sucesso, códigos da faixa 3xx indicam redirecionamento (veja o Redirect
-    Checker para acompanhar a cadeia completa), 4xx indica erro do lado do cliente (como página
-    não encontrada) e 5xx indica erro no servidor. Entre os cabeçalhos, vale prestar atenção
-    especial ao <code>Server</code> e <code>X-Powered-By</code> (podem revelar a tecnologia por
-    trás do site), ao <code>Cache-Control</code> (define por quanto tempo navegadores e CDNs podem
-    reutilizar a resposta sem buscar novamente no servidor), ao <code>Content-Type</code> (define
-    como o conteúdo deve ser interpretado) e a cabeçalhos de segurança como
-    <code>Strict-Transport-Security</code> e <code>Content-Security-Policy</code> — para uma
-    análise dedicada e com pontuação desses últimos, use a ferramenta Security Headers.
-  </p>
-  <h2>Casos de uso comuns</h2>
-  <p>
-    Desenvolvedores usam esta ferramenta para depurar problemas de cache (por que uma página não
-    está atualizando após um deploy, por exemplo), para confirmar que um cabeçalho customizado
-    configurado no servidor ou CDN está realmente sendo enviado, e para investigar rapidamente a
-    stack tecnológica de um site de terceiros antes de uma integração. Também é útil para
-    confirmar o `Content-Type` correto de APIs e arquivos estáticos, um erro comum que pode
-    quebrar o comportamento esperado no navegador.
-  </p>
-  <h2>Limitações</h2>
-  <p>
-    Os cabeçalhos podem variar entre requisições devido a balanceamento de carga, CDNs com
-    múltiplos nós, ou personalização baseada em cookies/geolocalização — o resultado mostrado
-    reflete apenas a resposta obtida no momento exato da consulta. Esta ferramenta usa o método
-    GET com um User-Agent próprio e identificado; alguns servidores podem retornar cabeçalhos
-    diferentes para outros métodos (HEAD, POST) ou para navegadores reais.
-  </p>
-  <h2>Cabeçalhos de cache em detalhe</h2>
-  <p>
-    Entre os cabeçalhos mais influentes na experiência do usuário está o Cache-Control, que aceita
-    diretivas como max-age (por quantos segundos a resposta pode ser reaproveitada sem nova
-    checagem), no-cache (permite guardar, mas exige revalidação a cada uso) e no-store (proíbe
-    qualquer armazenamento). Um Cache-Control mal configurado é uma causa comum de dois problemas
-    opostos: páginas que não atualizam para os visitantes mesmo após um deploy (cache agressivo
-    demais) ou sites lentos que buscam o mesmo recurso repetidamente do servidor sem necessidade
-    (cache ausente ou tempo de vida curto demais). Cabeçalhos como ETag e Last-Modified trabalham
-    junto com o cache para permitir revalidação eficiente: o navegador pode perguntar "isso ainda
-    é válido?" com uma requisição leve, em vez de baixar o conteúdo inteiro novamente quando nada
-    mudou.
-  </p>
-  <h2>Cabeçalhos personalizados</h2>
-  <p>
-    É comum encontrar cabeçalhos prefixados com X-, uma convenção histórica ainda amplamente usada
-    para identificar cabeçalhos não padronizados criados por uma aplicação, CDN ou balanceador
-    específico, como X-Request-Id, útil para rastrear uma requisição em sistemas de log
-    distribuídos, ou X-Cache, que indica se uma CDN serviu a resposta a partir do cache ou buscou
-    novamente na origem. Esses cabeçalhos costumam ser valiosos durante depuração de performance e
-    incidentes, revelando detalhes internos da infraestrutura que não apareceriam de outra forma.
-  </p>
-</section>
+   <h2>What are HTTP headers?</h2>
+   <p>
+     Every response from a web server carries, in addition to the page content, a set of
+     metadata called HTTP headers. They inform the browser (or any HTTP client) about things
+     like the type of content returned, whether and for how long the response can be cached,
+     which server technology is processing the request, whether cookies should be set, and
+     various security directives. This tool makes a request to the provided URL and lists
+     all returned headers, highlighting the HTTP status code with a different color.
+   </p>
+   <h2>How to interpret the result</h2>
+   <p>
+     The status code at the top (200, 301, 404, 500, etc.) indicates the overall result
+     of the request — 200 means success, codes in the 3xx range indicate redirection (see the
+     Redirect Checker to follow the full chain), 4xx indicates a client-side error (like a page
+     not found), and 5xx indicates a server-side error. Among the headers, pay special
+     attention to <code>Server</code> and <code>X-Powered-By</code> (which can reveal the
+     technology behind the site), to <code>Cache-Control</code> (defines how long browsers and
+     CDNs can reuse the response without fetching again from the server), to
+     <code>Content-Type</code> (defines how the content should be interpreted), and to security
+     headers like <code>Strict-Transport-Security</code> and <code>Content-Security-Policy</code> — for a dedicated
+     analysis and scoring of the latter, use the Security Headers tool.
+   </p>
+   <h2>Common use cases</h2>
+   <p>
+     Developers use this tool to debug cache issues (why a page is not updating after a deploy,
+     for example), to confirm that a custom header configured on the server or CDN is actually
+     being sent, and to quickly investigate the technology stack of a third-party site before an
+     integration. It is also useful to confirm the correct <code>Content-Type</code> of APIs and
+     static files, a common error that can break expected browser behavior.
+   </p>
+   <h2>Limitations</h2>
+   <p>
+     Headers can vary between requests due to load balancing, multi-node CDNs, or
+     customization based on cookies/geolocation — the result shown reflects only the response
+     obtained at the exact moment of the query. This tool uses the GET method with its own
+     identified User-Agent; some servers may return different headers for other methods (HEAD,
+     POST) or for real browsers.
+   </p>
+   <h2>Cache headers in detail</h2>
+   <p>
+     Among the most user-impactful headers is Cache-Control, which accepts directives like
+     max-age (how many seconds the response can be reused without a new check), no-cache
+     (allows storing but requires revalidation on each use), and no-store (prohibits any
+     storage). A misconfigured Cache-Control is a common cause of two opposite problems: pages
+     that do not update for visitors even after a deploy (too aggressive caching) or slow sites
+     that fetch the same resource repeatedly from the server unnecessarily (absent cache or too
+     short a time-to-live). Headers like ETag and Last-Modified work alongside cache to allow
+     efficient revalidation: the browser can ask "is this still valid?" with a lightweight request
+     instead of downloading the entire content again when nothing has changed.
+   </p>
+   <h2>Custom headers</h2>
+   <p>
+     It is common to encounter headers prefixed with X-, a historical convention still widely used to
+     identify non-standardized headers created by an application, CDN, or specific load balancer,
+     such as X-Request-Id, useful for tracing a request in distributed log systems, or X-Cache,
+     which indicates whether a CDN served the response from cache or fetched again from the origin.
+     These headers are often valuable during performance debugging and incident investigation,
+     revealing internal infrastructure details that would otherwise not appear.
+   </p>
+ </section>
 {% endif %}
 
 {% set faqs = [
-  ("Por que o Server não aparece na resposta?", "Alguns servidores e CDNs, por segurança, omitem ou ofuscam propositalmente o cabeçalho Server para dificultar a identificação da tecnologia usada."),
-  ("O que significa Cache-Control: no-store?", "Indica que a resposta não deve ser armazenada em cache algum, nem pelo navegador nem por proxies intermediários — comum em páginas com dados sensíveis ou muito dinâmicos."),
-  ("Os cabeçalhos mudam a cada consulta?", "Podem mudar, especialmente Date, Set-Cookie e cabeçalhos relacionados a balanceamento de carga ou CDN."),
-] %}
-{% if mode == "form" %}
-<section class="mt-10 max-w-3xl">
-  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
-  {{ faq_accordion(faqs) }}
-</section>
-{% endif %}
+   ("Why doesn't the Server header appear in the response?", "Some servers and CDNs, for security, intentionally omit or obscure the Server header to make it harder to identify the technology used."),
+   ("What does Cache-Control: no-store mean?", "Indicates that the response should not be stored in any cache, neither by the browser nor by intermediate proxies — common in pages with sensitive or very dynamic data."),
+   ("Do the headers change with each query?", "They can change, especially Date, Set-Cookie, and headers related to load balancing or CDN."),
+ ] %}
+ {% if mode == "form" %}
+ <section class="mt-10 max-w-3xl">
+   <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+   {{ faq_accordion(faqs) }}
+ </section>
+ {% endif %}
 
 <section class="mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
     {{ related_tools_list(related_tools) }}
   </div>
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
     {{ recent_searches_list(tool, recent_searches) }}
   </div>
 </section>

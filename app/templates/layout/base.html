@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="pt-BR" class="h-full">
+<html lang="en" class="h-full">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{{ site_name }} — Ferramentas técnicas para DNS, SEO, SSL e servidores{% endblock %}</title>
-  <meta name="description" content="{% block meta_description %}Analise DNS, SEO, SSL, servidor e segurança em um só lugar. Ferramentas técnicas gratuitas e rápidas do {{ site_name }}.{% endblock %}">
+  <title>{% block title %}{{ site_name }} — Technical tools for DNS, SEO, SSL, and servers{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Analyze DNS, SEO, SSL, servers, and security in one place. Free and fast technical tools from {{ site_name }}.{% endblock %}">
   {% block canonical %}{% endblock %}
   {% block robots_meta %}<meta name="robots" content="index, follow">{% endblock %}
   <meta property="og:site_name" content="{{ site_name }}">
@@ -14,6 +14,26 @@
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2220%22 font-size=%2220%22>🔎</text></svg>">
   <link rel="stylesheet" href="/static/dist/main.css">
+  <link rel="stylesheet" href="/static/dist/altcha.css">
+  <script type="module" src="/static/dist/altcha.js" defer></script>
+  <script>
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        var widget = document.querySelector('altcha-widget');
+        if (!widget) {
+          console.error('ALTCHA widget not found in DOM');
+        } else {
+          console.log('ALTCHA widget found:', widget);
+          widget.addEventListener('error', function(e) {
+            console.error('ALTCHA widget error:', e);
+          });
+          widget.addEventListener('statechange', function(e) {
+            console.log('ALTCHA widget state:', e.detail.state);
+          });
+        }
+      }, 1000);
+    });
+  </script>
   {% block head_extra %}{% endblock %}
 </head>
 <body class="h-full bg-slate-50 text-slate-800" x-data="{ toast: null }">
@@ -22,7 +42,7 @@
   <button
     class="fixed left-3 top-3 z-40 rounded-lg border border-slate-200 bg-white p-2 shadow-sm lg:hidden"
     @click="drawerOpen = true"
-    aria-label="Abrir menu de ferramentas"
+    aria-label="Open tools menu"
   >
     <span aria-hidden="true">☰</span>
   </button>
@@ -51,12 +71,12 @@
       <button
         class="hidden rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 lg:block"
         @click="toggleCollapsed()"
-        :aria-label="collapsed ? 'Expandir menu' : 'Recolher menu'"
+        :aria-label="collapsed ? 'Expand menu' : 'Collapse menu'"
       >
         <span x-show="!collapsed" x-cloak aria-hidden="true">«</span>
         <span x-show="collapsed" x-cloak aria-hidden="true">»</span>
       </button>
-      <button class="p-1 text-slate-400 lg:hidden" @click="drawerOpen = false" aria-label="Fechar menu">✕</button>
+      <button class="p-1 text-slate-400 lg:hidden" @click="drawerOpen = false" aria-label="Close menu">✕</button>
     </div>
 
     <div class="border-b border-slate-100 p-3" x-show="!collapsed" x-cloak>
@@ -66,23 +86,61 @@
         @click="$dispatch('analisa:open-search')"
         class="input flex w-full items-center justify-between text-left text-slate-400"
       >
-        <span>Buscar ferramenta…</span>
+        <span>Search tools…</span>
         <kbd class="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs">Ctrl K</kbd>
       </button>
     </div>
 
-    <nav class="flex-1 overflow-y-auto px-2 py-3" aria-label="Categorias de ferramentas">
+    <nav class="flex-1 overflow-y-auto px-2 py-3" aria-label="Tool categories">
       {% for category in sidebar_categories %}
         {% set active_tools = category.tools | selectattr('is_active') | list %}
         {% if active_tools %}
+        {% set category_colors = {
+            'dns': 'text-sky-400 hover:text-sky-300 hover:bg-sky-400/10',
+            'email': 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-400/10',
+            'domain-ip': 'text-amber-400 hover:text-amber-300 hover:bg-amber-400/10',
+            'seo': 'text-violet-400 hover:text-violet-300 hover:bg-violet-400/10',
+            'http-server': 'text-cyan-400 hover:text-cyan-300 hover:bg-cyan-400/10',
+            'ssl-security': 'text-rose-400 hover:text-rose-300 hover:bg-rose-400/10',
+            'utils': 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-400/10',
+        } %}
+        {% set category_active_bg = {
+            'dns': 'bg-sky-400/15',
+            'email': 'bg-emerald-400/15',
+            'domain-ip': 'bg-amber-400/15',
+            'seo': 'bg-violet-400/15',
+            'http-server': 'bg-cyan-400/15',
+            'ssl-security': 'bg-rose-400/15',
+            'utils': 'bg-indigo-400/15',
+        } %}
+        {% set category_base_bg = {
+            'dns': 'bg-sky-400/5',
+            'email': 'bg-emerald-400/5',
+            'domain-ip': 'bg-amber-400/5',
+            'seo': 'bg-violet-400/5',
+            'http-server': 'bg-cyan-400/5',
+            'ssl-security': 'bg-rose-400/5',
+            'utils': 'bg-indigo-400/5',
+        } %}
+        {% set category_icons = {
+            'dns': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>',
+            'email': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>',
+            'domain-ip': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+            'seo': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
+            'http-server': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>',
+            'ssl-security': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',
+            'utils': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>',
+        } %}
         <div class="mb-1" {% if request.blueprint == 'main' and category.slug == (tool_row.category.slug if tool_row is defined else '') %}data-active-category="{{ category.slug }}"{% endif %}>
           <button
             type="button"
-            class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-slate-600"
+            class="{{ category_colors[category.slug] }} {{ category_base_bg[category.slug] }} flex w-full origin-left items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide transition-all duration-150 ease-out hover:scale-[1.04] hover:shadow-sm"
+            :class="{ '{{ category_active_bg[category.slug] }}': isCategoryOpen('{{ category.slug }}') }"
             @click="toggleCategory('{{ category.slug }}')"
           >
-            <span x-show="!collapsed" x-cloak>{{ category.name }}</span>
-            <span x-show="collapsed" x-cloak aria-hidden="true">{{ category.name[:2] }}</span>
+            <span x-show="!collapsed" x-cloak class="shrink-0">{{ category_icons[category.slug] | safe }}</span>
+            <span x-show="!collapsed" x-cloak class="flex-1">{{ category.name }}</span>
+            <span x-show="collapsed" x-cloak aria-hidden="true" class="text-xs">{{ category.name[:2] }}</span>
             <span x-show="!collapsed" x-cloak aria-hidden="true" x-text="isCategoryOpen('{{ category.slug }}') ? '−' : '+'"></span>
           </button>
           <div x-show="collapsed || isCategoryOpen('{{ category.slug }}')" x-collapse>
@@ -107,9 +165,8 @@
     </nav>
 
     <div class="space-y-1 border-t border-slate-100 p-3 text-sm" x-show="!collapsed" x-cloak>
-      <a href="{{ url_for('main.home') }}" class="sidebar-link">Todas as ferramentas</a>
-      <a href="{{ url_for('main.roadmap') }}" class="sidebar-link">Roadmap e sugestões</a>
-      <a href="{{ url_for('main.docs') }}" class="sidebar-link">Documentação</a>
+      <a href="{{ url_for('main.home') }}" class="sidebar-link">All tools</a>
+      <a href="{{ url_for('main.docs') }}" class="sidebar-link">Documentation</a>
     </div>
   </aside>
 
@@ -118,7 +175,7 @@
       {% block content %}{% endblock %}
     </main>
     <footer class="border-t border-slate-200 bg-white px-4 py-6 text-center text-xs text-slate-400">
-      © {{ site_name }} — dados coletados automaticamente para fins técnicos e informativos.
+      © {{ site_name }} — data collected automatically for technical and informational purposes.
     </footer>
   </div>
 

@@ -49,6 +49,12 @@ class BaseTool(ABC):
     requires_captcha: bool = True
     rate_limit_per_minute: int = 10
 
+    # Nome de um segundo campo de formulário (além do `input_value` padrão)
+    # que a ferramenta precisa, ex.: o tamanho em pixels do QR Code Generator.
+    # `_handle_submit` (main/routes.py) o combina em `raw_input` antes de
+    # chamar `validate_input` — a própria ferramenta decide o formato exato.
+    secondary_input_field: str | None = None
+
     # Incremente ao mudar a lógica de `execute`/`normalize_input` de forma
     # que resultados em cache deveriam ser invalidados (seção 14).
     analyzer_version: int = 1
@@ -84,7 +90,7 @@ class BaseTool(ABC):
         return result.summary
 
     def seo_metadata(self, normalized_input: str, result: ToolResult) -> dict[str, str]:
-        title = f"{self.name} para {normalized_input} | Analista.to"
+        title = f"{self.name} for {normalized_input} | Analista.to"
         description = (result.summary or self.short_description).strip()
         return {"title": title[:255], "description": description[:300]}
 

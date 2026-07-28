@@ -28,9 +28,9 @@ def _reverse_dns(ip: str) -> str | None:
 class IpLookupTool(BaseTool):
     slug = "ip-lookup"
     name = "IP Lookup"
-    category_slug = "dominio-ip"
-    short_description = "Descubra o DNS reverso, provedor e geolocalização aproximada de um endereço IP."
-    description = "Consulta DNS reverso (PTR) e dados aproximados de geolocalização/ASN de um endereço IP."
+    category_slug = "domain-ip"
+    short_description = "Discover the reverse DNS, provider, and approximate geolocation of an IP address."
+    description = "Queries reverse DNS (PTR) and approximate geolocation/ASN data for an IP address."
     icon = "map-pin"
     input_type = InputType.IP
     input_placeholder = "8.8.8.8"
@@ -52,7 +52,7 @@ class IpLookupTool(BaseTool):
         if is_private:
             return ToolResult(
                 success=True,
-                summary=f"{normalized_input} é um endereço IP privado/reservado.",
+                summary=f"{normalized_input} is a private/reserved IP address.",
                 data={
                     "ip": normalized_input,
                     "is_private": True,
@@ -66,9 +66,9 @@ class IpLookupTool(BaseTool):
 
         summary_parts = [normalized_input]
         if geolocation and geolocation.get("org"):
-            summary_parts.append(f"pertence a {geolocation['org']}")
+            summary_parts.append(f"belongs to {geolocation['org']}")
         if geolocation and geolocation.get("country"):
-            summary_parts.append(f"localizado em {geolocation['country']}")
+            summary_parts.append(f"located in {geolocation['country']}")
         summary = " ".join(summary_parts) + "."
 
         return ToolResult(

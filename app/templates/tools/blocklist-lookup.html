@@ -1,0 +1,235 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Blocklist Lookup{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check whether a domain or IP is listed on 60 major DNS-based email blocklists (DNSBL/RBL).{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Blocklist Lookup</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain or IP</label>
+        <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+        <p class="mt-1 text-xs text-slate-400">Examples: example.com, mail.example.com, 8.8.8.8</p>
+      </div>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check blocklists</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}
+      {{ status_bar(search) }}
+    {% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div
+        id="result-content"
+        class="space-y-5"
+        x-data="{
+          revealed: -1,
+          total: {{ data.lists | length }},
+          filter: 'all',
+          toggleFilter(value) { this.filter = (this.filter === value) ? 'all' : value; }
+        }"
+        x-init="
+          let i = 0;
+          const step = () => {
+            revealed = i;
+            i += 1;
+            if (i <= total) setTimeout(step, 30);
+          };
+          step();
+        "
+      >
+        <div class="card space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs text-slate-400">Host checked</p>
+              <p class="font-mono text-lg text-brand-900">{{ data.host }}</p>
+              {% if data.resolved_ip %}
+              <p class="text-xs text-slate-500">Resolved IP: {{ data.resolved_ip }}</p>
+              {% endif %}
+            </div>
+            {{ copy_button("#result-content") }}
+          </div>
+
+          {% if data.total_checked == 0 %}
+          <p class="badge-warning">{{ result.summary }}</p>
+          {% else %}
+          <div class="grid grid-cols-2 gap-4">
+            <button
+              type="button"
+              @click="toggleFilter('listed')"
+              :aria-pressed="filter === 'listed'"
+              class="rounded-lg border p-4 text-center transition-colors"
+              :class="filter === 'listed' ? 'border-rose-400 bg-rose-100 ring-2 ring-rose-300' : 'border-rose-200 bg-rose-50 hover:bg-rose-100'"
+            >
+              <p class="text-2xl font-semibold text-rose-600">{{ data.listed_count }}</p>
+              <p class="text-xs text-slate-500">Listed<span x-show="filter === 'listed'"> — showing only these</span></p>
+            </button>
+            <button
+              type="button"
+              @click="toggleFilter('clean')"
+              :aria-pressed="filter === 'clean'"
+              class="rounded-lg border p-4 text-center transition-colors"
+              :class="filter === 'clean' ? 'border-emerald-400 bg-emerald-100 ring-2 ring-emerald-300' : 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100'"
+            >
+              <p class="text-2xl font-semibold text-emerald-600">{{ data.clean_count }}</p>
+              <p class="text-xs text-slate-500">Clean<span x-show="filter === 'clean'"> — showing only these</span></p>
+            </button>
+          </div>
+          <p class="text-xs text-slate-400" x-show="filter !== 'all'">
+            Filtered to <span x-text="filter"></span> blocklists only —
+            <button type="button" class="text-brand-600 hover:underline" @click="filter = 'all'">show all</button>
+          </p>
+          {% endif %}
+        </div>
+
+        {% if data.total_checked > 0 %}
+        <div class="card overflow-hidden p-0">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead>
+                <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                  <th class="px-4 py-2">Blocklist</th>
+                  <th class="px-4 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for entry in data.lists %}
+                <tr class="border-b border-slate-100 last:border-0" x-show="filter === 'all' || filter === '{{ entry.status }}'">
+                  <td class="px-4 py-2 font-mono text-xs text-slate-700">{{ entry.zone }}</td>
+                  <td class="px-4 py-2">
+                    <template x-if="revealed <= {{ loop.index0 }}">
+                      <span class="inline-flex items-center gap-1.5 text-xs text-slate-400">
+                        <span class="h-2 w-2 animate-pulse rounded-full bg-slate-300"></span>
+                        Checking…
+                      </span>
+                    </template>
+                    <template x-if="revealed > {{ loop.index0 }}">
+                      <span class="badge-{{ 'danger' if entry.status == 'listed' else 'success' }}">
+                        {{ "Listed" if entry.status == "listed" else "Clean" }}
+                      </span>
+                    </template>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is Blocklist Lookup?</h2>
+      <p>
+        A DNSBL (DNS-based Blackhole List), also called an RBL (Real-time Blackhole List), is a
+        community- or vendor-maintained list of IP addresses known or suspected to send spam,
+        distribute malware, or participate in other abusive network behavior. Mail servers around
+        the world consult these lists in real time before accepting an email: if the sending IP
+        is listed on a blocklist the receiving server trusts, the message can be rejected or
+        marked as spam before it ever reaches an inbox. This tool checks a domain or IP address
+        against 60 of the most widely used blocklists at once, using the same mechanism mail
+        servers themselves use — a specially formatted DNS query against each list's zone — so the
+        result reflects exactly what a real mail server would see.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        "Clean" means that specific blocklist has no record of the IP being a source of abuse —
+        the normal, expected state for a properly managed mail server. "Listed" means that
+        blocklist operator has flagged the IP, for reasons ranging from confirmed spam activity to
+        being part of an IP range known for compromised home routers or open proxies, to something
+        as mundane as sharing an IP with another customer on the same hosting provider who caused
+        the listing. A single listing on a small or specialized blocklist is common and often has
+        little practical impact; being listed on major, widely trusted lists like Spamhaus's ZEN
+        or the SORBS lists is far more likely to cause real deliverability problems, since a large
+        share of mail servers worldwide check those specific lists before accepting mail.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        Email administrators run this check when legitimate messages mysteriously stop arriving at
+        recipients' inboxes, since an undisclosed blocklist listing is one of the most common and
+        hardest-to-diagnose causes of silent deliverability failure. It is a standard step after
+        migrating a mail server to a new IP, confirming the new address has no inherited reputation
+        problems from a previous tenant on shared hosting or cloud infrastructure. Hosting
+        providers and IT teams monitor their outbound mail IPs periodically to catch a listing
+        early — often the first visible sign that a server has been compromised and is being used
+        to send spam without the owner's knowledge. It is also useful when evaluating a new SMTP
+        relay or transactional email provider's shared sending IPs before committing to them.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        This check only supports IPv4 addresses; a domain that resolves only to IPv6 cannot be
+        checked with this tool today. Blocklist status can change within minutes, so a clean result
+        is only a snapshot at the moment of the query, not a guarantee going forward. Being listed
+        does not always mean the current owner of the IP did anything wrong — IP addresses are
+        recycled constantly, especially on cloud and shared hosting providers, and a listing can
+        persist from a previous tenant's abuse long after the address changed hands. Delisting
+        processes vary by blocklist operator: some expire automatically after a period of inactivity,
+        while others require the IP owner to submit a manual delisting request through the
+        operator's own website, which this tool does not do on your behalf. Finally, a small
+        number of major operators — Spamhaus in particular — rate-limit or block direct DNS
+        queries from networks their infrastructure does not recognize as a standard recursive
+        resolver, an anti-abuse measure on their end rather than a limitation of this tool; if a
+        query to one of those specific zones is silently throttled, it can show as clean even when
+        the address may actually be listed, so treat a single "clean" result on those particular
+        lists with a little more caution than the rest.
+      </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+      ("My IP is listed — does that mean I'm sending spam?", "Not necessarily. Listings can result from a previous IP owner's activity, from sharing infrastructure with other customers, or from a compromised server sending spam without your knowledge. Investigate before assuming intentional abuse."),
+      ("How do I get removed from a blocklist?", "Each operator has its own delisting process, usually a form on their website. Some lists expire listings automatically after a period without new abuse reports; others require an explicit request."),
+      ("Why is one blocklist more important than another?", "Impact depends on how many receiving mail servers actually consult that specific list. Being listed on a small, rarely used blocklist has limited real-world effect; being listed on Spamhaus ZEN or similarly major lists can affect deliverability broadly."),
+      ("Does this check IPv6 addresses?", "Not currently — only IPv4 addresses are supported, since the vast majority of DNSBL infrastructure and mail server IPs in practice are still IPv4."),
+    ] %}
+    {% if mode == "form" %}
+    <section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

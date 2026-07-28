@@ -1,12 +1,12 @@
 """Abstração de CAPTCHA com múltiplos providers (seção 19).
 
-Selecionado por `CAPTCHA_PROVIDER`: cap | math | none. Cap (https://trycap.dev)
-é o provider self-hosted padrão (proof-of-work + verificação de instrumentação
-do navegador, sem Google e sem telemetria) — validado no backend contra o
-próprio serviço `analisa_cap` deste compose. O desafio matemático é gerado no
-servidor, com token assinado (itsdangerous) de curta validade; a resposta
-correta nunca é enviada ao client e o token é invalidado após o uso (marcado
-em Redis) ou depois de N tentativas erradas.
+Selecionado por `CAPTCHA_PROVIDER`: altcha | math | none. Altcha
+(https://altcha.org) é o provider self-hosted padrão (proof-of-work via
+KDF, sem Google e sem telemetria) — validado no backend com a biblioteca
+`altcha`. O desafio matemático é gerado no servidor, com token assinado
+(itsdangerous) de curta validade; a resposta correta nunca é enviada ao
+client e o token é invalidado após o uso (marcado em Redis) ou depois de N
+tentativas erradas.
 """
 from __future__ import annotations
 
@@ -14,7 +14,6 @@ import random
 import secrets
 from abc import ABC, abstractmethod
 
-import httpx
 from flask import current_app
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
@@ -40,36 +39,34 @@ class NoopCaptchaProvider(CaptchaProvider):
         return None
 
 
-class CapCaptchaProvider(CaptchaProvider):
-    """Cap (https://trycap.dev) — proof-of-work + verificação de
-    instrumentação do navegador, validado contra o serviço `analisa_cap`
-    self-hosted deste compose (compatível com o formato `siteverify` do
-    reCAPTCHA/hCaptcha)."""
+class AltchaCaptchaProvider(CaptchaProvider):
+    """Altcha (https://altcha.org) — proof-of-work via KDF, validado
+    localmente no backend com a biblioteca `altcha` (sem chamadas externas)."""
 
     def verify(self, payload: dict) -> None:
-        token = payload.get("cap-token")
+        token = payload.get("altcha")
         if not token:
-            raise CaptchaError("Token do Cap ausente", "missing_token")
+            raise CaptchaError("Missing ALTCHA payload", "missing_token")
 
         cfg = current_app.config
-        site_key = cfg["CAP_SITE_KEY"]
-        secret = cfg["CAP_SECRET_KEY"]
-        if not site_key or not secret:
-            raise CaptchaError("Cap não está configurado (CAP_SITE_KEY/CAP_SECRET_KEY ausentes)", "provider_error")
+        hmac_secret = cfg.get("ALTCHA_HMAC_SECRET")
+        if not hmac_secret:
+            raise CaptchaError("ALTCHA is not configured (ALTCHA_HMAC_SECRET missing)", "provider_error")
 
-        verify_url = f"{cfg['CAP_INTERNAL_URL'].rstrip('/')}/{site_key}/siteverify"
-        try:
-            response = httpx.post(
-                verify_url,
-                json={"secret": secret, "response": token},
-                timeout=5,
-            )
-            result = response.json()
-        except httpx.HTTPError as exc:
-            raise CaptchaError(f"Falha ao validar Cap: {exc}", "provider_error") from exc
+        from altcha import verify_solution
 
-        if not result.get("success"):
-            raise CaptchaError("CAPTCHA inválido", "invalid_captcha")
+        hmac_key_secret = cfg.get("ALTCHA_HMAC_KEY_SECRET") or None
+        result = verify_solution(
+            token,
+            hmac_secret,
+            hmac_key_secret=hmac_key_secret,
+        )
+        if not result.verified:
+            if result.expired:
+                raise CaptchaError("ALTCHA challenge expired", "expired")
+            if result.invalid_signature:
+                raise CaptchaError("Invalid ALTCHA signature", "invalid_signature")
+            raise CaptchaError("Invalid CAPTCHA", "invalid_captcha")
 
 
 class MathCaptchaProvider(CaptchaProvider):
@@ -83,21 +80,21 @@ class MathCaptchaProvider(CaptchaProvider):
         answer = a + b
         nonce = secrets.token_urlsafe(9)
         token = self._serializer().dumps({"answer": answer, "nonce": nonce})
-        return {"question": f"Quanto é {a} + {b}?", "token": token}
+        return {"question": f"What is {a} + {b}?", "token": token}
 
     def verify(self, payload: dict) -> None:
         token = payload.get("math_token")
         answer = payload.get("math_answer")
         if not token or answer in (None, ""):
-            raise CaptchaError("Desafio matemático incompleto", "missing_token")
+            raise CaptchaError("Incomplete math challenge", "missing_token")
 
         ttl = current_app.config["MATH_CHALLENGE_TTL_SECONDS"]
         try:
             data = self._serializer().loads(token, max_age=ttl)
         except SignatureExpired as exc:
-            raise CaptchaError("Desafio expirado, gere um novo", "expired") from exc
+            raise CaptchaError("Challenge expired, generate a new one", "expired") from exc
         except BadSignature as exc:
-            raise CaptchaError("Desafio inválido", "invalid_token") from exc
+            raise CaptchaError("Invalid challenge", "invalid_token") from exc
 
         nonce = data["nonce"]
         from app.extensions import redis_cache
@@ -107,13 +104,13 @@ class MathCaptchaProvider(CaptchaProvider):
 
         if redis_cache is not None:
             if redis_cache.get(used_key):
-                raise CaptchaError("Este desafio já foi utilizado", "already_used")
+                raise CaptchaError("This challenge has already been used", "already_used")
 
             max_attempts = current_app.config["MATH_CHALLENGE_MAX_ATTEMPTS"]
             attempts = redis_cache.incr(attempts_key)
             redis_cache.expire(attempts_key, ttl)
             if attempts > max_attempts:
-                raise CaptchaError("Número máximo de tentativas excedido", "too_many_attempts")
+                raise CaptchaError("Maximum number of attempts exceeded", "too_many_attempts")
 
         try:
             is_correct = int(answer) == int(data["answer"])
@@ -121,14 +118,14 @@ class MathCaptchaProvider(CaptchaProvider):
             is_correct = False
 
         if not is_correct:
-            raise CaptchaError("Resposta incorreta", "wrong_answer")
+            raise CaptchaError("Incorrect answer", "wrong_answer")
 
         if redis_cache is not None:
             redis_cache.set(used_key, "1", ex=ttl)
 
 
 _PROVIDERS: dict[str, type[CaptchaProvider]] = {
-    "cap": CapCaptchaProvider,
+    "altcha": AltchaCaptchaProvider,
     "math": MathCaptchaProvider,
     "none": NoopCaptchaProvider,
 }

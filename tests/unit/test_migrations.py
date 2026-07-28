@@ -18,7 +18,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 def _admin_dsn() -> str:
     test_url = os.environ.get(
         "TEST_DATABASE_URL",
-        "postgresql://analisa:change-me-strong-password@localhost:15439/analisa_to_test",
+        "postgresql://analisa:Ww4NnlHBkAS1coYU9TSG4ePracEwZsPK@localhost:15439/analisa_to_test",
     )
     base = test_url.replace("postgresql+psycopg://", "postgresql://")
     return base.rsplit("/", 1)[0] + "/postgres"

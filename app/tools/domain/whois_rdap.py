@@ -1,6 +1,6 @@
-"""WHOIS/RDAP: RDAP (via bootstrap público rdap.org) como fonte primária, com
-fallback para WHOIS bruto (porta 43) numa lista de servidores conhecidos por
-TLD, para os casos em que o RDAP ainda não está disponível.
+"""WHOIS/RDAP: RDAP (via public rdap.org bootstrap) as primary source, with
+fallback to raw WHOIS (port 43) on a list of known servers by
+TLD, for cases where RDAP is not yet available.
 """
 from __future__ import annotations
 
@@ -101,13 +101,13 @@ def _raw_whois_query(server: str, domain: str) -> str:
 
 class WhoisRdapTool(BaseTool):
     slug = "whois-rdap"
-    name = "WHOIS e RDAP"
-    category_slug = "dominio-ip"
-    short_description = "Consulte o registrador, datas de registro/expiração e nameservers de um domínio."
-    description = "Consulta dados de registro de um domínio via RDAP, com fallback para WHOIS tradicional."
+    name = "WHOIS and RDAP"
+    category_slug = "domain-ip"
+    short_description = "Query the registrar, registration/expiration dates, and nameservers of a domain."
+    description = "Queries domain registration data via RDAP, with fallback to traditional WHOIS."
     icon = "id-card"
     input_type = InputType.DOMAIN
-    input_placeholder = "exemplo.com.br"
+    input_placeholder = "example.com"
     public_url_prefix = "whois"
     ttl_seconds = 24 * 3600
     rate_limit_per_minute = 8
@@ -131,7 +131,7 @@ class WhoisRdapTool(BaseTool):
         if response.status_code == 404:
             return ToolResult(
                 success=True,
-                summary=f"{domain} não está registrado.",
+                summary=f"{domain} is not registered.",
                 data={"domain": domain, "registered": False, "source": "rdap"},
             )
 
@@ -154,18 +154,18 @@ class WhoisRdapTool(BaseTool):
             return ToolResult(
                 success=False,
                 error_code="whois_unsupported_tld",
-                error_message=f"Consulta WHOIS/RDAP indisponível para o TLD .{tld}.",
+                error_message=f"WHOIS/RDAP query not available for the .{tld} TLD.",
             )
 
         try:
             raw_text = _raw_whois_query(server, domain)
         except (OSError, TimeoutError) as exc:
-            raise ToolExecutionError(f"Falha ao consultar o servidor WHOIS {server}: {exc}") from exc
+            raise ToolExecutionError(f"Failed to query WHOIS server {server}: {exc}") from exc
 
         if re.search(r"no match|not found|no data found|no entries found", raw_text, re.IGNORECASE):
             return ToolResult(
                 success=True,
-                summary=f"{domain} não está registrado.",
+                summary=f"{domain} is not registered.",
                 data={"domain": domain, "registered": False, "source": "whois"},
             )
 

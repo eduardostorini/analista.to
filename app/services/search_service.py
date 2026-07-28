@@ -55,14 +55,19 @@ class SearchService:
             dedupe_key=dedupe_key,
             input_type=tool.input_type,
             status=SearchStatus.QUEUED,
-            visibility=SearchVisibility.PUBLIC,
+            # Ferramentas não indexáveis (ex.: QR Code Generator) também não
+            # devem aparecer em nenhuma listagem pública (home, categoria,
+            # "consultas recentes" da própria ferramenta) — a entrada de
+            # texto/URL arbitrária do usuário nunca deveria ficar visível
+            # para outros visitantes.
+            visibility=SearchVisibility.PUBLIC if tool.is_publicly_indexable else SearchVisibility.PRIVATE,
             ip_hash=hash_ip(ip_address),
             user_agent_hash=hash_user_agent(user_agent) if user_agent else None,
         )
         db.session.add(search)
         db.session.commit()
 
-        JobService.emit(search, SearchStatus.QUEUED, 0, "Consulta adicionada à fila")
+        JobService.emit(search, SearchStatus.QUEUED, 0, "Search added to queue")
         SearchService._enqueue(search)
         return search, False
 

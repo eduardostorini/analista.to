@@ -23,12 +23,12 @@ _NOTABLE_HEADERS = (
 class HttpHeadersTool(BaseTool):
     slug = "http-headers"
     name = "HTTP Headers"
-    category_slug = "http-servidor"
-    short_description = "Veja todos os cabeçalhos HTTP retornados por uma URL."
-    description = "Consulta e organiza os cabeçalhos de resposta HTTP de uma URL."
+    category_slug = "http-server"
+    short_description = "View all HTTP headers returned by a URL."
+    description = "Queries and organizes the HTTP response headers of a URL."
     icon = "list"
     input_type = InputType.URL
-    input_placeholder = "https://exemplo.com.br/"
+    input_placeholder = "https://example.com/"
     public_url_prefix = "http/headers"
     ttl_seconds = 3600
     rate_limit_per_minute = 5
@@ -41,7 +41,7 @@ class HttpHeadersTool(BaseTool):
         return normalize_url(cleaned_input)
 
     def execute(self, normalized_input: str) -> ToolResult:
-        response = SafeHTTPClient().get(normalized_input)
+        response = SafeHTTPClient().request("HEAD", normalized_input, max_response_bytes=1024 * 1024)
 
         headers = [{"name": name, "value": value} for name, value in response.headers.items()]
         notable = {
@@ -58,6 +58,6 @@ class HttpHeadersTool(BaseTool):
             "header_count": len(headers),
         }
 
-        summary = f"{normalized_input} respondeu HTTP {response.status_code} com {len(headers)} cabeçalhos."
+        summary = f"{normalized_input} responded with HTTP {response.status_code} and {len(headers)} headers."
 
         return ToolResult(success=True, summary=summary, data=data)

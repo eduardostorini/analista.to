@@ -58,7 +58,6 @@ class SitemapService:
         with current_app.test_request_context():
             urls = [
                 url_for("main.home"),
-                url_for("main.roadmap"),
                 url_for("main.docs"),
             ]
         body = _XML_HEADER + _URLSET_OPEN

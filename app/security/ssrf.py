@@ -96,14 +96,14 @@ def resolve_host_ips(hostname: str) -> list[ipaddress.IPv4Address | ipaddress.IP
             except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
                 continue
             except dns.exception.DNSException as exc:
-                raise SSRFBlockedError(f"Falha ao resolver {hostname}: {exc}", "dns_error") from exc
+                raise SSRFBlockedError(f"Failed to resolve {hostname}: {exc}", "dns_error") from exc
         if not found_any or not candidates:
-            raise SSRFBlockedError(f"Não foi possível resolver o host {hostname}", "dns_not_found")
+            raise SSRFBlockedError(f"Could not resolve host {hostname}", "dns_not_found")
 
     for ip_obj in candidates:
         if _is_blocked_ip(ip_obj):
             raise SSRFBlockedError(
-                f"Host resolve para um endereço não permitido ({ip_obj})", "private_ip"
+                f"Host resolved to a disallowed address ({ip_obj})", "private_ip"
             )
 
     return candidates
@@ -113,19 +113,19 @@ def validate_url(url: str) -> ValidatedTarget:
     parts = urlsplit(url)
 
     if parts.scheme not in _ALLOWED_SCHEMES:
-        raise SSRFBlockedError(f"Esquema não permitido: {parts.scheme!r}", "scheme_blocked")
+        raise SSRFBlockedError(f"Scheme not allowed: {parts.scheme!r}", "scheme_blocked")
 
     if parts.username or parts.password:
-        raise SSRFBlockedError("URLs com credenciais embutidas não são permitidas", "credentials_in_url")
+        raise SSRFBlockedError("URLs with embedded credentials are not allowed", "credentials_in_url")
 
     hostname = parts.hostname
     if not hostname:
-        raise SSRFBlockedError("URL sem host válido", "missing_host")
+        raise SSRFBlockedError("URL without valid host", "missing_host")
 
     port = parts.port or (443 if parts.scheme == "https" else 80)
     allowed_ports = current_app.config["OUTBOUND_ALLOWED_PORTS"]
     if port not in allowed_ports:
-        raise SSRFBlockedError(f"Porta não permitida: {port}", "port_blocked")
+        raise SSRFBlockedError(f"Port not allowed: {port}", "port_blocked")
 
     ips = resolve_host_ips(hostname)
     chosen_ip = str(ips[0])
@@ -159,40 +159,46 @@ class _PinnedTransport(httpx.HTTPTransport):
 class SafeHTTPClient:
     """Cliente HTTP com proteção SSRF completa e seguimento manual de redirects."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, http2: bool = False) -> None:
         cfg = current_app.config
         self._connect_timeout = cfg["OUTBOUND_CONNECT_TIMEOUT_SECONDS"]
         self._read_timeout = cfg["OUTBOUND_READ_TIMEOUT_SECONDS"]
         self._max_redirects = cfg["OUTBOUND_MAX_REDIRECTS"]
         self._max_bytes = cfg["OUTBOUND_MAX_RESPONSE_BYTES"]
         self._user_agent = cfg["OUTBOUND_USER_AGENT"]
+        # Opt-in: negociado via ALPN, só tem efeito sobre HTTPS. Usado pelo
+        # HTTP 2/3 Checker para reportar o protocolo real da conexão em
+        # `response.http_version` (default False preserva o comportamento
+        # de todas as outras ferramentas).
+        self._http2 = http2
 
-    def get(self, url: str, *, headers: dict[str, str] | None = None) -> httpx.Response:
-        return self.request("GET", url, headers=headers)
+    def get(self, url: str, *, headers: dict[str, str] | None = None, max_response_bytes: int | None = None) -> httpx.Response:
+        return self.request("GET", url, headers=headers, max_response_bytes=max_response_bytes)
 
     def request(
-        self, method: str, url: str, *, headers: dict[str, str] | None = None
+        self, method: str, url: str, *, headers: dict[str, str] | None = None, max_response_bytes: int | None = None
     ) -> httpx.Response:
-        response, _history = self.request_with_history(method, url, headers=headers)
+        response, _history = self.request_with_history(method, url, headers=headers, max_response_bytes=max_response_bytes)
         return response
 
     def request_with_history(
-        self, method: str, url: str, *, headers: dict[str, str] | None = None
+        self, method: str, url: str, *, headers: dict[str, str] | None = None, max_response_bytes: int | None = None
     ) -> tuple[httpx.Response, list[dict]]:
         """Como `request()`, mas também devolve a cadeia de redirecionamentos
         seguidos manualmente (usado pelo Redirect Checker)."""
         remaining_redirects = self._max_redirects
         current_url = url
+        limit = max_response_bytes if max_response_bytes is not None else self._max_bytes
         request_headers = {"User-Agent": self._user_agent, **(headers or {})}
         history: list[dict] = []
 
         while True:
             target = validate_url(current_url)
-            transport = _PinnedTransport(target.ip, target.hostname)
+            transport = _PinnedTransport(target.ip, target.hostname, http2=self._http2)
             timeout = httpx.Timeout(connect=self._connect_timeout, read=self._read_timeout, write=self._read_timeout, pool=self._connect_timeout)
 
             with httpx.Client(transport=transport, timeout=timeout, follow_redirects=False) as client:
-                response = self._send_with_size_limit(client, method, target.url, request_headers)
+                response = self._send_with_size_limit(client, method, target.url, request_headers, limit=limit)
 
             if response.is_redirect and remaining_redirects > 0:
                 location = response.headers.get("location")
@@ -209,29 +215,42 @@ class SafeHTTPClient:
             return response, history
 
     def _send_with_size_limit(
-        self, client: httpx.Client, method: str, url: str, headers: dict[str, str]
+        self, client: httpx.Client, method: str, url: str, headers: dict[str, str], *, limit: int
     ) -> httpx.Response:
         with client.stream(method, url, headers=headers) as response:
             content_length = response.headers.get("content-length")
-            if content_length and int(content_length) > self._max_bytes:
-                raise ResponseTooLargeError(
-                    f"Resposta excede o limite de {self._max_bytes} bytes"
-                )
+            if content_length and int(content_length) > limit:
+                    raise ResponseTooLargeError(
+                        f"Response exceeds the limit of {limit} bytes"
+                    )
 
             chunks: list[bytes] = []
             total = 0
             for chunk in response.iter_bytes():
                 total += len(chunk)
-                if total > self._max_bytes:
+                if total > limit:
                     raise ResponseTooLargeError(
-                        f"Resposta excede o limite de {self._max_bytes} bytes"
+                        f"Response exceeds the limit of {limit} bytes"
                     )
                 chunks.append(chunk)
 
             body = b"".join(chunks)
+            response_headers = dict(response.headers)
+            original_content_encoding = response_headers.get("content-encoding", "")
+            for key in ["content-encoding", "transfer-encoding"]:
+                response_headers.pop(key, None)
             return httpx.Response(
                 status_code=response.status_code,
-                headers=response.headers,
+                headers=response_headers,
                 content=body,
                 request=response.request,
+                extensions={
+                    "http_version": response.extensions.get("http_version", b"HTTP/1.1"),
+                    # `content-encoding` é removido acima (o corpo já chega
+                    # descomprimido por `iter_bytes()`, então reexibir o header
+                    # original seria enganoso) — preservado aqui para quem
+                    # precisa saber qual algoritmo o servidor realmente usou,
+                    # como o Brotli Checker.
+                    "original_content_encoding": original_content_encoding,
+                },
             )

@@ -38,8 +38,6 @@ def build_tool_context(tool, tool_row: Tool) -> dict:
         "related_tools": related_tools,
         "recent_searches": recent_searches,
         "captcha_provider": current_app.config["CAPTCHA_PROVIDER"],
-        "cap_public_url": current_app.config["CAP_PUBLIC_URL"],
-        "cap_site_key": current_app.config["CAP_SITE_KEY"],
         "form_error": None,
         "tool_url": tool_url,
         "canonical_url": current_app.config["SITE_URL"] + tool_url,

@@ -1,4 +1,4 @@
-"""Validação e normalização de entrada compartilhadas entre ferramentas."""
+"""Shared input validation and normalization across tools."""
 from __future__ import annotations
 
 import ipaddress
@@ -18,7 +18,7 @@ def clean_domain_input(raw: str) -> str:
     """
     value = (raw or "").strip()
     if not value:
-        raise ToolValidationError("Informe um domínio.")
+        raise ToolValidationError("Please enter a domain.")
 
     if "://" not in value and value.count("/") == 0 and value.count(" ") == 0:
         candidate = value
@@ -30,7 +30,7 @@ def clean_domain_input(raw: str) -> str:
 
     candidate = candidate.strip().rstrip(".").lower()
     if not candidate:
-        raise ToolValidationError("Não foi possível interpretar o domínio informado.")
+        raise ToolValidationError("Could not interpret the provided domain.")
     return candidate
 
 
@@ -39,10 +39,10 @@ def normalize_domain(hostname: str) -> str:
     try:
         ascii_hostname = hostname.encode("idna").decode("ascii")
     except UnicodeError as exc:
-        raise ToolValidationError("Domínio inválido.") from exc
+        raise ToolValidationError("Invalid domain.") from exc
 
     if not _HOSTNAME_RE.match(ascii_hostname):
-        raise ToolValidationError("Domínio inválido. Use o formato exemplo.com.br.")
+        raise ToolValidationError("Invalid domain. Use the format example.com.br.")
 
     return ascii_hostname
 
@@ -54,15 +54,15 @@ def validate_and_normalize_domain(raw: str) -> str:
 def clean_url_input(raw: str) -> str:
     value = (raw or "").strip()
     if not value:
-        raise ToolValidationError("Informe uma URL.")
+        raise ToolValidationError("Please enter a URL.")
     if "://" not in value:
         value = f"https://{value}"
 
     parts = urlsplit(value)
     if parts.scheme not in ("http", "https"):
-        raise ToolValidationError("A URL deve usar http:// ou https://.")
+        raise ToolValidationError("URL must use http:// or https://.")
     if not parts.hostname:
-        raise ToolValidationError("URL inválida.")
+        raise ToolValidationError("Invalid URL.")
 
     normalize_domain(parts.hostname)
     return value
@@ -80,9 +80,9 @@ def normalize_url(url: str) -> str:
 def validate_ip_input(raw: str) -> str:
     value = (raw or "").strip()
     if not value:
-        raise ToolValidationError("Informe um endereço IP.")
+        raise ToolValidationError("Please enter an IP address.")
     try:
         ipaddress.ip_address(value)
     except ValueError as exc:
-        raise ToolValidationError("Endereço IP inválido.") from exc
+        raise ToolValidationError("Invalid IP address.") from exc
     return value

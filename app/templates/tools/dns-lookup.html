@@ -2,12 +2,12 @@
 {% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
 
 {% block title %}DNS Lookup{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
-{% block meta_description %}Consulte de uma vez os registros A, AAAA, MX, TXT, NS, CNAME e SOA de qualquer domínio, gratuitamente e sem cadastro.{% endblock %}
+{% block meta_description %}Query A, AAAA, MX, TXT, NS, CNAME, and SOA records for any domain, free and without registration.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
 {% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
 
 {% block content %}
-{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
 {{ breadcrumbs(crumbs) }}
 
 <div class="grid gap-8 lg:grid-cols-3">
@@ -23,12 +23,12 @@
     <form method="post" class="card space-y-4">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div>
-        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domínio</label>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
         <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
-        <p class="mt-1 text-xs text-slate-400">Exemplos: exemplo.com.br, google.com, minhaempresa.dev</p>
+        <p class="mt-1 text-xs text-slate-400">Examples: example.com, google.com, mycompany.dev</p>
       </div>
-      {{ captcha_widget(captcha_provider, cap_public_url, cap_site_key) }}
-      <button type="submit" class="btn-primary w-full sm:w-auto">Consultar DNS</button>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Query DNS</button>
     </form>
     {% endif %}
 
@@ -38,8 +38,8 @@
 
     {% if mode == "failed" %}
     <div class="card border-rose-200 bg-rose-50">
-      <p class="badge-danger mb-2">Falhou</p>
-      <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
     </div>
     {% endif %}
 
@@ -48,21 +48,21 @@
       <div id="result-content" class="card space-y-5">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-xs text-slate-400">Domínio consultado</p>
+            <p class="text-xs text-slate-400">Domain queried</p>
             <p class="font-mono text-lg text-brand-900">{{ data.domain }}</p>
           </div>
           {{ copy_button("#result-content") }}
         </div>
 
         {% if not data.exists %}
-        <p class="badge-warning">Domínio sem delegação DNS ativa</p>
+        <p class="badge-warning">Domain with no active DNS delegation</p>
         {% else %}
         <div class="overflow-x-auto">
           <table class="w-full text-left text-sm">
             <thead>
               <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
-                <th class="py-2 pr-4">Tipo</th>
-                <th class="py-2">Valores</th>
+                <th class="py-2 pr-4">Type</th>
+                <th class="py-2">Values</th>
               </tr>
             </thead>
             <tbody>
@@ -87,79 +87,84 @@
 
     {% if mode == "form" %}
 <section class="prose-tool mt-10 space-y-4">
-      <h2>O que é o DNS Lookup?</h2>
-      <p>
-        O DNS (Domain Name System) é o sistema que traduz nomes de domínio legíveis por humanos,
-        como <code>exemplo.com.br</code>, em informações que servidores e aplicações usam para
-        se comunicar — o mais conhecido é o endereço IP, mas o DNS carrega muito mais do que isso.
-        O DNS Lookup do {{ site_name }} consulta, em uma única análise, os sete tipos de registro
-        mais usados no dia a dia de quem administra um domínio: <strong>A</strong> (endereço IPv4),
-        <strong>AAAA</strong> (endereço IPv6), <strong>MX</strong> (servidores de e-mail),
-        <strong>TXT</strong> (verificações, SPF e outras strings arbitrárias), <strong>NS</strong>
-        (servidores de nomes responsáveis pelo domínio), <strong>CNAME</strong> (apelidos para
-        outro nome) e <strong>SOA</strong> (dados administrativos da zona, como o servidor primário
-        e o intervalo de atualização). Em vez de rodar sete comandos <code>dig</code> ou
-        <code>nslookup</code> separados, você recebe tudo organizado em uma única tabela.
-      </p>
-      <h2>Como interpretar o resultado</h2>
-      <p>
-        Se o domínio não tiver nenhum servidor de nomes (NS) respondendo, ele é tratado como sem
-        delegação DNS ativa — o que normalmente significa que o domínio não está registrado, foi
-        removido, ou a zona ainda não foi publicada pelo registrador. Quando o domínio existe,
-        cada linha da tabela mostra o tipo de registro e os valores encontrados; tipos sem nenhum
-        registro aparecem com um traço, o que é normal — nem todo domínio precisa ter, por
-        exemplo, um registro AAAA (IPv6) ou MX (e-mail) configurado. Preste atenção especial ao
-        NS: se os nameservers exibidos não forem os que você esperava (por exemplo, ainda
-        apontando para o registrador em vez do seu provedor de hospedagem), isso costuma indicar
-        que a migração de DNS não foi concluída ou que a propagação ainda está em andamento.
-        Múltiplos registros A geralmente indicam balanceamento de carga entre vários servidores;
-        um CNAME nunca deve coexistir com outros registros no mesmo nome, por isso, se você
-        esperava ver um CNAME e não o encontrou junto de outros tipos, vale revisar a configuração
-        na zona.
-      </p>
-      <h2>Casos de uso comuns</h2>
-      <p>
-        Esta ferramenta é útil para confirmar que uma migração de hospedagem ou de provedor de
-        e-mail já propagou, para diagnosticar por que um site não está acessível, para auditar
-        rapidamente a configuração DNS de um domínio de terceiros antes de uma integração, ou
-        simplesmente para entender como um domínio está estruturado sem precisar instalar
-        ferramentas de linha de comando. Times de suporte também usam o DNS Lookup como primeiro
-        passo ao investigar reclamações de "o site não abre" ou "o e-mail não chega", já que
-        muitos desses problemas têm raiz em registros DNS incorretos ou desatualizados.
-      </p>
-      <h2>Limitações</h2>
-      <p>
-        Os resultados refletem o que os servidores DNS públicos consultados pelo {{ site_name }}
-        enxergam no momento da consulta. Como o DNS é distribuído e usa cache (TTL) em múltiplas
-        camadas, é possível que resolvedores diferentes ao redor do mundo ainda mostrem valores
-        antigos por algumas horas após uma alteração — esse fenômeno é chamado de propagação DNS.
-        Se você acabou de alterar um registro e ele ainda não aparece atualizado aqui, aguarde o
-        TTL configurado na zona (geralmente entre alguns minutos e algumas horas) e tente
-        novamente.
-      </p>
-    </section>
+       <h2>What is DNS Lookup?</h2>
+       <p>
+         DNS (Domain Name System) is the system that translates human-readable
+         domain names like <code>example.com</code> into information that servers
+         and applications use to communicate — the most well-known is the IP
+         address, but DNS carries much more than that. The {{ site_name }} DNS Lookup
+         queries, in a single analysis, the seven most commonly used record types
+         for domain administration: <strong>A</strong> (IPv4 address),
+         <strong>AAAA</strong> (IPv6 address), <strong>MX</strong> (mail servers),
+         <strong>TXT</strong> (verification, SPF, and other arbitrary strings),
+         <strong>NS</strong> (nameservers responsible for the domain),
+         <strong>CNAME</strong> (aliases for another name), and
+         <strong>SOA</strong> (administrative zone data, such as the primary
+         server and the refresh interval). Instead of running seven separate
+         <code>dig</code> or <code>nslookup</code> commands, you get everything
+         organized in a single table.
+       </p>
+       <h2>How to interpret the result</h2>
+       <p>
+         If the domain has no responding nameservers (NS), it is treated as having
+         no active DNS delegation — which typically means the domain is not
+         registered, has been removed, or the zone has not yet been published by
+         the registrar. When the domain exists, each table row shows the record
+         type and the values found; types with no records appear with a dash, which
+         is normal — not every domain needs, for example, an AAAA (IPv6) or MX
+         (email) record. Pay special attention to the NS: if the nameservers shown
+         are not what you expected (e.g., still pointing to the registrar instead of
+         your hosting provider), this usually indicates that the DNS migration is not
+         complete or that propagation is still in progress. Multiple A records
+         generally indicate load balancing across multiple servers; a CNAME should
+         never coexist with other records at the same name, so if you expected to
+         see a CNAME but did not find it alongside other types, review the zone
+         configuration.
+       </p>
+       <h2>Common use cases</h2>
+       <p>
+         This tool is useful for confirming that a hosting or email provider
+         migration has propagated, for diagnosing why a site is not accessible, for
+         quickly auditing the DNS configuration of a third-party domain before an
+         integration, or simply for understanding how a domain is structured without
+         needing to install command-line tools. Support teams also use DNS Lookup as
+         the first step when investigating "the site won't open" or "email isn't
+         arriving" complaints, since many of these problems stem from incorrect or
+         outdated DNS records.
+       </p>
+       <h2>Limitations</h2>
+       <p>
+         The results reflect what the public DNS servers queried by {{ site_name }}
+         see at the time of the query. Because DNS is distributed and uses cache (TTL)
+         at multiple layers, it is possible that different resolvers around the world
+         still show old values for some hours after a change — this phenomenon is
+         called DNS propagation. If you just changed a record and it does not yet
+         appear updated here, wait for the TTL configured in the zone (typically
+         between a few minutes and a few hours) and try again.
+       </p>
+     </section>
 {% endif %}
 
-    {% set faqs = [
-      ("Por que meu domínio não mostra nenhum registro?", "Provavelmente o domínio não está registrado, expirou, ou ainda não tem servidores de nomes (NS) configurados apontando para uma zona publicada."),
-      ("O DNS Lookup mostra subdomínios automaticamente?", "Não. Cada consulta é específica para o nome exato informado. Para checar um subdomínio, informe-o diretamente, por exemplo blog.exemplo.com.br."),
-      ("Por que vejo valores diferentes em outra ferramenta?", "Cada ferramenta pode consultar resolvedores DNS diferentes, e o cache (TTL) faz com que mudanças recentes demorem para propagar de forma uniforme."),
-    ] %}
-    {% if mode == "form" %}
-<section class="mt-10">
-      <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
-      {{ faq_accordion(faqs) }}
-    </section>
-{% endif %}
+{% set faqs = [
+       ("Why does my domain show no records?", "The domain is probably not registered, has expired, or has no nameservers (NS) configured pointing to a published zone."),
+       ("Does DNS Lookup automatically show subdomains?", "No. Each query is specific to the exact name entered. To check a subdomain, enter it directly, e.g. blog.example.com."),
+       ("Why do I see different values in another tool?", "Each tool may query different DNS resolvers, and cache (TTL) causes recent changes to propagate unevenly."),
+     ] %}
+     {% if mode == "form" %}
+ <section class="mt-10">
+       <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+       {{ faq_accordion(faqs) }}
+     </section>
+ {% endif %}
   </div>
 
   <aside class="space-y-8">
     <section>
-      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
       {{ related_tools_list(related_tools) }}
     </section>
     <section>
-      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
       {{ recent_searches_list(tool, recent_searches) }}
     </section>
   </aside>

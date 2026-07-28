@@ -1,46 +1,46 @@
-# Migrações (Alembic / Flask-Migrate)
+# Migrations (Alembic / Flask-Migrate)
 
-## Criando uma migração
+## Creating a migration
 
-Depois de alterar um modelo em `app/models/`:
+After modifying a model in `app/models/`:
 
 ```bash
-flask db migrate -m "descrição curta da mudança"
+flask db migrate -m "short description of the change"
 ```
 
-Revise sempre o arquivo gerado em `migrations/versions/` — o autogenerate do
-Alembic é um ponto de partida, não a palavra final (não detecta renomeações
-de coluna, por exemplo, e as trata como drop+add).
+Always review the generated file in `migrations/versions/` — Alembic's autogenerate
+is a starting point, not the final word (it does not detect column renames,
+for example, and treats them as drop+add).
 
-## Aplicando
+## Applying
 
 ```bash
 flask db upgrade
 ```
 
-## Revertendo
+## Reverting
 
 ```bash
 flask db downgrade -1
 ```
 
-## Convenções deste projeto
+## Conventions in this project
 
-- Toda mudança de schema passa por migração — nunca edite o banco de
-  produção manualmente.
-- Novas ferramentas **não** exigem migração (a tabela `tools` já suporta
-  qualquer ferramenta via `handler`/`slug`).
-- Para colunas com `NOT NULL` em tabelas com dados existentes, adicione com
-  um valor padrão ou faça o preenchimento (`op.execute(...)`) antes de
-  aplicar a restrição, em duas migrações se necessário.
-- Índices em colunas de alto volume (`searches.created_at`,
-  `searches.status` etc.) já existem na migração inicial — mantenha esse
-  padrão para novas colunas usadas em filtros/relatórios.
+- Every schema change goes through a migration — never edit the database
+  in production manually.
+- New tools **do not** require a migration (the `tools` table already supports
+  any tool via `handler`/`slug`).
+- For columns with `NOT NULL` in tables with existing data, add them with
+  a default value or perform the fill (`op.execute(...)`) before applying the
+  constraint, in two migrations if necessary.
+- Indexes on high-volume columns (`searches.created_at`,
+  `searches.status`, etc.) already exist in the initial migration — maintain this
+  pattern for new columns used in filters/reports.
 
-## Particionamento (preparação futura)
+## Partitioning (future preparation)
 
-Com volume alto, `searches`/`search_results` são candidatas a
-particionamento por data (mês) ou por `tool_id`. Isso não está implementado
-nesta fase — seria prematuro sem dados reais de volume — mas o desenho do
-`public_id` (aleatório, não sequencial) e dos índices já foi pensado para
-não colidir com uma futura migração de particionamento.
+With high volume, `searches`/`search_results` are candidates for
+partitioning by date (month) or by `tool_id`. This is not implemented
+in this phase — it would be premature without real volume data — but the design of
+`public_id` (random, not sequential) and the indexes has already been thought
+through to not conflict with a future partitioning migration.

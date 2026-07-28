@@ -1,17 +1,17 @@
 {% extends "layout/base.html" %}
 {% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
 
-{% block title %}Detector de Tecnologias{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
-{% block meta_description %}Identifique CMS, servidor, CDN, frameworks JS e ferramentas de analytics usados por um site.{% endblock %}
+{% block title %}Technology Detector{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Identify CMS, server, CDN, JS frameworks, and analytics tools used by a site.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
 {% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
 
 {% block content %}
-{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
 {{ breadcrumbs(crumbs) }}
 
 <header class="mb-8 max-w-2xl">
-  <h1 class="text-3xl">Detector de Tecnologias</h1>
+  <h1 class="text-3xl">Technology Detector</h1>
   <p class="mt-2 text-slate-600">{{ tool.description }}</p>
 </header>
 
@@ -20,10 +20,10 @@
 {% if mode == "form" %}
 <form method="post" class="card mb-8 max-w-xl space-y-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domínio</label>
+  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
   <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
-  {{ captcha_widget(captcha_provider, cap_public_url, cap_site_key) }}
-  <button type="submit" class="btn-primary w-full sm:w-auto">Detectar tecnologias</button>
+  {{ captcha_widget(captcha_provider) }}
+  <button type="submit" class="btn-primary w-full sm:w-auto">Detect technologies</button>
 </form>
 {% endif %}
 
@@ -31,8 +31,8 @@
 
 {% if mode == "failed" %}
 <div class="card mb-8 max-w-xl border-rose-200 bg-rose-50">
-  <p class="badge-danger mb-2">Falhou</p>
-  <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+  <p class="badge-danger mb-2">Failed</p>
+  <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
 </div>
 {% endif %}
 
@@ -44,7 +44,7 @@
       {{ copy_button("#result-content") }}
     </div>
     {% if not data.detected %}
-      <p class="badge-neutral">Nenhuma tecnologia conhecida foi identificada.</p>
+      <p class="badge-neutral">No known technology was identified.</p>
     {% else %}
       <div class="grid gap-4 sm:grid-cols-2">
         {% for category_key, names in data.by_category.items() %}
@@ -62,90 +62,90 @@
 
 {% if mode == "form" %}
 <section class="prose-tool max-w-3xl space-y-4">
-  <h2>Como funciona o detector de tecnologias?</h2>
+  <h2>How does the technology detector work?</h2>
   <p>
-    Todo site deixa pistas técnicas sobre a plataforma em que foi construído: um CMS como
-    WordPress costuma expor caminhos característicos como <code>/wp-content/</code>, provedores de
-    CDN como Cloudflare declaram isso em cabeçalhos de resposta, frameworks JavaScript deixam
-    marcações específicas no HTML renderizado, e ferramentas de analytics carregam scripts de
-    domínios conhecidos. Esta ferramenta busca a página inicial do domínio informado e compara o
-    HTML e os cabeçalhos HTTP contra um conjunto de assinaturas conhecidas e mantidas manualmente,
-    organizadas em categorias: CMS, servidor, CDN, linguagem/backend, frameworks JavaScript e
-    ferramentas de analytics.
+    Every site leaves technical clues about the platform on which it was built: a CMS like
+    WordPress usually exposes characteristic paths like <code>/wp-content/</code>, CDN providers
+    like Cloudflare declare this in response headers, JavaScript frameworks leave
+    specific markers in the rendered HTML, and analytics tools load scripts from
+    known domains. This tool fetches the homepage of the provided domain and compares the
+    HTML and HTTP headers against a set of known and manually maintained signatures,
+    organized into categories: CMS, server, CDN, language/backend, JavaScript frameworks, and
+    analytics tools.
   </p>
-  <h2>Como interpretar o resultado</h2>
+  <h2>How to interpret the result</h2>
   <p>
-    Cada tecnologia identificada aparece agrupada por categoria — é comum e esperado que um site
-    tenha itens em várias categorias ao mesmo tempo (por exemplo, WordPress como CMS, Nginx como
-    servidor, Cloudflare como CDN e Google Analytics para métricas, todos coexistindo). A ausência
-    de detecção em uma categoria não significa necessariamente que o site não usa nada daquele
-    tipo — apenas que nenhuma das assinaturas conhecidas foi encontrada, seja porque a tecnologia
-    usada não está na nossa lista, seja porque o site ofusca deliberadamente esses sinais.
+    Each identified technology appears grouped by category — it is common and expected for a site
+    to have items in several categories at the same time (for example, WordPress as CMS, Nginx as
+    server, Cloudflare as CDN, and Google Analytics for metrics, all coexisting). The absence
+    of detection in a category does not necessarily mean the site does not use anything from that
+    type — only that none of the known signatures was found, either because the technology
+    used is not in our list, or because the site deliberately obscures these signals.
   </p>
-  <h2>Casos de uso comuns</h2>
+  <h2>Common use cases</h2>
   <p>
-    Esta ferramenta é útil para pesquisa de concorrência (entender que plataforma um concorrente
-    usa antes de orçar um projeto similar), para due diligence técnica rápida antes de uma
-    parceria ou aquisição, para identificar rapidamente se um site usa uma CDN (o que pode
-    explicar certos comportamentos de cache ou performance) e para confirmar que ferramentas de
-    marketing (como Google Tag Manager ou Meta Pixel) foram implementadas corretamente em um site
-    próprio após um deploy.
+    This tool is useful for competitive research (understanding which platform a competitor
+    uses before budgeting a similar project), for quick technical due diligence before a
+    partnership or acquisition, to quickly identify whether a site uses a CDN (which may
+    explain certain cache or performance behaviors) and to confirm that marketing tools
+    (such as Google Tag Manager or Meta Pixel) were correctly implemented on a site
+    after a deploy.
   </p>
-  <h2>Limitações importantes</h2>
+  <h2>Important limitations</h2>
   <p>
-    Esta é uma detecção por heurística própria, com uma lista deliberadamente pequena e mantida
-    manualmente — <strong>não é</strong> um substituto para bancos de assinaturas extensos como o
-    do Wappalyzer, que cobrem milhares de tecnologias. Sites que usam tecnologias fora da nossa
-    lista, ou que ofuscam ativamente esses sinais (minificação agressiva, proxies reversos que
-    removem cabeçalhos identificadores, carregamento de scripts via proxy próprio), não serão
-    detectados corretamente. O resultado deve ser interpretado como um indício, não como uma
-    certeza absoluta — para confirmação definitiva, sempre vale investigar manualmente quando a
-    informação for crítica para uma decisão.
+    This is detection by proprietary heuristic, with a deliberately small and manually maintained
+    list — <strong>it is not</strong> a substitute for extensive signature databases like
+    Wappalyzer's, which cover thousands of technologies. Sites that use technologies outside our
+    list, or that actively obscure these signals (aggressive minification, reverse proxies that
+    remove identifying headers, script loading via own proxy), will not be
+    detected correctly. The result should be interpreted as an indication, not as an absolute
+    certainty — for definitive confirmation, always investigate manually when the
+    information is critical for a decision.
   </p>
-  <h2>Por que identificar tecnologias importa</h2>
+  <h2>Why identifying technologies matters</h2>
   <p>
-    Saber a stack tecnológica de um site vai muito além de curiosidade técnica. Agências e
-    freelancers usam essa informação para calibrar propostas comerciais e estimar a complexidade
-    de um projeto antes mesmo de conversar com o cliente. Investidores e times de inteligência de
-    mercado usam para mapear rapidamente a maturidade técnica de concorrentes em um setor. Times
-    de segurança usam para identificar exposição a vulnerabilidades conhecidas de versões
-    específicas de CMS populares. E profissionais de marketing usam para confirmar que pixels de
-    rastreamento e tags de conversão de campanhas pagas foram implementados corretamente em
-    páginas de destino antes de investir orçamento em anúncios direcionados a elas.
+    Knowing a site's technology stack goes far beyond technical curiosity. Agencies and
+    freelancers use this information to calibrate commercial proposals and estimate the complexity
+    of a project before even talking to the client. Investors and market intelligence teams
+    use it to quickly map the technical maturity of competitors in a sector. Security
+    teams use it to identify exposure to known vulnerabilities in specific versions
+    of popular CMSs. And marketing professionals use it to confirm that tracking pixels and
+    paid campaign conversion tags were correctly implemented on
+    landing pages before investing budget in ads directed to them.
   </p>
-  <h2>CMS, framework e infraestrutura não são a mesma coisa</h2>
+  <h2>CMS, framework, and infrastructure are not the same thing</h2>
   <p>
-    Vale entender a diferença entre as camadas detectadas: um CMS (como WordPress ou Shopify) é a
-    plataforma que gerencia o conteúdo e normalmente decide também qual framework JavaScript é
-    usado no front-end; a CDN (como Cloudflare) é uma camada de distribuição de conteúdo e cache
-    que fica na frente do servidor real, muitas vezes ocultando qual servidor de origem está por
-    trás dela; e o servidor (Nginx, Apache) é o software que efetivamente processa as requisições
-    HTTP na origem. Um mesmo site pode, por exemplo, usar WordPress como CMS, Nginx como servidor
-    de origem e Cloudflare como CDN simultaneamente — três camadas distintas que juntas formam a
-    stack completa reportada por esta ferramenta.
+    It is worth understanding the difference between the detected layers: a CMS (like WordPress or Shopify) is the
+    platform that manages the content and usually also decides which JavaScript framework is
+    used on the front-end; the CDN (like Cloudflare) is a content distribution and cache
+    layer that sits in front of the real server, often hiding which origin server is behind
+    it; and the server (Nginx, Apache) is the software that actually processes HTTP
+    requests at the origin. The same site can, for example, use WordPress as CMS, Nginx as origin
+    server and Cloudflare as CDN simultaneously — three distinct layers that together form the
+    complete stack reported by this tool.
   </p>
 </section>
 {% endif %}
 
 {% set faqs = [
-  ("Por que uma tecnologia que eu sei que o site usa não aparece?", "Nossa lista de assinaturas é deliberadamente pequena e cobre apenas os sinais mais comuns. Tecnologias fora dessa lista, ou sites que ofuscam esses sinais, não serão detectados."),
-  ("O detector executa JavaScript para identificar frameworks?", "Não. A análise é feita sobre o HTML e cabeçalhos retornados diretamente pelo servidor, sem executar scripts."),
-  ("Posso confiar 100% no resultado para uma decisão importante?", "Trate o resultado como um indício forte, não como certeza absoluta — combine com investigação manual quando a informação for crítica."),
-] %}
+   ("Why is a technology that I know the site uses not appearing?", "Our signature list is deliberately small and covers only the most common signals. Technologies outside this list, or sites that obscure these signals, will not be detected."),
+   ("Does the detector execute JavaScript to identify frameworks?", "No. The analysis is performed on the HTML and headers returned directly by the server, without executing scripts."),
+   ("Can I 100% trust the result for an important decision?", "Treat the result as a strong indication, not as absolute certainty — combine with manual investigation when the information is critical."),
+ ] %}
 {% if mode == "form" %}
 <section class="mt-10 max-w-3xl">
-  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
+  <h2 class="mb-4 text-xl">Frequently asked questions</h2>
   {{ faq_accordion(faqs) }}
 </section>
 {% endif %}
 
 <section class="mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
     {{ related_tools_list(related_tools) }}
   </div>
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
     {{ recent_searches_list(tool, recent_searches) }}
   </div>
 </section>

@@ -2,12 +2,12 @@
 {% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
 
 {% block title %}TXT Lookup{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
-{% block meta_description %}Liste todos os registros TXT de um domínio e descubra automaticamente quais são SPF, verificações de propriedade ou outras strings.{% endblock %}
+{% block meta_description %}List all TXT records for a domain and automatically discover which are SPF, ownership verifications, or other strings.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
 {% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
 
 {% block content %}
-{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
 {{ breadcrumbs(crumbs) }}
 
 <header class="mb-8 max-w-2xl">
@@ -20,10 +20,10 @@
 {% if mode == "form" %}
 <form method="post" class="card mb-8 max-w-xl space-y-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domínio</label>
+  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
   <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
-  {{ captcha_widget(captcha_provider, cap_public_url, cap_site_key) }}
-  <button type="submit" class="btn-primary w-full sm:w-auto">Consultar TXT</button>
+  {{ captcha_widget(captcha_provider) }}
+  <button type="submit" class="btn-primary w-full sm:w-auto">Query TXT</button>
 </form>
 {% endif %}
 
@@ -31,8 +31,8 @@
 
 {% if mode == "failed" %}
 <div class="card mb-8 max-w-xl border-rose-200 bg-rose-50">
-  <p class="badge-danger mb-2">Falhou</p>
-  <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+  <p class="badge-danger mb-2">Failed</p>
+  <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
 </div>
 {% endif %}
 
@@ -44,9 +44,9 @@
       {{ copy_button("#result-content") }}
     </div>
     {% if not data.exists %}
-      <p class="badge-warning">Domínio sem delegação DNS ativa</p>
+      <p class="badge-warning">Domain with no active DNS delegation</p>
     {% elif data.records|length == 0 %}
-      <p class="badge-warning">Nenhum registro TXT encontrado.</p>
+      <p class="badge-warning">No TXT records found.</p>
     {% else %}
       <div class="grid gap-3 sm:grid-cols-2">
         {% for record in data.records %}
@@ -62,81 +62,77 @@
 
 {% if mode == "form" %}
 <section class="prose-tool max-w-3xl space-y-4">
-  <h2>O que é o TXT Lookup?</h2>
-  <p>
-    Registros TXT são o "campo livre" do DNS: eles guardam qualquer texto arbitrário associado a
-    um domínio, sem um formato fixo. Por isso, se tornaram o mecanismo padrão para dezenas de
-    finalidades diferentes — de autenticação de e-mail (SPF, DKIM, DMARC) a verificação de
-    propriedade de domínio por serviços como Google Search Console, Microsoft 365 e ferramentas de
-    marketing. O TXT Lookup do {{ site_name }} busca todos os registros TXT publicados na raiz do
-    domínio informado e tenta identificar automaticamente o propósito de cada um, com base em
-    padrões conhecidos no início do valor.
-  </p>
-  <h2>Como interpretar o resultado</h2>
-  <p>
-    Cada card do resultado mostra uma etiqueta de classificação (SPF, DMARC, verificação do
-    Google, DKIM, Microsoft ou "outro") e o valor completo do registro. Um registro que começa com
-    <code>v=spf1</code> define quais servidores podem enviar e-mail em nome do domínio — para uma
-    análise detalhada desse registro específico, use o SPF Checker. Valores contendo
-    <code>google-site-verification=</code> confirmam a propriedade do domínio perante o Google.
-    Registros classificados como "outro" cobrem desde verificações de outras plataformas (Facebook,
-    Adobe, Stripe, Zoom, entre dezenas de serviços) até anotações internas da empresa — não há
-    problema em ter vários registros TXT coexistindo, já que cada aplicação lê apenas o que
-    reconhece e ignora o restante.
-  </p>
-  <h2>Casos de uso comuns</h2>
-  <p>
-    Administradores usam o TXT Lookup para auditar rapidamente quais serviços de terceiros têm
-    alguma integração declarada com um domínio, para confirmar que uma verificação de propriedade
-    foi propagada antes de clicar em "verificar" no painel de um serviço, ou para localizar
-    registros esquecidos de integrações antigas que podem ser removidos com segurança. Times de
-    segurança também revisam registros TXT durante auditorias, já que configurações de SPF
-    excessivamente permissivas ou registros de verificação abandonados podem indicar problemas de
-    governança de domínio.
-  </p>
-  <h2>Limitações</h2>
-  <p>
-    Domínios com muitos registros TXT longos podem ter parte do conteúdo truncado por limites de
-    tamanho de pacote UDP em alguns resolvedores intermediários — nesse caso, o valor exibido pode
-    aparecer incompleto mesmo que o registro publicado esteja correto. A classificação automática
-    é baseada em padrões conhecidos e pode não reconhecer formatos proprietários ou muito recentes,
-    caindo na categoria "outro" nesses casos. Como em qualquer consulta DNS, mudanças recentes
-    podem levar até o TTL configurado para propagar totalmente.
-  </p>
-  <h2>TXT como mecanismo de verificação de propriedade</h2>
-  <p>
-    Um dos usos mais comuns e menos visíveis dos registros TXT é a verificação de propriedade de
-    domínio: quando você conecta uma conta do Google Search Console, um provedor de e-mail
-    corporativo, ou uma ferramenta de automação de marketing, essas plataformas frequentemente
-    pedem para você adicionar um registro TXT específico como prova de que você controla o DNS do
-    domínio — só depois que esse registro é publicado e propagado é que a plataforma libera o
-    acesso completo aos recursos vinculados ao domínio. Esse mecanismo é preferido a outros
-    métodos de verificação (como upload de arquivo) justamente porque não exige acesso ao
-    servidor web, apenas ao painel de DNS, tornando-o compatível com qualquer tipo de
-    hospedagem ou arquitetura de site.
-  </p>
-</section>
+<h2>What is TXT Lookup?</h2>
+   <p>
+     TXT records are the "free field" of DNS: they store any arbitrary text
+     associated with a domain, without a fixed format. That is why they have become
+     the standard mechanism for dozens of different purposes — from email authentication
+     (SPF, DKIM, DMARC) to domain ownership verification by services like Google Search
+     Console, Microsoft 365, and marketing tools. {{ site_name }} TXT Lookup fetches all
+     TXT records published at the root of the informed domain and tries to automatically
+     identify the purpose of each one, based on known patterns at the start of the value.
+   </p>
+   <h2>How to interpret the result</h2>
+   <p>
+     Each result card shows a classification tag (SPF, DMARC, Google verification, DKIM,
+     Microsoft, or "other") and the full record value. A record starting with
+     <code>v=spf1</code> defines which servers are authorized to send email on behalf of
+     the domain — for a detailed analysis of that specific record, use the SPF Checker.
+     Values containing <code>google-site-verification=</code> confirm domain ownership with
+     Google. Records classified as "other" cover everything from verification for other platforms
+     (Facebook, Adobe, Stripe, Zoom, among dozens of services) to internal company notes — there
+     is nothing wrong with having multiple TXT records coexisting, since each application reads only
+     what it recognizes and ignores the rest.
+   </p>
+   <h2>Common use cases</h2>
+   <p>
+     Administrators use TXT Lookup to quickly audit which third-party services have declared
+     some integration with a domain, to confirm that an ownership verification has propagated
+     before clicking "verify" in a service panel, or to locate forgotten integration records from
+     old services that can be safely removed. Security teams also review TXT records during audits,
+     since excessively permissive SPF configurations or abandoned verification records can indicate
+     domain governance issues.
+   </p>
+   <h2>Limitations</h2>
+   <p>
+     Domains with many long TXT records may have content truncated by UDP packet size limits in some
+     intermediate resolvers — in that case, the displayed value may appear incomplete even though the
+     published record is correct. Automatic classification is based on known patterns and may not
+     recognize proprietary or very recent formats, falling into the "other" category in such cases. As
+     with any DNS query, recent changes may take up to the configured TTL to fully propagate.
+   </p>
+   <h2>TXT as domain ownership verification mechanism</h2>
+   <p>
+     One of the most common and least visible uses of TXT records is domain ownership verification: when
+     you connect a Google Search Console account, a corporate email provider, or a marketing automation
+     tool, these platforms frequently ask you to add a specific TXT record as proof that you control the DNS
+     of the domain — only after that record is published and propagated does the platform grant
+     full access to the features linked to the domain. This mechanism is preferred over other
+     verification methods (like file upload) precisely because it does not require access to the web
+     server, only the DNS panel, making it compatible with any type of hosting or site architecture.
+   </p>
+ </section>
 {% endif %}
 
 {% set faqs = [
-  ("Por que tenho vários registros TXT que não reconheço?", "Muitos serviços de terceiros criam um registro de verificação de propriedade ao serem configurados e nem sempre são removidos depois. Revise periodicamente e remova os que não usa mais."),
-  ("O TXT Lookup mostra o registro SPF completo?", "Sim, o valor completo é exibido. Para uma análise técnica (contagem de lookups, validação da sintaxe), use a ferramenta SPF Checker."),
-  ("Posso ter dois registros TXT idênticos?", "Tecnicamente sim, mas isso normalmente é um erro de configuração e não traz benefício algum."),
-] %}
-{% if mode == "form" %}
-<section class="mt-10 max-w-3xl">
-  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
-  {{ faq_accordion(faqs) }}
-</section>
-{% endif %}
+   ("Why do I have several TXT records I don't recognize?", "Many third-party services create an ownership verification record when being set up and do not always remove them afterward. Review periodically and remove the ones you no longer use."),
+   ("Does TXT Lookup show the full SPF record?", "Yes, the complete value is displayed. For a technical analysis (lookup count, syntax validation), use the SPF Checker tool."),
+   ("Can I have two identical TXT records?", "Technically yes, but this is normally a configuration error and provides no benefit."),
+ ] %}
+ {% if mode == "form" %}
+ <section class="mt-10 max-w-3xl">
+   <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+   {{ faq_accordion(faqs) }}
+ </section>
+ {% endif %}
 
 <section class="mt-10 grid gap-8 sm:grid-cols-2">
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
     {{ related_tools_list(related_tools) }}
   </div>
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
     {{ recent_searches_list(tool, recent_searches) }}
   </div>
 </section>

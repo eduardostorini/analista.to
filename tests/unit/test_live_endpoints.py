@@ -10,6 +10,24 @@ def test_math_captcha_endpoint_returns_question(client, app):
     assert "token" in data
 
 
+def test_altcha_challenge_endpoint_returns_challenge(client, app):
+    app.config["CAPTCHA_PROVIDER"] = "altcha"
+    app.config["ALTCHA_HMAC_SECRET"] = "test-secret-key-for-altcha"
+    response = client.get("/api/altcha-challenge")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert "parameters" in data
+    assert "signature" in data
+    assert data["parameters"]["algorithm"] == "PBKDF2/SHA-256"
+
+
+def test_altcha_challenge_endpoint_requires_secret(client, app):
+    app.config["CAPTCHA_PROVIDER"] = "altcha"
+    app.config["ALTCHA_HMAC_SECRET"] = ""
+    response = client.get("/api/altcha-challenge")
+    assert response.status_code == 500
+
+
 def test_job_status_404_for_unknown_public_id(client):
     response = client.get("/jobs/does-not-exist/status")
     assert response.status_code == 404

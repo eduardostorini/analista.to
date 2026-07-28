@@ -1,71 +1,73 @@
 {% extends "layout/base.html" %}
 {% from "tools/_tool_macros.html" import breadcrumbs %}
 
-{% block title %}Documentação | {{ site_name }}{% endblock %}
-{% block meta_description %}Entenda como as consultas do {{ site_name }} funcionam: filas, status, cache, páginas públicas e proteção contra abuso.{% endblock %}
+{% block title %}Documentation | {{ site_name }}{% endblock %}
+{% block meta_description %}Understand how {{ site_name }} queries work: queues, status, cache, public pages, and abuse protection.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ site_url }}{{ url_for('main.docs') }}">{% endblock %}
 
 {% block content %}
-{{ breadcrumbs([("Início", url_for('main.home')), ("Documentação", None)]) }}
+{{ breadcrumbs([("Home", url_for('main.home')), ("Documentation", None)]) }}
 
 <header class="mb-8 max-w-2xl">
-  <h1 class="text-3xl">Documentação</h1>
-  <p class="mt-2 text-slate-600">Como o {{ site_name }} processa uma consulta, do envio do formulário até o resultado.</p>
+  <h1 class="text-3xl">Documentation</h1>
+  <p class="mt-2 text-slate-600">How {{ site_name }} processes a query, from form submission to result.</p>
 </header>
 
 <div class="prose-tool space-y-10">
   <section>
-    <h2>O ciclo de vida de uma consulta</h2>
-    <p>
-      Ao enviar o formulário de uma ferramenta, sua entrada passa por validação, verificação
-      anti-robô e limites de uso antes de ser aceita. A consulta então entra em uma fila e é
-      processada em segundo plano por um worker dedicado — isso evita que análises de rede
-      lentas travem a navegação. Enquanto isso, a página mostra uma barra de status que é
-      atualizada em tempo real (via Server-Sent Events, com fallback automático para
-      atualização periódica caso a conexão em tempo real não esteja disponível).
+    <h2>The query lifecycle</h2>
+<p>
+      When you submit a tool's form, your input passes through validation,
+      anti-bot checks, and usage limits before being accepted. The query then
+      enters a queue and is processed in the background by a dedicated worker —
+      this prevents slow network analyses from blocking navigation. While this
+      happens, the page shows a status bar that is updated in real time (via
+      Server-Sent Events, with automatic fallback to periodic polling if the
+      real-time connection is unavailable).
     </p>
-    <p>Os estados possíveis de uma consulta são:</p>
+    <p>Possible query statuses are:</p>
     <ul>
-      <li><strong>Aguardando validação / Verificando CAPTCHA</strong> — checagens antes de entrar na fila.</li>
-      <li><strong>Consulta adicionada à fila / Processando / Consultando serviços</strong> — a tarefa está na fila ou em execução.</li>
-      <li><strong>Analisando resultados / Gerando relatório</strong> — os dados coletados estão sendo organizados.</li>
-      <li><strong>Criando página pública</strong> — quando aplicável, a página compartilhável está sendo gerada.</li>
-      <li><strong>Concluído</strong> — o relatório está pronto.</li>
-      <li><strong>Falhou / Expirado / Cancelado</strong> — a consulta não pôde ser concluída; o motivo é exibido na tela.</li>
+      <li><strong>Awaiting validation / Checking CAPTCHA</strong> — pre-queue checks.</li>
+      <li><strong>Query queued / Processing / Querying services</strong> — the task is in the queue or running.</li>
+      <li><strong>Analyzing results / Generating report</strong> — collected data is being organized.</li>
+      <li><strong>Creating public page</strong> — when applicable, the shareable page is being generated.</li>
+      <li><strong>Completed</strong> — the report is ready.</li>
+      <li><strong>Failed / Expired / Cancelled</strong> — the query could not be completed; the reason is shown on screen.</li>
     </ul>
   </section>
 
   <section>
-    <h2>Cache e reaproveitamento</h2>
-    <p>
-      Para não sobrecarregar os serviços consultados nem gerar relatórios duplicados, cada
-      ferramenta tem um TTL (tempo de validade) próprio. Se alguém já consultou a mesma entrada
-      recentemente, você recebe o resultado existente instantaneamente, em vez de esperar um
-      novo processamento. Passado o TTL, uma nova consulta é permitida normalmente.
-    </p>
+    <h2>Cache and reuse</h2>
+<p>
+       To avoid overloading the queried services and generating duplicate reports,
+       each tool has its own TTL (time-to-live). If someone has already queried the
+       same input recently, you receive the existing result instantly instead of
+       waiting for new processing. After the TTL expires, a new query is allowed
+       normally.
+     </p>
   </section>
 
   <section>
-    <h2>Páginas públicas e SEO</h2>
-    <p>
-      Consultas concluídas com sucesso para recursos públicos podem gerar uma página
-      compartilhável, com URL previsível (por exemplo, <code>/dns/exemplo.com.br/</code>).
-      Nem toda consulta é indexada pelos buscadores: resultados com erro, vazios, duplicados,
-      envolvendo redes privadas ou aguardando processamento recebem a diretiva
-      <code>noindex</code> automaticamente. Você pode conferir a data da coleta e a validade
-      dos dados diretamente na página do resultado.
-    </p>
+    <h2>Public pages and SEO</h2>
+<p>
+       Successfully completed queries for public resources may generate a
+       shareable page with a predictable URL (e.g., <code>/dns/example.com/</code>).
+       Not every query is indexed by search engines: results with errors, empty
+       results, duplicates, queries involving private networks, or queries awaiting
+       processing receive the <code>noindex</code> directive automatically. You can
+       check the crawl date and data freshness directly on the result page.
+     </p>
   </section>
 
   <section>
-    <h2>Proteção contra abuso</h2>
-    <p>
-      Antes de qualquer requisição de rede, validamos o alvo para bloquear endereços privados,
-      de loopback, link-local, multicast e de metadados de provedores de nuvem — mesmo que o
-      domínio informado resolva para um desses endereços após um redirecionamento. Também
-      aplicamos limites de requisições por IP, por sessão, por ferramenta e por entrada
-      consultada, além de um desafio anti-robô (CAPTCHA ou desafio matemático) nos formulários.
-    </p>
+    <h2>Abuse protection</h2>
+<p>
+       Before any network request, we validate the target to block private,
+       loopback, link-local, multicast, and cloud metadata addresses — even if the
+       provided domain resolves to one of those addresses after a redirect. We also
+       apply rate limits per IP, per session, per tool, and per queried input,
+       plus an anti-bot challenge (CAPTCHA or math challenge) on the forms.
+     </p>
   </section>
 </div>
 {% endblock %}

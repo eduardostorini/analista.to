@@ -1,0 +1,163 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Subdomain Finder{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Discover subdomains of a domain using public Certificate Transparency logs.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Subdomain Finder</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
+        <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+        <p class="mt-1 text-xs text-slate-400">Examples: example.com, agenciamuvi.com.br</p>
+      </div>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Find subdomains</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}
+      {{ status_bar(search) }}
+    {% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs text-slate-400">Domain queried</p>
+            <p class="font-mono text-lg text-brand-900">{{ data.domain }}</p>
+          </div>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if data.note == "unavailable" %}
+        <p class="badge-warning">Certificate Transparency data is temporarily unavailable for this domain — the public log search may be rate-limiting requests. Try again in a few minutes.</p>
+        {% elif data.subdomain_count == 0 %}
+        <p class="badge-warning">No subdomains found for this domain in Certificate Transparency logs.</p>
+        {% else %}
+        <p class="text-sm text-slate-600">
+          <span class="font-semibold text-brand-900">{{ data.subdomain_count }}</span>
+          subdomain{{ "s" if data.subdomain_count != 1 else "" }} found.
+          {% if data.source %}<span class="text-xs text-slate-400">Source: {{ data.source }}</span>{% endif %}
+        </p>
+        <div class="max-h-96 overflow-y-auto rounded-lg border border-slate-200">
+          <ul class="divide-y divide-slate-100 text-sm">
+            {% for subdomain in data.subdomains %}
+            <li class="px-4 py-2 font-mono text-slate-700">{{ subdomain }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is Subdomain Finder?</h2>
+      <p>
+        Most organizations run far more subdomains than the handful listed on their homepage —
+        staging environments, internal dashboards, regional sites, API endpoints, and old
+        marketing microsites frequently live on subdomains that are never linked from anywhere
+        public. Subdomain Finder discovers these by searching Certificate Transparency logs, a
+        public, append-only record that every trusted certificate authority is required to publish
+        to whenever it issues a TLS certificate. Since virtually every subdomain running HTTPS
+        today has a certificate — and certificates commonly cover multiple subdomains at once
+        through Subject Alternative Names — these logs end up being an unusually complete public
+        map of an organization's HTTPS-enabled infrastructure, discoverable without ever touching
+        the target's own servers.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        Each entry in the list is a hostname that appeared on at least one publicly logged
+        certificate for the domain you searched, at some point in time. This does not mean every
+        listed subdomain is currently live — a certificate can still be logged even after the
+        server behind it has been decommissioned, moved, or replaced, since Certificate
+        Transparency logs are permanent historical records, not a live inventory. A large number of
+        subdomains, especially ones with generic names like <code>dev</code>, <code>staging</code>,
+        <code>test</code>, or <code>old</code>, often signals forgotten infrastructure that may no
+        longer be maintained or monitored as closely as production systems — exactly the kind of
+        asset that security reviews look for first. To check whether a specific subdomain is
+        actually active, follow up with the DNS Lookup or Ping tool.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        Security teams and penetration testers use subdomain enumeration as one of the very first
+        steps of reconnaissance, since mapping the full attack surface of an organization — not
+        just its main website — is essential before any deeper testing begins. IT and security
+        staff run it against their own domains periodically to catch forgotten or unauthorized
+        subdomains before an attacker does, a practice often called "shadow IT" discovery.
+        Competitive researchers and marketers use it to understand how a competitor structures
+        regional sites, product lines, or internal tools. It is also a useful sanity check after a
+        company reorganizes its infrastructure or migrates providers, confirming that old
+        subdomains were properly retired rather than left dangling and pointing at infrastructure
+        nobody controls anymore — a common source of subdomain takeover vulnerabilities.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        This tool is entirely passive: it never scans, brute-forces, or connects to the target
+        domain's own infrastructure, which means it can only find subdomains that have had a
+        publicly logged TLS certificate at some point. Internal-only subdomains that never obtained
+        a public certificate, or organizations that rely exclusively on broad wildcard certificates
+        without individual entries, will not be fully represented. Conversely, since Certificate
+        Transparency logs never expire entries, the list can include subdomains that were
+        decommissioned years ago — treat every result as a lead worth verifying, not a guarantee
+        that the subdomain is currently live, resolvable, or still controlled by the same
+        organization. For a complete assessment, combine this list with active checks like DNS
+        Lookup, Ping, or the Website Hosting Checker.
+      </p>
+    </section>
+{% endif %}
+
+    {% set faqs = [
+      ("Does this tool scan or connect to the target domain?", "No. It only searches public Certificate Transparency logs, which are independent of the target's own servers — nothing is sent to the domain being searched."),
+      ("Why does a subdomain appear that no longer works?", "Certificate Transparency logs are permanent historical records. A subdomain can remain listed long after the server behind it was shut down or its certificate expired."),
+      ("Can this find subdomains that never had a TLS certificate?", "No. This method only surfaces subdomains that appeared on at least one publicly logged certificate — purely internal subdomains without public HTTPS may not appear."),
+      ("What should I do with a list of unfamiliar subdomains?", "Verify each one with DNS Lookup or Ping before drawing conclusions — some may be inactive, and others may belong to a different service reusing a similar name pattern."),
+    ] %}
+    {% if mode == "form" %}
+<section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+{% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

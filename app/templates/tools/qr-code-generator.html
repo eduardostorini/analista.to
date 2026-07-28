@@ -1,0 +1,179 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, copy_button, form_error_banner %}
+
+{% block title %}QR Code Generator | {{ site_name }}{% endblock %}
+{% block meta_description %}Generate a downloadable QR code from any text or URL, in a few preset pixel sizes.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">QR Code Generator</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Text or URL</label>
+        <input
+          id="input_value" name="input_value" type="text" required class="input"
+          placeholder="{{ tool.input_placeholder }}"
+          value="{{ (submitted_value.split('::', 1)[1] if '::' in submitted_value else submitted_value) if submitted_value else '' }}"
+        >
+      </div>
+      <div>
+        <label for="qr_size" class="mb-1 block text-sm font-medium text-slate-700">Size</label>
+        <select id="qr_size" name="qr_size" class="input">
+          <option value="150">150 × 150 px</option>
+          <option value="200">200 × 200 px</option>
+          <option value="300" selected>300 × 300 px (default)</option>
+          <option value="400">400 × 400 px</option>
+          <option value="500">500 × 500 px</option>
+          <option value="800">800 × 800 px</option>
+          <option value="1000">1000 × 1000 px</option>
+        </select>
+      </div>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Generate QR code</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}
+      {{ status_bar(search) }}
+    {% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-slate-400">{{ data.size }} × {{ data.size }} px</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        <div class="flex flex-col items-center gap-4 rounded-lg border border-slate-200 bg-white p-6">
+          <img
+            src="data:image/png;base64,{{ data.image_base64 }}"
+            alt="QR code encoding: {{ data.text }}"
+            class="max-w-full"
+            style="width: min(100%, {{ data.size }}px); image-rendering: pixelated;"
+          >
+          <a
+            href="data:image/png;base64,{{ data.image_base64 }}"
+            download="qrcode-{{ data.size }}px.png"
+            class="btn-primary"
+          >
+            Download PNG
+          </a>
+        </div>
+
+        <div>
+          <p class="text-xs text-slate-400">Encoded content</p>
+          <p class="break-all rounded bg-slate-50 p-2 font-mono text-xs text-slate-600">{{ data.text }}</p>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is the QR Code Generator?</h2>
+      <p>
+        A QR code (Quick Response code) is a two-dimensional barcode that packs text — a website
+        URL, a phone number, a Wi-Fi password, plain text, almost anything — into a pattern of
+        black and white squares that any modern smartphone camera can scan and decode instantly.
+        This tool generates a QR code entirely on our server from whatever text or URL you enter,
+        at a pixel size you choose from a short list of common presets, and gives you a PNG file
+        you can download and use immediately — on a printed flyer, a business card, a product
+        label, a presentation slide, or anywhere else a quick scan is more convenient than typing.
+        Nothing about what you encode is stored publicly or shown to other visitors: this is the
+        one tool on the site that intentionally does not keep or publish a result page, precisely
+        because what people put into a QR code is often personal or private.
+      </p>
+      <h2>How to choose a size</h2>
+      <p>
+        Size should match how the code will be viewed and how far away the scanner will be. A
+        smaller size like 150 or 200 pixels works well embedded in a digital document or a web
+        page meant to be scanned from a phone held close by. Mid-range sizes around 300 to 500
+        pixels are a safe default for most printed material, like flyers or product packaging,
+        scanned from a comfortable arm's length. Larger sizes — 800 or 1000 pixels — are meant for
+        large-format printing, posters, or storefront signage that needs to be scannable from
+        several meters away, since a QR code's readable distance scales roughly with its printed
+        size. Whatever size you pick, the underlying pattern is generated at full sharpness and
+        scaled without blurring, so the code stays crisp and scannable rather than becoming a soft,
+        unreadable smear the way a simple photo resize often does.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        The image you get back is a complete, standalone QR code — there is nothing further to
+        configure or verify beyond checking that your phone's camera can read it back correctly,
+        which is worth doing before printing something at scale. Longer text needs more modules
+        (the small black-and-white squares that make up the pattern) to encode, so very long input
+        produces a visually denser code that can be harder to scan reliably at small sizes; if you
+        need a QR code for a long piece of text, prefer a larger preset size, or consider shortening
+        the content — a short URL, for instance, encodes far more reliably than a long one with
+        many tracking parameters attached.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        QR codes bridge printed and physical materials with digital destinations: a restaurant menu
+        linking to an online ordering page, a business card linking to a contact file or LinkedIn
+        profile, event signage linking to registration, a product label linking to a manual or
+        warranty page, or a shared Wi-Fi network's credentials made scannable instead of typed
+        character by character. They are also commonly used for quick internal tooling — encoding a
+        server hostname, a short internal note, or a one-time link — where speed and simplicity
+        matter more than a polished design.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        Text over roughly 1,500 characters is rejected outright, since QR codes become impractically
+        dense and unreliable to scan well before reaching their theoretical maximum capacity — if you
+        need to encode a large amount of text, host it at a URL and encode the link instead. This
+        tool does not support custom colors, embedded logos, or error-correction level selection;
+        it favors a plain, maximally scannable black-on-white code over visual customization. Finally,
+        remember that a QR code is just a container — it does not make the destination it points to
+        any safer or more trustworthy, so treat scanning an unfamiliar QR code with the same caution
+        you would an unfamiliar link.
+      </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+      ("Is what I encode kept private?", "Yes. Unlike every other tool on this site, the QR Code Generator never creates a public result page or lists your query anywhere — the generated image is shown only to you."),
+      ("What size should I pick for a printed flyer?", "300 to 500 pixels is a safe default for most printed material scanned from arm's length. Go larger (800-1000px) for posters or signage meant to be scanned from further away."),
+      ("Why did my QR code fail to scan?", "Very long text produces a denser, harder-to-scan pattern, especially at small sizes. Try a larger preset size, or shorten the encoded text (for example, a short link instead of a long URL)."),
+      ("Can I add a logo or custom colors?", "Not currently — this tool generates a plain black-on-white code optimized purely for reliable scanning."),
+    ] %}
+    {% if mode == "form" %}
+    <section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

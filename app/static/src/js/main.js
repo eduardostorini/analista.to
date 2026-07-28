@@ -9,9 +9,6 @@ import { copyButton } from "./components/copy.js";
 import { mathCaptcha } from "./components/captcha-math.js";
 import { toast } from "./components/toast.js";
 import { chartTimeline } from "./components/chart-timeline.js";
-import { initCapWidget } from "./components/cap-widget-setup.js";
-
-initCapWidget();
 
 Alpine.plugin(collapse);
 Alpine.plugin(focus);

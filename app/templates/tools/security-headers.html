@@ -2,12 +2,12 @@
 {% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
 
 {% block title %}Security Headers{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
-{% block meta_description %}Avalie quais cabeçalhos de segurança HTTP uma página está enviando, com pontuação e destaque para os críticos ausentes.{% endblock %}
+{% block meta_description %}Evaluate which HTTP security headers a page is sending, with scoring and highlighting for critical missing ones.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
 {% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
 
 {% block content %}
-{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
 {{ breadcrumbs(crumbs) }}
 
 <header class="mb-8 max-w-2xl">
@@ -22,8 +22,8 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">URL</label>
   <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
-  {{ captcha_widget(captcha_provider, cap_public_url, cap_site_key) }}
-  <button type="submit" class="btn-primary w-full sm:w-auto">Avaliar cabeçalhos</button>
+  {{ captcha_widget(captcha_provider) }}
+  <button type="submit" class="btn-primary w-full sm:w-auto">Evaluate headers</button>
 </form>
 {% endif %}
 
@@ -31,8 +31,8 @@
 
 {% if mode == "failed" %}
 <div class="card mb-8 max-w-xl border-rose-200 bg-rose-50">
-  <p class="badge-danger mb-2">Falhou</p>
-  <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+  <p class="badge-danger mb-2">Failed</p>
+  <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
 </div>
 {% endif %}
 
@@ -51,10 +51,10 @@
       {% for header in data.headers %}
       <div class="card flex items-start justify-between gap-4">
         <div class="min-w-0">
-          <p class="text-sm font-medium text-slate-700">{{ header.header }}{% if header.critical %} <span class="text-xs text-rose-500">(crítico)</span>{% endif %}</p>
+          <p class="text-sm font-medium text-slate-700">{{ header.header }}{% if header.critical %} <span class="text-xs text-rose-500">(critical)</span>{% endif %}</p>
           {% if header.value %}<p class="mt-1 break-all font-mono text-xs text-slate-500">{{ header.value }}</p>{% endif %}
         </div>
-        <span class="badge-{{ 'success' if header.present else 'danger' }} shrink-0">{{ "presente" if header.present else "ausente" }}</span>
+        <span class="badge-{{ 'success' if header.present else 'danger' }} shrink-0">{{ "present" if header.present else "absent" }}</span>
       </div>
       {% endfor %}
     </div>
@@ -63,92 +63,67 @@
 
 {% if mode == "form" %}
 <section class="prose-tool max-w-3xl space-y-4">
-  <h2>O que são cabeçalhos de segurança HTTP?</h2>
-  <p>
-    Além de controlar cache e tipo de conteúdo, cabeçalhos HTTP também podem instruir o navegador
-    a aplicar políticas de segurança adicionais — como recusar carregar a página dentro de um
-    <code>&lt;iframe&gt;</code> de outro site, impedir que o navegador tente "adivinhar" o tipo de
-    um arquivo de forma insegura, ou restringir de quais domínios scripts e estilos podem ser
-    carregados. Esta ferramenta verifica a presença e o valor de sete cabeçalhos de segurança
-    amplamente recomendados e calcula uma pontuação simples baseada em quantos estão presentes.
-  </p>
-  <h2>Como interpretar o resultado</h2>
-  <p>
-    Dois cabeçalhos são marcados como <strong>críticos</strong>: <code>Strict-Transport-Security</code>
-    (HSTS), que instrui o navegador a sempre usar HTTPS com aquele domínio, mesmo que o usuário
-    digite ou clique em um link http://, prevenindo ataques de downgrade; e o
-    <code>Content-Security-Policy</code> (CSP), que restringe de quais origens o navegador pode
-    carregar scripts, estilos e outros recursos, sendo uma das defesas mais eficazes contra ataques
-    de Cross-Site Scripting (XSS). Os demais cabeçalhos — <code>X-Content-Type-Options</code>,
-    <code>X-Frame-Options</code>, <code>Referrer-Policy</code>, <code>Permissions-Policy</code> e
-    <code>Cross-Origin-Opener-Policy</code> — reduzem riscos mais específicos (MIME sniffing,
-    clickjacking, vazamento de dados de navegação, acesso indevido a APIs do navegador e isolamento
-    entre abas). A pontuação é uma soma simples de presença, não uma avaliação da qualidade da
-    política configurada — um CSP presente, mas configurado de forma excessivamente permissiva,
-    ainda conta como "presente" nesta análise.
-  </p>
-  <h2>Casos de uso comuns</h2>
-  <p>
-    Times de segurança e desenvolvimento usam esta ferramenta como checklist rápido antes de um
-    lançamento, para confirmar que configurações de segurança feitas no servidor, CDN ou
-    plataforma de hospedagem foram realmente aplicadas em produção. Também é útil em auditorias de
-    conformidade e em comparações rápidas entre a postura de segurança de diferentes ambientes
-    (produção vs. homologação) ou de fornecedores durante um processo de avaliação técnica.
-  </p>
-  <h2>Limitações</h2>
-  <p>
-    Esta ferramenta verifica apenas <strong>presença e valor bruto</strong> dos cabeçalhos — não
-    avalia se uma política de CSP está bem construída (por exemplo, se usa <code>unsafe-inline</code>
-    de forma insegura) nem simula ataques reais. A ausência de um cabeçalho não crítico não
-    significa necessariamente vulnerabilidade grave — depende do contexto e da natureza da
-    aplicação. Trate a pontuação como um indicador de higiene básica de configuração, não como uma
-    auditoria de segurança completa.
-  </p>
-  <h2>Da teoria à prática</h2>
-  <p>
-    Implementar esses cabeçalhos costuma ser simples do ponto de vista técnico — a maioria dos
-    servidores web, CDNs e frameworks modernos permite configurá-los com poucas linhas — mas
-    exige atenção especial ao Content-Security-Policy, que pode quebrar funcionalidades da página
-    se for definido de forma restritiva demais sem considerar todos os domínios de scripts,
-    estilos e imagens realmente usados pelo site. Uma abordagem recomendada é implantar o CSP
-    primeiro em modo "somente relatório" (Content-Security-Policy-Report-Only), que registra
-    violações sem bloquear nada, permitindo ajustar a política com segurança antes de ativá-la em
-    modo de bloqueio real. Os demais cabeçalhos desta lista têm risco de quebra muito menor e
-    geralmente podem ser ativados diretamente sem esse cuidado adicional.
-  </p>
-  <h2>Onde configurar</h2>
-  <p>
-    Dependendo da sua infraestrutura, esses cabeçalhos podem ser definidos em camadas diferentes:
-    diretamente na aplicação (frameworks web modernos costumam ter extensões prontas para isso),
-    no servidor web (Nginx e Apache aceitam diretivas simples de add_header), ou na CDN/proxy
-    reverso na frente da aplicação, que é frequentemente o ponto mais centralizado e fácil de
-    manter para todo o tráfego de um domínio. Quando múltiplas camadas definem o mesmo cabeçalho
-    com valores diferentes, normalmente prevalece o valor definido na camada mais próxima do
-    cliente, então vale revisar toda a cadeia se um valor esperado não estiver aparecendo
-    corretamente no resultado desta ferramenta.
-  </p>
-</section>
+<h2>What are HTTP security headers?</h2>
+   <p>
+     In addition to controlling cache and content type, HTTP headers can also instruct the browser
+     to apply additional security policies — such as refusing to load the page inside an
+     <code>&lt;iframe&gt;</code> of another site, preventing the browser from insecurely
+     "guessing" the type of a file, or restricting which domains scripts and styles can be
+     loaded from. This tool checks the presence and value of seven widely recommended
+     security headers and calculates a simple score based on how many are present.
+   </p>
+   <h2>How to interpret the result</h2>
+   <p>
+     Two headers are marked as <strong>critical</strong>: <code>Strict-Transport-Security</code>
+     (HSTS), which instructs the browser to always use HTTPS with that domain, even when the user
+     types or clicks on an http:// link, preventing downgrade attacks; and the
+     <code>Content-Security-Policy</code> (CSP), which restricts which origins the browser can
+     load scripts, styles, and other resources from, being one of the most effective defenses against
+     Cross-Site Scripting (XSS) attacks. The remaining headers — <code>X-Content-Type-Options</code>,
+     <code>X-Frame-Options</code>, <code>Referrer-Policy</code>, <code>Permissions-Policy</code> and
+     <code>Cross-Origin-Opener-Policy</code> — reduce more specific risks (MIME sniffing,
+     clickjacking, navigation data leakage, unauthorized access to browser APIs, and tab isolation). The score is a simple sum of presence, not an evaluation of the quality of the configured policy — a present CSP that is configured overly permissively
+     still counts as "present" in this analysis.
+   </p>
+   <h2>Common use cases</h2>
+   <p>
+     Security and development teams use this tool as a quick checklist before a
+     launch, to confirm that security configurations made on the server, CDN, or hosting platform have actually been applied in production. It is also useful in compliance audits and in quick comparisons between the security posture of different environments (production vs. staging) or of vendors during a technical evaluation process.
+   </p>
+   <h2>Limitations</h2>
+   <p>
+     This tool checks only <strong>presence and raw value</strong> of headers — it does not evaluate whether a CSP policy is well constructed (e.g., whether it uses <code>unsafe-inline</code> insecurely) nor simulate real attacks. The absence of a non-critical header does not necessarily mean a severe vulnerability — it depends on the context and nature of the application. Treat the score as an indicator of basic configuration hygiene, not as a complete security audit.
+   </p>
+   <h2>From theory to practice</h2>
+   <p>
+     Implementing these headers is usually simple from a technical standpoint — most modern web servers, CDNs, and frameworks allow configuring them with a few lines — but requires special attention to the Content-Security-Policy, which can break page functionality if set too restrictively without considering all the script, style, and image domains actually used by the site. A recommended approach is to deploy the CSP first in report-only mode (Content-Security-Policy-Report-Only), which logs violations without blocking anything, allowing the policy to be adjusted safely before activating it in real blocking mode. The other headers on this list have a much lower risk of breakage and can generally be activated directly without that additional care.
+   </p>
+   <h2>Where to configure</h2>
+   <p>
+     Depending on your infrastructure, these headers can be defined at different layers: directly in the application (modern web frameworks often have ready-made extensions for this), on the web server (Nginx and Apache accept simple add_header directives), or on the CDN/reverse proxy in front of the application, which is frequently the most centralized and easy-to-maintain point for all traffic of a domain. When multiple layers define the same header with different values, normally the value defined in the layer closest to the client prevails, so it is worth reviewing the entire chain if an expected value is not appearing correctly in this tool's result.
+   </p>
+ </section>
 {% endif %}
 
 {% set faqs = [
-  ("Qual cabeçalho de segurança é mais importante?", "Content-Security-Policy e Strict-Transport-Security são os que têm maior impacto prático contra XSS e ataques de downgrade para HTTP, por isso são marcados como críticos."),
-  ("Uma pontuação máxima significa que o site é seguro?", "Significa boa higiene básica de cabeçalhos, mas não substitui uma auditoria de segurança completa nem garante ausência de outras vulnerabilidades."),
-  ("Por que um cabeçalho aparece como presente mas ainda assim recebo alertas de segurança em outra ferramenta?", "Esta análise verifica apenas presença e valor bruto, não a qualidade da configuração — um CSP mal configurado ainda conta como presente aqui."),
-] %}
-{% if mode == "form" %}
-<section class="mt-10 max-w-3xl">
-  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
-  {{ faq_accordion(faqs) }}
-</section>
-{% endif %}
+   ("Which security header is most important?", "Content-Security-Policy and Strict-Transport-Security have the greatest practical impact against XSS and HTTP downgrade attacks, which is why they are marked as critical."),
+   ("Does a maximum score mean the site is secure?", "It means good basic header hygiene, but does not replace a complete security audit nor guarantee the absence of other vulnerabilities."),
+   ("Why does a header appear as present but I still get security alerts from another tool?", "This analysis checks only presence and raw value, not configuration quality — a misconfigured CSP still counts as present here."),
+ ] %}
+ {% if mode == "form" %}
+ <section class="mt-10 max-w-3xl">
+   <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+   {{ faq_accordion(faqs) }}
+ </section>
+ {% endif %}
 
 <section class="mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
     {{ related_tools_list(related_tools) }}
   </div>
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
     {{ recent_searches_list(tool, recent_searches) }}
   </div>
 </section>

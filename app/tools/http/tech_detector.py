@@ -1,9 +1,9 @@
-"""Detecção de tecnologias por heurística própria (headers + HTML/JS visível).
+"""Technology detection by proprietary heuristics (headers + visible HTML/JS).
 
-Não usa um banco de assinaturas de terceiros (tipo Wappalyzer) — cobre um
-conjunto deliberadamente pequeno e mantido manualmente de sinais bem
-conhecidos. Isso é uma limitação conhecida e documentada: sites que ofuscam
-essas pistas, ou tecnologias fora da lista, não serão detectados.
+Does not use a third-party signature database (like Wappalyzer) — covers a
+deliberately small and manually maintained set of well-known signals.
+This is a known and documented limitation: sites that obscure these clues,
+or technologies outside the list, will not be detected.
 """
 from __future__ import annotations
 
@@ -59,14 +59,14 @@ _SIGNATURES: list[Signature] = [
 
 class TechDetectorTool(BaseTool):
     slug = "tech-detector"
-    name = "Detector de Tecnologias"
-    category_slug = "http-servidor"
-    short_description = "Identifique CMS, servidor, CDN, frameworks JS e ferramentas de analytics usados por um site."
-    description = "Analisa cabeçalhos HTTP e o HTML público de uma página para identificar tecnologias conhecidas."
+    name = "Technology Detector"
+    category_slug = "http-server"
+    short_description = "Identify CMS, server, CDN, JS frameworks, and analytics tools used by a site."
+    description = "Analyzes HTTP headers and public HTML of a page to identify known technologies."
     icon = "cpu"
     input_type = InputType.DOMAIN
-    input_placeholder = "exemplo.com.br"
-    public_url_prefix = "http/tecnologias"
+    input_placeholder = "example.com"
+    public_url_prefix = "http/technologies"
     ttl_seconds = 6 * 3600
     rate_limit_per_minute = 8
     analyzer_version = 1
@@ -78,7 +78,7 @@ class TechDetectorTool(BaseTool):
         return validate_and_normalize_domain(cleaned_input)
 
     def execute(self, normalized_input: str) -> ToolResult:
-        response = SafeHTTPClient().get(f"https://{normalized_input}/")
+        response = SafeHTTPClient().get(f"https://{normalized_input}/", max_response_bytes=5 * 1024 * 1024)
         headers_lower = {k.lower(): v for k, v in response.headers.items()}
         html = response.content.decode("utf-8", errors="replace")
 
@@ -101,9 +101,9 @@ class TechDetectorTool(BaseTool):
 
         if detected:
             names = ", ".join(item["name"] for item in detected[:5])
-            summary = f"Tecnologias identificadas em {normalized_input}: {names}."
+            summary = f"Technologies identified on {normalized_input}: {names}."
         else:
-            summary = f"Nenhuma tecnologia conhecida foi identificada em {normalized_input}."
+            summary = f"No known technology was identified on {normalized_input}."
 
         return ToolResult(success=True, summary=summary, data=data)
 

@@ -89,11 +89,9 @@ class BaseConfig:
     IP_HASH_CURRENT_SALT_ID = os.environ.get("IP_HASH_CURRENT_SALT_ID", "1")
 
     # --- CAPTCHA ------------------------------------------------------------
-    CAPTCHA_PROVIDER = os.environ.get("CAPTCHA_PROVIDER", "cap")
-    CAP_PUBLIC_URL = os.environ.get("CAP_PUBLIC_URL", "http://localhost:3010")
-    CAP_INTERNAL_URL = os.environ.get("CAP_INTERNAL_URL", "http://analisa_cap:3000")
-    CAP_SITE_KEY = os.environ.get("CAP_SITE_KEY", "")
-    CAP_SECRET_KEY = os.environ.get("CAP_SECRET_KEY", "")
+    CAPTCHA_PROVIDER = os.environ.get("CAPTCHA_PROVIDER", "altcha")
+    ALTCHA_HMAC_SECRET = os.environ.get("ALTCHA_HMAC_SECRET", "")
+    ALTCHA_HMAC_KEY_SECRET = os.environ.get("ALTCHA_HMAC_KEY_SECRET", "")
     MATH_CHALLENGE_TTL_SECONDS = _int(os.environ.get("MATH_CHALLENGE_TTL_SECONDS"), 300)
     MATH_CHALLENGE_MAX_ATTEMPTS = _int(os.environ.get("MATH_CHALLENGE_MAX_ATTEMPTS"), 5)
 
@@ -109,13 +107,37 @@ class BaseConfig:
     OUTBOUND_CONNECT_TIMEOUT_SECONDS = _int(os.environ.get("OUTBOUND_CONNECT_TIMEOUT_SECONDS"), 5)
     OUTBOUND_READ_TIMEOUT_SECONDS = _int(os.environ.get("OUTBOUND_READ_TIMEOUT_SECONDS"), 10)
     OUTBOUND_MAX_REDIRECTS = _int(os.environ.get("OUTBOUND_MAX_REDIRECTS"), 5)
-    OUTBOUND_MAX_RESPONSE_BYTES = _int(os.environ.get("OUTBOUND_MAX_RESPONSE_BYTES"), 2 * 1024 * 1024)
+    OUTBOUND_MAX_RESPONSE_BYTES = _int(os.environ.get("OUTBOUND_MAX_RESPONSE_BYTES"), 10 * 1024 * 1024)
     OUTBOUND_ALLOWED_PORTS = {int(p) for p in _list(os.environ.get("OUTBOUND_ALLOWED_PORTS", "80,443"))}
+
+    # --- Open Ports Lookup ----------------------------------------------------------
+    # Conexões TCP em paralelo para manter o scan de ~85 portas rápido mesmo com
+    # portas "filtradas" (sem resposta) que só resolvem no timeout individual.
+    PORT_SCAN_TIMEOUT_MS = _int(os.environ.get("PORT_SCAN_TIMEOUT_MS"), 1500)
+    PORT_SCAN_MAX_WORKERS = _int(os.environ.get("PORT_SCAN_MAX_WORKERS"), 40)
+
+    # --- Blocklist Lookup (DNSBL/RBL) -----------------------------------------------
+    # DNSBL zones costumam responder mais devagar que um connect TCP direto —
+    # timeout maior que o do Open Ports Lookup, mas ainda em paralelo.
+    DNSBL_TIMEOUT_MS = _int(os.environ.get("DNSBL_TIMEOUT_MS"), 4000)
+    DNSBL_MAX_WORKERS = _int(os.environ.get("DNSBL_MAX_WORKERS"), 30)
 
     # --- Fontes de dados de ferramentas específicas -----------------------------
     IP_GEOLOCATION_API_URL = os.environ.get(
         "IP_GEOLOCATION_API_URL",
         "http://ip-api.com/json/{ip}?fields=status,message,country,countryCode,regionName,city,lat,lon,isp,org,as,query",
+    )
+    REVERSE_IP_LOOKUP_API_URL = os.environ.get(
+        "REVERSE_IP_LOOKUP_API_URL", "https://api.hackertarget.com/reverseiplookup/?q={ip}"
+    )
+    # Fonte primária (Certificate Transparency) para o Subdomain Finder — mais
+    # abrangente, mas o crt.sh é conhecido por instabilidade/lentidão
+    # ocasional, daí o fallback abaixo.
+    SUBDOMAIN_CT_LOGS_API_URL = os.environ.get(
+        "SUBDOMAIN_CT_LOGS_API_URL", "https://crt.sh/?q=%25.{domain}&output=json"
+    )
+    SUBDOMAIN_FALLBACK_API_URL = os.environ.get(
+        "SUBDOMAIN_FALLBACK_API_URL", "https://api.hackertarget.com/hostsearch/?q={domain}"
     )
 
     # --- Admin ------------------------------------------------------------------
@@ -125,6 +147,12 @@ class BaseConfig:
     # --- Páginas estáticas / SEO --------------------------------------------------
     GENERATED_PAGES_DIR = os.environ.get("GENERATED_PAGES_DIR", "/data/generated-pages")
     SITEMAPS_DIR = os.environ.get("SITEMAPS_DIR", "/data/sitemaps")
+
+    # --- Screenshot de site (Website Hosting Checker) --------------------------
+    SCREENSHOTS_DIR = os.environ.get("SCREENSHOTS_DIR", "/data/screenshots")
+    SCREENSHOT_NAV_TIMEOUT_SECONDS = _int(os.environ.get("SCREENSHOT_NAV_TIMEOUT_SECONDS"), 10)
+    SCREENSHOT_VIEWPORT_WIDTH = _int(os.environ.get("SCREENSHOT_VIEWPORT_WIDTH"), 1280)
+    SCREENSHOT_VIEWPORT_HEIGHT = _int(os.environ.get("SCREENSHOT_VIEWPORT_HEIGHT"), 800)
     SITEMAP_MAX_URLS_PER_FILE = _int(os.environ.get("SITEMAP_MAX_URLS_PER_FILE"), 45000)
     # Depois de quantos dias uma página pública gerada é considerada
     # "expirada" (seção 16) e retirada do índice/sitemap automaticamente.

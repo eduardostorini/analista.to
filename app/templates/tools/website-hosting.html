@@ -1,0 +1,241 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Website Hosting Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Find out which hosting provider, ISP, and location a website uses. Free instant lookup for any domain or IP.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Website Hosting Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain or IP</label>
+        <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+        <p class="mt-1 text-xs text-slate-400">Examples: example.com, 8.8.8.8, google.com</p>
+      </div>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check hosting</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}
+      {{ status_bar(search) }}
+    {% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs text-slate-400">Domain queried</p>
+            <p class="font-mono text-lg text-brand-900">{{ data.domain }}</p>
+            {% if data.resolved_ip %}
+            <p class="text-xs text-slate-500">Resolved IP: {{ data.resolved_ip }}</p>
+            {% endif %}
+          </div>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if data.screenshot_url %}
+        <div class="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+          <div class="flex items-center gap-1.5 border-b border-slate-200 bg-slate-100 px-3 py-2">
+            <span class="h-2.5 w-2.5 rounded-full bg-rose-300"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-amber-300"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-emerald-300"></span>
+            <span class="ml-2 truncate rounded bg-white px-2 py-0.5 font-mono text-xs text-slate-500">{{ data.domain }}</span>
+          </div>
+          <img
+            src="{{ data.screenshot_url }}"
+            alt="Screenshot of {{ data.domain }}"
+            loading="lazy"
+            class="block w-full bg-slate-50"
+          >
+        </div>
+        {% endif %}
+
+        {% if data.hosting %}
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                <th class="py-2 pr-4">Field</th>
+                <th class="py-2">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">IP address</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.hosting.ip }}</td>
+              </tr>
+              {% if data.hosting.organization %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Organization</td>
+                <td class="py-2 text-slate-600">{{ data.hosting.organization }}</td>
+              </tr>
+              {% endif %}
+              {% if data.hosting.isp %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">ISP</td>
+                <td class="py-2 text-slate-600">{{ data.hosting.isp }}</td>
+              </tr>
+              {% endif %}
+              {% if data.hosting.asn %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">ASN</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.hosting.asn }}</td>
+              </tr>
+              {% endif %}
+              {% if data.hosting.as_name %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">AS Name</td>
+                <td class="py-2 text-slate-600">{{ data.hosting.as_name }}</td>
+              </tr>
+              {% endif %}
+              {% if data.hosting.country %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Country</td>
+                <td class="py-2 text-slate-600">{{ data.hosting.country }}</td>
+              </tr>
+              {% endif %}
+              {% if data.hosting.region %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Region</td>
+                <td class="py-2 text-slate-600">{{ data.hosting.region }}</td>
+              </tr>
+              {% endif %}
+              {% if data.hosting.city %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">City</td>
+                <td class="py-2 text-slate-600">{{ data.hosting.city }}</td>
+              </tr>
+              {% endif %}
+              {% if data.hosting.latitude is not none and data.hosting.longitude is not none %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Coordinates</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.hosting.latitude }}, {{ data.hosting.longitude }}</td>
+              </tr>
+              {% endif %}
+              {% if data.hosting.timezone %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Timezone</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.hosting.timezone }}</td>
+              </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="badge-warning">No hosting data available for this domain/IP.</p>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is Website Hosting Checker?</h2>
+      <p>
+        Every website lives on a server, and every server is connected to the internet through
+        an internet service provider or a hosting provider. The Website Hosting Checker lets
+        you discover who is behind that server. By entering any domain name or IP address,
+        you can instantly see the ISP, the organization that owns the IP block, the physical
+        city and country where the server is registered, the timezone it operates in, and the
+        autonomous system number (ASN) that routes the traffic. This is useful for anyone who
+        wants to understand where a site is hosted without needing command-line tools or
+        technical knowledge.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        The ISP field tells you which internet provider serves the IP address — this is often a
+        major telecom or a cloud provider. The Organization field is more specific: it points to
+        the company or institution that directly controls the IP block, which can be a hosting
+        provider, a university, a government agency, or a corporate network. The Country, Region,
+        and City fields are based on IP geolocation databases and represent the registered
+        location of the IP block, not necessarily the exact physical rack where the server sits.
+        Latitude and Longitude are approximate coordinates tied to that registered location, useful
+        for mapping but not precise enough to identify a specific building. The Timezone field
+        reflects the timezone associated with the IP block's registered location, which often
+        matches the hosting provider's primary operations center or the location of their data
+        center. The ASN and AS Name identify the network operator on the global routing table,
+        which is especially helpful when dealing with large cloud providers that own many IP
+        ranges under a single autonomous system.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        Website owners use this tool to confirm that their domain is pointing to the correct
+        hosting provider after a migration. Security analysts use it to verify whether a suspicious
+        domain is hosted in an unexpected country or operated by a known bad actor. System
+        administrators use it to debug routing issues by comparing the reported ISP with the
+        expected provider. Buyers use it during due diligence before purchasing a website, because
+        the hosting provider can affect performance, compliance, and data residency. Support teams
+        use it to answer questions like "is my site running on the server I paid for?" or "which
+        data center is serving this domain right now?" It is also commonly used in journalism and
+        research to map the infrastructure behind news sites, social media platforms, or political
+        campaigns.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        IP geolocation is not exact. The city and coordinates are based on the registered
+        location of the IP block, which can be several kilometers away from the actual server.
+        Some large providers use anycast routing, meaning the same IP can be served from multiple
+        data centers around the world, so the location shown may be only one of many possible
+        points of presence. The ISP and organization fields depend on public registration data,
+        which can be outdated or hidden behind privacy services. If a domain uses a CDN or a
+        reverse proxy, the IP you see belongs to the CDN, not the origin server — to find the
+        true origin you would need additional tools such as a DNS lookup or HTTP headers
+        inspection. Finally, some domains resolve to a CNAME that points to another domain,
+        and the IP returned is for that target, which may or may not be the final server. For the
+        most accurate picture, combine this tool with DNS lookup and HTTP headers analysis.
+      </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+      ("Why does the hosting location not match the physical server location?", "Geolocation databases map IP blocks to the registered address of the organization that owns them. The actual server may be in a different city or even country, especially with cloud providers and CDNs that use anycast."),
+      ("What is the difference between ISP and Organization?", "ISP is the internet service provider that connects the IP to the global network. Organization is the entity that directly controls the IP block, which can be the same as the ISP or a downstream customer such as a hosting company."),
+      ("Can I use this tool for IP addresses?", "Yes. You can enter either a domain name or a raw IP address. For domains, the tool resolves the IP first and then looks up the hosting information."),
+      ("What is an ASN?", "ASN stands for Autonomous System Number. It identifies a network operator on the internet routing table. Large providers like AWS, Cloudflare, and Google each have their own ASNs, which can help you understand which network is responsible for the IP."),
+    ] %}
+    {% if mode == "form" %}
+    <section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

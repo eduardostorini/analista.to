@@ -1,0 +1,201 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}HTTP 2/3 Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check whether a website serves HTTP/2 and whether it advertises HTTP/3 (QUIC) support.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">HTTP 2/3 Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain or IP</label>
+        <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+        <p class="mt-1 text-xs text-slate-400">Examples: example.com, agenciamuvi.com.br</p>
+      </div>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check protocol</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}
+      {{ status_bar(search) }}
+    {% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs text-slate-400">Domain queried</p>
+            <p class="font-mono text-lg text-brand-900">{{ data.url }}</p>
+          </div>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.online %}
+        <p class="badge-danger">Did not respond to HTTP or HTTPS requests within the timeout.</p>
+        {% else %}
+        <div class="flex flex-wrap gap-2">
+          <span class="badge-{{ 'success' if data.supports_http2 else 'warning' }}">
+            HTTP/2 {{ "supported" if data.supports_http2 else "not detected" }}
+          </span>
+          <span class="badge-{{ 'success' if data.supports_http3 else 'warning' }}">
+            HTTP/3 (QUIC) {{ "advertised" if data.supports_http3 else "not advertised" }}
+          </span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                <th class="py-2 pr-4">Field</th>
+                <th class="py-2">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">URL</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.url }}</td>
+              </tr>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Negotiated protocol</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.protocol }}</td>
+              </tr>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Response status code</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.status_code }}</td>
+              </tr>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Connection scheme</td>
+                <td class="py-2 text-slate-600">{{ data.scheme | upper }}</td>
+              </tr>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Alt-Svc header</td>
+                <td class="py-2 break-all font-mono text-xs text-slate-600">{{ data.alt_svc or "—" }}</td>
+              </tr>
+              {% if data.server %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Server</td>
+                <td class="py-2 text-slate-600">{{ data.server }}</td>
+              </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is the HTTP 2/3 Checker?</h2>
+      <p>
+        HTTP/2 and HTTP/3 are newer versions of the protocol that powers the web, designed to
+        replace the older, request-at-a-time model of HTTP/1.1 with faster, more efficient ways
+        of moving data between browser and server. This tool connects to a domain the same way a
+        browser would, negotiates the connection over TLS, and reports which protocol version the
+        server actually used, together with whether it advertises HTTP/3 (QUIC) support through
+        the standard Alt-Svc response header — the same signal real browsers rely on to decide
+        whether to upgrade a future connection to HTTP/3.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        "HTTP/2 supported" means the TLS handshake's ALPN negotiation — the mechanism client and
+        server use to agree on a protocol before any HTTP traffic is exchanged — selected HTTP/2
+        for this connection, which in practice requires HTTPS; plain HTTP almost never upgrades to
+        HTTP/2 in the real world, so testing over an unencrypted connection will normally show
+        HTTP/1.1 even on servers that fully support HTTP/2 over TLS. "HTTP/3 (QUIC) advertised"
+        reflects the presence of an <code>h3</code> token in the Alt-Svc header, which is how a
+        server tells clients "I also speak HTTP/3 on this port, feel free to try it next time" —
+        it does not mean this particular request traveled over HTTP/3, since QUIC runs over UDP
+        and requires a separate connection attempt that browsers make opportunistically after
+        seeing this header.
+      </p>
+      <h2>Why the protocol version matters</h2>
+      <p>
+        HTTP/1.1 opens a limited number of parallel connections and processes requests on each one
+        mostly in sequence, which is why old-school sites split assets across multiple domains to
+        work around the limit. HTTP/2 introduced multiplexing — many requests and responses
+        interleaved over a single connection — plus header compression and server push, cutting
+        page load times considerably on sites with many small resources. HTTP/3 goes further by
+        replacing the underlying TCP transport with QUIC, built on UDP, which removes a problem
+        called "head-of-line blocking" (where one lost packet stalls every request sharing that
+        TCP connection) and speeds up connection setup, which is especially noticeable on mobile
+        networks with higher latency and packet loss.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        Site owners use this tool to confirm that a CDN or reverse proxy migration actually
+        enabled HTTP/2 or HTTP/3 as expected, since it is easy to assume a modern CDN provider
+        turns these on by default when in fact a specific configuration flag was left disabled.
+        Developers use it while debugging performance regressions, since dropping from HTTP/2 back
+        to HTTP/1.1 — for example after switching load balancers — can silently increase load
+        times without any error being raised anywhere. It is also useful for competitive research,
+        checking which protocol a competitor's infrastructure uses, and for basic due diligence
+        when choosing between hosting providers or CDNs that advertise HTTP/3 support.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        This tool does not open a raw QUIC/UDP connection to verify HTTP/3 directly — doing so
+        reliably from a server-side background job is significantly more involved than a normal
+        HTTP request, and is not how most lightweight online checkers work either. Instead, it
+        relies on the Alt-Svc header, the same well-established mechanism browsers use, which is
+        accurate for any server that correctly advertises its capabilities but will miss a
+        misconfigured server that supports HTTP/3 without announcing it. Results can also vary by
+        region for sites behind a CDN with per-datacenter configuration, and a server may
+        temporarily disable HTTP/2 or HTTP/3 under specific load conditions.
+      </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+      ("Does my site need HTTPS to use HTTP/2?", "In practice, yes. Every major browser only supports HTTP/2 over an encrypted TLS connection, even though the specification technically allows an unencrypted variant."),
+      ("Why does it show HTTP/1.1 even though my server supports HTTP/2?", "The most common causes are testing over plain HTTP instead of HTTPS, a reverse proxy or CDN in front of the origin that itself only speaks HTTP/1.1 to the outside, or HTTP/2 simply not being enabled in the web server's configuration."),
+      ("What does the Alt-Svc header actually do?", "It lets a server tell clients that an alternative protocol and endpoint are available for future requests — most commonly used today to advertise HTTP/3 (QUIC) support alongside a regular HTTP/2 connection."),
+      ("Is HTTP/3 support already common?", "It is growing quickly, especially among major CDNs and cloud providers, but it is still far from universal — many servers and smaller hosting providers only support HTTP/1.1 and HTTP/2 today."),
+    ] %}
+    {% if mode == "form" %}
+    <section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

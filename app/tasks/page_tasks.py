@@ -31,7 +31,7 @@ def generate_page(self, search_id: int) -> None:
     # Marca como concluída ANTES de gerar a página: `PageIndexabilityService`
     # só indexa buscas com status terminal, então a página seria gravada
     # como "pending" para sempre se a avaliação rodasse antes desta linha.
-    JobService.emit(search, SearchStatus.COMPLETED, 100, "Concluído")
+    JobService.emit(search, SearchStatus.COMPLETED, 100, "Completed")
 
     try:
         PageGenerationService.generate(search)

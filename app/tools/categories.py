@@ -1,8 +1,8 @@
-"""Fonte da verdade das categorias de ferramentas (seção 6 da especificação).
+"""Source of truth for tool categories (section 6 of the spec).
 
-Somente categorias com ferramentas reais no MVP entram aqui — as demais
-categorias planejadas aparecem em `/roadmap/` como texto, nunca como cards de
-ferramentas inexistentes (seção 7).
+Only categories with real MVP tools are listed here — other planned
+categories are kept internally, never as cards for nonexistent tools
+(section 7).
 """
 from __future__ import annotations
 
@@ -23,8 +23,8 @@ CATEGORIES: list[CategoryDefinition] = [
         slug="dns",
         name="DNS",
         description=(
-            "Ferramentas para consultar registros DNS, verificar propagação e "
-            "diagnosticar problemas de resolução de nomes."
+            "Tools to query DNS records, check propagation and "
+            "diagnose name resolution issues."
         ),
         icon="server-cog",
         sort_order=10,
@@ -33,18 +33,18 @@ CATEGORIES: list[CategoryDefinition] = [
         slug="email",
         name="E-mail",
         description=(
-            "Verifique a configuração de SPF e DMARC de um domínio para "
-            "autenticação de e-mail."
+            "Verify a domain's SPF and DMARC configuration "
+            "for email authentication."
         ),
         icon="mail-check",
         sort_order=20,
     ),
     CategoryDefinition(
-        slug="dominio-ip",
-        name="Domínio e IP",
+        slug="domain-ip",
+        name="Domain & IP",
         description=(
-            "Consulte informações de registro de domínio (WHOIS/RDAP), "
-            "geolocalização e dados de propriedade de endereços IP."
+            "Lookup domain registration info (WHOIS/RDAP), "
+            "geolocation and ownership data for IP addresses."
         ),
         icon="globe",
         sort_order=30,
@@ -53,31 +53,41 @@ CATEGORIES: list[CategoryDefinition] = [
         slug="seo",
         name="SEO",
         description=(
-            "Verifique title, meta description, robots.txt, sitemap e outros "
-            "fatores técnicos de otimização para buscadores."
+            "Check title, meta description, robots.txt, sitemap and other "
+            "technical SEO factors."
         ),
         icon="search",
         sort_order=40,
     ),
     CategoryDefinition(
-        slug="http-servidor",
-        name="HTTP e servidor",
+        slug="http-server",
+        name="HTTP & Server",
         description=(
-            "Inspecione cabeçalhos HTTP, cadeias de redirecionamento e a "
-            "tecnologia usada pelo servidor de um site."
+            "Inspect HTTP headers, redirect chains and the "
+            "technology used by a website's server."
         ),
         icon="server",
         sort_order=50,
     ),
     CategoryDefinition(
-        slug="ssl-seguranca",
-        name="SSL e segurança",
+        slug="ssl-security",
+        name="SSL & Security",
         description=(
-            "Analise certificados SSL/TLS e os cabeçalhos de segurança "
-            "expostos por um site."
+            "Analyze SSL/TLS certificates and the security headers "
+            "exposed by a website."
         ),
         icon="shield-check",
         sort_order=60,
+    ),
+    CategoryDefinition(
+        slug="utils",
+        name="Utils",
+        description=(
+            "General-purpose utilities that don't fit a single "
+            "technical category, like the QR Code Generator."
+        ),
+        icon="wrench",
+        sort_order=70,
     ),
 ]
 

@@ -19,12 +19,12 @@ _CHECKS = (
 class SecurityHeadersTool(BaseTool):
     slug = "security-headers"
     name = "Security Headers"
-    category_slug = "ssl-seguranca"
-    short_description = "Avalie quais cabeçalhos de segurança HTTP uma página está enviando."
-    description = "Verifica a presença e o valor dos principais cabeçalhos de segurança HTTP."
+    category_slug = "ssl-security"
+    short_description = "Evaluate which HTTP security headers a page is sending."
+    description = "Checks the presence and value of the main HTTP security headers."
     icon = "shield-alert"
     input_type = InputType.URL
-    input_placeholder = "https://exemplo.com.br/"
+    input_placeholder = "https://example.com/"
     public_url_prefix = "http/security-headers"
     ttl_seconds = 3600
     rate_limit_per_minute = 5
@@ -37,7 +37,7 @@ class SecurityHeadersTool(BaseTool):
         return normalize_url(cleaned_input)
 
     def execute(self, normalized_input: str) -> ToolResult:
-        response = SafeHTTPClient().get(normalized_input)
+        response = SafeHTTPClient().request("HEAD", normalized_input, max_response_bytes=1024 * 1024)
         headers_lower = {k.lower(): v for k, v in response.headers.items()}
 
         results = []
@@ -67,8 +67,8 @@ class SecurityHeadersTool(BaseTool):
             "missing_critical": missing_critical,
         }
 
-        summary = f"{normalized_input}: {score}/{max_score} cabeçalhos de segurança recomendados presentes."
+        summary = f"{normalized_input}: {score}/{max_score} recommended security headers present."
         if missing_critical:
-            summary += f" Faltando: {', '.join(missing_critical)}."
+            summary += f" Missing: {', '.join(missing_critical)}."
 
         return ToolResult(success=True, summary=summary, data=data)

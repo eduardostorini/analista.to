@@ -34,7 +34,7 @@ def login():
     if request.method == "POST":
         user = verify_admin_credentials(request.form.get("email", ""), request.form.get("password", ""))
         if user is None:
-            flash("E-mail ou senha inválidos.", "error")
+            flash("Invalid email or password.", "error")
         else:
             login_user(user)
             return redirect(url_for("admin.dashboard"))
@@ -90,22 +90,22 @@ def dashboard():
 _CHART_PERIOD_CHOICES = (7, 30, 90)
 
 _ABUSE_EVENT_LABELS = {
-    AbuseEventType.RATE_LIMIT_EXCEEDED: "Limite de requisições excedido",
-    AbuseEventType.CAPTCHA_FAILED: "CAPTCHA falhou",
-    AbuseEventType.SSRF_BLOCKED: "Bloqueio SSRF",
-    AbuseEventType.INVALID_INPUT: "Entrada inválida",
-    AbuseEventType.SUSPICIOUS_PATTERN: "Padrão suspeito",
-    AbuseEventType.BLOCKED_ORIGIN: "Origem bloqueada",
+    AbuseEventType.RATE_LIMIT_EXCEEDED: "Rate limit exceeded",
+    AbuseEventType.CAPTCHA_FAILED: "CAPTCHA failed",
+    AbuseEventType.SSRF_BLOCKED: "SSRF blocked",
+    AbuseEventType.INVALID_INPUT: "Invalid input",
+    AbuseEventType.SUSPICIOUS_PATTERN: "Suspicious pattern",
+    AbuseEventType.BLOCKED_ORIGIN: "Blocked origin",
 }
 
 def _status_group_label(status: SearchStatus) -> str:
     if status == SearchStatus.COMPLETED:
-        return "Concluídas"
+        return "Completed"
     if status == SearchStatus.FAILED:
-        return "Falharam"
+        return "Failed"
     if status in (SearchStatus.EXPIRED, SearchStatus.CANCELLED):
-        return "Expiradas/canceladas"
-    return "Em andamento"
+        return "Expired/cancelled"
+    return "In progress"
 
 
 def _format_duration(seconds: float | None) -> str:
@@ -183,14 +183,14 @@ def charts():
         label = _status_group_label(status)
         status_counts[label] = status_counts.get(label, 0) + n
     tone_by_label = {
-        "Concluídas": "good",
-        "Falharam": "critical",
-        "Em andamento": "warning",
-        "Expiradas/canceladas": "muted",
+        "Completed": "good",
+        "Failed": "critical",
+        "In progress": "warning",
+        "Expired/cancelled": "muted",
     }
     status_breakdown = [
         {"label": label, "count": status_counts[label], "tone": tone_by_label[label]}
-        for label in ("Concluídas", "Falharam", "Em andamento", "Expiradas/canceladas")
+        for label in ("Completed", "Failed", "In progress", "Expired/cancelled")
         if status_counts.get(label)
     ]
 
@@ -220,7 +220,7 @@ def charts():
 
     # --- KPIs do período ---
     total_period = sum(row["count"] for row in timeline)
-    completed_period = status_counts.get("Concluídas", 0)
+    completed_period = status_counts.get("Completed", 0)
     success_rate_period = round((completed_period / total_period) * 100, 1) if total_period else 0.0
 
     avg_duration_seconds = (
@@ -270,27 +270,27 @@ def charts():
 # --- Categorias ------------------------------------------------------------------
 
 
-@admin_bp.get("/categorias/")
+@admin_bp.get("/categories/")
 @login_required
 def categories():
     rows = db.session.query(ToolCategory).order_by(ToolCategory.sort_order).all()
     return render_template("admin/categories.html", categories=rows)
 
 
-@admin_bp.post("/categorias/<int:category_id>/toggle")
+@admin_bp.post("/categories/<int:category_id>/toggle")
 @login_required
 def toggle_category(category_id: int):
     category = db.session.get(ToolCategory, category_id) or abort(404)
     category.is_active = not category.is_active
     db.session.commit()
-    flash(f"Categoria {category.name} atualizada.", "success")
+    flash(f"Category {category.name} updated.", "success")
     return redirect(url_for("admin.categories"))
 
 
-# --- Ferramentas --------------------------------------------------------------------
+# --- Tools --------------------------------------------------------------------
 
 
-@admin_bp.get("/ferramentas/")
+@admin_bp.get("/tools/")
 @login_required
 def tools():
     rows = db.session.query(Tool).order_by(Tool.sort_order).all()
@@ -298,7 +298,7 @@ def tools():
     return render_template("admin/tools.html", tools=rows, categories=categories_list)
 
 
-@admin_bp.post("/ferramentas/<int:tool_id>/update")
+@admin_bp.post("/tools/<int:tool_id>/update")
 @login_required
 def update_tool(tool_id: int):
     tool_row = db.session.get(Tool, tool_id) or abort(404)
@@ -316,11 +316,11 @@ def update_tool(tool_id: int):
         if db.session.get(ToolCategory, category_id):
             tool_row.category_id = category_id
     except ValueError:
-        flash("Valores numéricos inválidos.", "error")
+        flash("Invalid numeric values.", "error")
         return redirect(url_for("admin.tools"))
 
     db.session.commit()
-    flash(f"Ferramenta {tool_row.name} atualizada.", "success")
+    flash(f"Tool {tool_row.name} updated.", "success")
     return redirect(url_for("admin.tools"))
 
 
@@ -356,7 +356,7 @@ def reprocess_job(public_id: str):
     search.completed_at = None
     db.session.commit()
     current_app.extensions["celery"].send_task(RUN_SEARCH_TASK, args=[search.id])
-    flash("Consulta reenfileirada para reprocessamento.", "success")
+    flash("Search requeued for reprocessing.", "success")
     return redirect(url_for("admin.job_detail", public_id=public_id))
 
 
@@ -370,7 +370,7 @@ def delete_job(public_id: str):
         Path(search.generated_page.file_path).unlink(missing_ok=True)
     db.session.delete(search)
     db.session.commit()
-    flash("Consulta e resultados excluídos.", "success")
+    flash("Search and results deleted.", "success")
     return redirect(url_for("admin.jobs"))
 
 
@@ -389,7 +389,7 @@ def pages():
 def regenerate_page(page_id: int):
     page = db.session.get(GeneratedPage, page_id) or abort(404)
     current_app.extensions["celery"].send_task(GENERATE_PAGE_TASK, args=[page.search_id])
-    flash("Regeneração da página enfileirada.", "success")
+    flash("Page regeneration queued.", "success")
     return redirect(url_for("admin.pages"))
 
 
@@ -402,7 +402,7 @@ def remove_page_from_index(page_id: int):
     page.index_status = IndexStatus.REMOVED
     Path(page.file_path).unlink(missing_ok=True)
     db.session.commit()
-    flash("Página retirada do índice.", "success")
+    flash("Page removed from index.", "success")
     return redirect(url_for("admin.pages"))
 
 
@@ -410,7 +410,7 @@ def remove_page_from_index(page_id: int):
 @login_required
 def regenerate_sitemaps():
     current_app.extensions["celery"].send_task(REGENERATE_SITEMAPS_TASK)
-    flash("Regeneração dos sitemaps enfileirada.", "success")
+    flash("Sitemaps regeneration queued.", "success")
     return redirect(url_for("admin.pages"))
 
 
@@ -429,7 +429,7 @@ def abuse_events():
 @login_required
 def block_ip_hash(ip_hash: str):
     block(ip_hash)
-    flash("Origem bloqueada.", "success")
+    flash("Source blocked.", "success")
     return redirect(url_for("admin.abuse_events"))
 
 
@@ -437,5 +437,5 @@ def block_ip_hash(ip_hash: str):
 @login_required
 def unblock_ip_hash(ip_hash: str):
     unblock(ip_hash)
-    flash("Bloqueio removido.", "success")
+    flash("Block removed.", "success")
     return redirect(url_for("admin.abuse_events"))

@@ -2,12 +2,12 @@
 {% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
 
 {% block title %}DMARC Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
-{% block meta_description %}Verifique a política DMARC de um domínio e para onde os relatórios de autenticação de e-mail são enviados.{% endblock %}
+{% block meta_description %}Check a domain's DMARC policy and where email authentication reports are sent.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
 {% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
 
 {% block content %}
-{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
 {{ breadcrumbs(crumbs) }}
 
 <header class="mb-8 max-w-2xl">
@@ -20,11 +20,11 @@
 {% if mode == "form" %}
 <form method="post" class="card mb-8 max-w-xl space-y-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domínio</label>
+  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
   <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
-  <p class="text-xs text-slate-400">Consultamos automaticamente _dmarc.{{ '{domínio}' }}.</p>
-  {{ captcha_widget(captcha_provider, cap_public_url, cap_site_key) }}
-  <button type="submit" class="btn-primary w-full sm:w-auto">Verificar DMARC</button>
+  <p class="text-xs text-slate-400">We automatically check _dmarc.{{ '{domain}' }}.</p>
+  {{ captcha_widget(captcha_provider) }}
+  <button type="submit" class="btn-primary w-full sm:w-auto">Check DMARC</button>
 </form>
 {% endif %}
 
@@ -32,8 +32,8 @@
 
 {% if mode == "failed" %}
 <div class="card mb-8 max-w-xl border-rose-200 bg-rose-50">
-  <p class="badge-danger mb-2">Falhou</p>
-  <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+  <p class="badge-danger mb-2">Failed</p>
+  <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
 </div>
 {% endif %}
 
@@ -46,33 +46,33 @@
     </div>
 
     {% if not data.has_dmarc %}
-      <p class="badge-danger">Nenhum registro DMARC encontrado</p>
+      <p class="badge-danger">No DMARC record found</p>
     {% else %}
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="card">
-          <p class="text-xs text-slate-400">Política (p=)</p>
-          <p class="badge-{{ 'success' if data.policy == 'reject' else ('warning' if data.policy == 'quarantine' else 'danger') }} mt-1">{{ data.policy or "ausente" }}</p>
+          <p class="text-xs text-slate-400">Policy (p=)</p>
+          <p class="badge-{{ 'success' if data.policy == 'reject' else ('warning' if data.policy == 'quarantine' else 'danger') }} mt-1">{{ data.policy or "absent" }}</p>
           <p class="mt-1 text-xs text-slate-500">{{ data.policy_label or "" }}</p>
         </div>
         <div class="card">
-          <p class="text-xs text-slate-400">Aplicada a</p>
-          <p class="mt-1 text-sm text-slate-700">{{ data.percentage }}% das mensagens</p>
+          <p class="text-xs text-slate-400">Applied to</p>
+          <p class="mt-1 text-sm text-slate-700">{{ data.percentage }}% of messages</p>
         </div>
         <div class="card">
-          <p class="text-xs text-slate-400">Relatórios agregados (rua)</p>
-          <p class="mt-1 break-all text-sm text-slate-700">{{ data.aggregate_reports_to or "não configurado" }}</p>
+          <p class="text-xs text-slate-400">Aggregate reports (rua)</p>
+          <p class="mt-1 break-all text-sm text-slate-700">{{ data.aggregate_reports_to or "not configured" }}</p>
         </div>
         <div class="card">
-          <p class="text-xs text-slate-400">Relatórios forenses (ruf)</p>
-          <p class="mt-1 break-all text-sm text-slate-700">{{ data.forensic_reports_to or "não configurado" }}</p>
+          <p class="text-xs text-slate-400">Forensic reports (ruf)</p>
+          <p class="mt-1 break-all text-sm text-slate-700">{{ data.forensic_reports_to or "not configured" }}</p>
         </div>
         <div class="card">
-          <p class="text-xs text-slate-400">Alinhamento DKIM / SPF</p>
+          <p class="text-xs text-slate-400">DKIM / SPF alignment</p>
           <p class="mt-1 text-sm text-slate-700">{{ data.dkim_alignment }} / {{ data.spf_alignment }}</p>
         </div>
         <div class="card">
-          <p class="text-xs text-slate-400">Política de subdomínios (sp)</p>
-          <p class="mt-1 text-sm text-slate-700">{{ data.subdomain_policy or "herda a política principal" }}</p>
+          <p class="text-xs text-slate-400">Subdomain policy (sp)</p>
+          <p class="mt-1 text-sm text-slate-700">{{ data.subdomain_policy or "inherits the main policy" }}</p>
         </div>
       </div>
       <p class="break-all rounded-lg bg-slate-50 p-3 font-mono text-xs text-slate-600">{{ data.record }}</p>
@@ -80,7 +80,7 @@
 
     {% if data.issues %}
     <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
-      <p class="mb-2 text-sm font-semibold text-amber-800">Pontos de atenção</p>
+      <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
       <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
     </div>
     {% endif %}
@@ -89,84 +89,83 @@
 
 {% if mode == "form" %}
 <section class="prose-tool max-w-3xl space-y-4">
-  <h2>O que é o DMARC?</h2>
-  <p>
-    DMARC (Domain-based Message Authentication, Reporting and Conformance) é o padrão que amarra
-    SPF e DKIM em uma política única e coerente, publicada como um registro TXT em
-    <code>_dmarc.seudominio.com</code>. Ele resolve um problema que SPF e DKIM sozinhos não
-    resolvem completamente: o que fazer quando um e-mail falha na autenticação, e quem deve ser
-    avisado quando isso acontece. Sem DMARC, cada provedor de e-mail decide por conta própria como
-    tratar mensagens que falham em SPF/DKIM; com DMARC, o dono do domínio define explicitamente a
-    política (ignorar, colocar em quarentena/spam, ou rejeitar) e passa a receber relatórios
-    regulares sobre quem está enviando e-mail em nome do seu domínio — incluindo tentativas de
-    falsificação (spoofing).
-  </p>
-  <h2>Como interpretar o resultado</h2>
-  <p>
-    A política (<code>p=</code>) é o campo mais importante: <strong>none</strong> apenas monitora,
-    sem bloquear nada — é o ponto de partida recomendado antes de avançar para políticas mais
-    rígidas; <strong>quarantine</strong> direciona mensagens que falham para a pasta de spam; e
-    <strong>reject</strong> instrui os servidores receptores a rejeitarem totalmente mensagens não
-    autenticadas — a proteção mais forte, mas que só deve ser ativada depois de confirmar, via
-    relatórios agregados, que todos os remetentes legítimos estão devidamente autenticados. O
-    campo <code>pct</code> permite aplicar a política a apenas uma porcentagem das mensagens,
-    útil para uma transição gradual e seguro para reject. A ausência de um endereço em
-    <code>rua=</code> significa que o domínio não está recebendo nenhum relatório agregado — na
-    prática, abrindo mão da principal fonte de visibilidade que o DMARC oferece.
-  </p>
-  <h2>Casos de uso comuns</h2>
-  <p>
-    Esta ferramenta é usada para confirmar que um domínio está protegido contra spoofing antes de
-    uma campanha de phishing simulado ou uma auditoria de segurança, para acompanhar a evolução de
-    um domínio que está migrando gradualmente de <code>p=none</code> para
-    <code>p=reject</code>, e para diagnosticar por que e-mails legítimos de um domínio parceiro
-    estão sendo rejeitados por terceiros (frequentemente porque o SPF/DKIM não estão alinhados com
-    a política DMARC configurada). Provedores de e-mail marketing e times de segurança também
-    revisam DMARC regularmente como parte da postura de proteção de marca contra e-mails
-    falsificados.
-  </p>
-  <h2>Limitações</h2>
-  <p>
-    Esta ferramenta verifica apenas a sintaxe e presença do registro DMARC — não avalia se o SPF e
-    o DKIM do domínio estão de fato alinhados corretamente com a política (o que só pode ser
-    confirmado analisando cabeçalhos de e-mails reais entregues, ou os relatórios agregados
-    recebidos ao longo do tempo). Um DMARC bem configurado depende de SPF e DKIM corretamente
-    implementados — revise essas duas configurações em conjunto para uma proteção efetiva.
-  </p>
-  <h2>Boas práticas de implantação</h2>
-  <p>
-    A adoção segura do DMARC costuma seguir um caminho gradual: primeiro publique um registro com
-    p=none e um endereço válido em rua=, deixando o domínio coletando relatórios agregados por
-    pelo menos duas a quatro semanas. Analise esses relatórios (manualmente ou com uma ferramenta
-    especializada) para identificar todas as fontes legítimas de envio, incluindo serviços
-    terceirizados como plataformas de marketing, CRMs e sistemas de suporte, que frequentemente
-    são esquecidos nessa etapa. Só depois de confirmar que SPF e DKIM estão alinhados para todas
-    essas fontes é que faz sentido avançar para p=quarantine e, em seguida, para p=reject,
-    idealmente usando o campo pct para uma transição gradual em vez de uma mudança abrupta que
-    poderia bloquear e-mails legítimos ainda não identificados.
-  </p>
-</section>
+  <h2>What is DMARC?</h2>
+<p>
+     DMARC (Domain-based Message Authentication, Reporting and Conformance) is the
+     standard that ties SPF and DKIM into a single coherent policy, published as a
+     TXT record at <code>_dmarc.yourdomain.com</code>. It solves a problem that SPF
+     and DKIM alone do not fully address: what to do when an email fails authentication,
+     and who should be notified when that happens. Without DMARC, each email provider
+     decides on its own how to handle messages that fail SPF/DKIM; with DMARC, the
+     domain owner explicitly defines the policy (ignore, quarantine/spam, or reject) and
+     starts receiving regular reports about who is sending email on behalf of your domain —
+     including spoofing attempts.
+   </p>
+ <h2>How to interpret the result</h2>
+    <p>
+      The policy (<code>p=</code>) is the most important field: <strong>none</strong>
+      only monitors, blocking nothing — this is the recommended starting point before
+      advancing to stricter policies; <strong>quarantine</strong> directs failing messages to
+      the spam folder; and <strong>reject</strong> instructs receiving servers to completely
+      reject unauthenticated messages — the strongest protection, but it should only be activated
+      after confirming, via aggregate reports, that all legitimate senders are properly
+      authenticated. The <code>pct</code> field allows applying the policy to only a
+      percentage of messages, useful for a gradual and safe transition to reject. The absence
+      of an address in <code>rua=</code> means the domain is not receiving any aggregate reports —
+      in practice, giving up the main visibility source that DMARC provides.
+    </p>
+  <h2>Common use cases</h2>
+<p>
+     This tool is used to confirm that a domain is protected against spoofing before a
+     simulated phishing campaign or a security audit, to track the progress of a domain
+     gradually migrating from <code>p=none</code> to <code>p=reject</code>, and to diagnose
+     why legitimate emails from a partner domain are being rejected by third parties (frequently
+     because SPF/DKIM are not aligned with the configured DMARC policy). Email marketing
+     providers and security teams also review DMARC regularly as part of brand protection
+     against email spoofing.
+   </p>
+ <h2>Limitations</h2>
+    <p>
+      This tool checks only the syntax and presence of the DMARC record — it does not evaluate whether the
+      domain's SPF and DKIM are actually aligned with the policy (which can only be confirmed by analyzing
+      headers of real delivered emails, or the aggregate reports received over time). A well-configured DMARC
+      depends on SPF and DKIM being correctly implemented — review both configurations together for effective
+      protection.
+    </p>
+  <h2>Deployment best practices</h2>
+<p>
+     Safe DMARC adoption typically follows a gradual path: first publish a record with
+     p=none and a valid rua= address, letting the domain collect aggregate reports for
+     at least two to four weeks. Analyze those reports (manually or with a specialized
+     tool) to identify all legitimate sending sources, including third-party services like
+     marketing platforms, CRMs, and support systems, which are frequently forgotten at this
+     stage. Only after confirming that SPF and DKIM are aligned for all those sources does it
+     make sense to advance to p=quarantine and then to p=reject, ideally using the pct field
+     for a gradual transition instead of a sudden change that could block legitimate emails
+     not yet identified.
+   </p>
+ </section>
 {% endif %}
 
 {% set faqs = [
-  ("Qual política DMARC devo usar primeiro?", "Comece com p=none para apenas monitorar e coletar relatórios, avance para quarantine e só depois para reject, conforme a confiança nos dados coletados aumenta."),
-  ("Por que preciso configurar rua= se já tenho SPF e DKIM?", "Sem rua=, você não recebe nenhum relatório sobre quem está enviando e-mail em nome do seu domínio, perdendo visibilidade sobre tentativas de falsificação e problemas de configuração."),
-  ("DMARC substitui SPF e DKIM?", "Não. DMARC depende de SPF e/ou DKIM já estarem configurados — ele define a política de ação e o relatório, não a autenticação em si."),
-] %}
-{% if mode == "form" %}
-<section class="mt-10 max-w-3xl">
-  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
-  {{ faq_accordion(faqs) }}
-</section>
-{% endif %}
+    ("Which DMARC policy should I use first?", "Start with p=none to just monitor and collect reports, then advance to quarantine, and only then to reject, as confidence in the collected data increases."),
+    ("Why do I need to configure rua= if I already have SPF and DKIM?", "Without rua=, you receive no reports about who is sending email on behalf of your domain, losing visibility into spoofing attempts and configuration issues."),
+    ("Does DMARC replace SPF and DKIM?", "No. DMARC depends on SPF and/or DKIM already being configured — it defines the action policy and reporting, not the authentication itself."),
+  ] %}
+  {% if mode == "form" %}
+ <section class="mt-10 max-w-3xl">
+   <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+   {{ faq_accordion(faqs) }}
+ </section>
+ {% endif %}
 
 <section class="mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
     {{ related_tools_list(related_tools) }}
   </div>
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
     {{ recent_searches_list(tool, recent_searches) }}
   </div>
 </section>

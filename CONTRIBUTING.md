@@ -1,15 +1,15 @@
-# Como contribuir
+# How to Contribute
 
-Obrigado por considerar contribuir com o Analista.to! Este documento resume o
-fluxo esperado.
+Thank you for considering contributing to Analista.to! This document summarizes the
+expected workflow.
 
-## Antes de começar
+## Before you start
 
-- Para mudanças grandes (nova ferramenta, mudança de arquitetura), abra uma
-  issue descrevendo a proposta antes de investir tempo na implementação.
-- Para bugs pequenos e melhorias pontuais, pode abrir o PR diretamente.
+- For large changes (new tool, architecture change), open an issue
+  describing the proposal before investing time in implementation.
+- For small bugs and focused improvements, you can open the PR directly.
 
-## Ambiente de desenvolvimento
+## Development environment
 
 ```bash
 cp .env.example .env
@@ -18,44 +18,44 @@ docker compose exec analisa_web flask db upgrade
 docker compose exec analisa_web flask sync-tools
 ```
 
-## Padrões de código
+## Code standards
 
-- **Python:** siga o estilo já usado no projeto (type hints, docstrings só
-  quando o "porquê" não é óbvio, sem abstrações prematuras). Rode `ruff` e
-  `mypy` antes de abrir o PR.
-- **Templates:** cada ferramenta tem um template próprio em
-  `app/templates/tools/<slug>.html` — não crie um template genérico
-  compartilhado entre ferramentas.
-- **Commits:** mensagens no imperativo, descrevendo o "porquê" quando não é
-  óbvio pelo diff.
+- **Python:** follow the style already used in the project (type hints, docstrings only
+  when the "why" is not obvious, no premature abstractions). Run `ruff` and
+  `mypy` before opening the PR.
+- **Templates:** each tool has its own template in
+  `app/templates/tools/<slug>.html` — do not create a shared generic
+  template across tools.
+- **Commits:** messages in the imperative, describing the "why" when it is not
+  obvious from the diff.
 
-## Adicionando uma ferramenta
+## Adding a tool
 
-Siga [`docs/adding-a-tool.md`](docs/adding-a-tool.md). Requisitos que o CI
-valida automaticamente:
+Follow [`docs/adding-a-tool.md`](docs/adding-a-tool.md). Requirements that CI
+validates automatically:
 
-- Template dedicado com ≥500 palavras de conteúdo autoral
+- Dedicated template with ≥500 words of original content
   (`tests/test_tool_pages.py`).
-- Testes unitários da lógica de `validate_input`/`normalize_input`/`execute`
-  com mocks de rede (nunca chamadas reais em teste).
-- Nenhuma requisição de rede fora de `SafeHTTPClient`/`resolve_host_ips`.
+- Unit tests for `validate_input`/`normalize_input`/`execute`
+  logic with network mocks (never real calls in tests).
+- No network requests outside of `SafeHTTPClient`/`resolve_host_ips`.
 
-## Testes
+## Tests
 
 ```bash
 pip install -r requirements-dev.txt
 pytest
 ```
 
-Todo PR deve manter a suíte de testes passando. Novas funcionalidades devem
-vir acompanhadas de testes.
+Every PR must keep the test suite passing. New features must
+be accompanied by tests.
 
 ## Pull requests
 
-- Descreva o que mudou e por quê.
-- Referencie a issue relacionada, se houver.
-- Mantenha o PR focado em uma única mudança lógica.
+- Describe what changed and why.
+- Reference the related issue, if any.
+- Keep the PR focused on a single logical change.
 
-## Código de conduta
+## Code of conduct
 
-Este projeto segue o [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+This project follows the [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).

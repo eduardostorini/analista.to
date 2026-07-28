@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from app.security.captcha import CaptchaError, MathCaptchaProvider, NoopCaptchaProvider
+from app.security.captcha import CaptchaError, MathCaptchaProvider, NoopCaptchaProvider, AltchaCaptchaProvider
 
 
 def test_noop_provider_always_passes():
@@ -68,3 +68,19 @@ def test_math_captcha_missing_fields():
     with pytest.raises(CaptchaError) as exc_info:
         provider.verify({})
     assert exc_info.value.reason == "missing_token"
+
+
+def test_altcha_provider_rejects_missing_payload(app):
+    app.config["ALTCHA_HMAC_SECRET"] = "test-secret"
+    provider = AltchaCaptchaProvider()
+    with pytest.raises(CaptchaError) as exc_info:
+        provider.verify({})
+    assert exc_info.value.reason == "missing_token"
+
+
+def test_altcha_provider_rejects_missing_secret(app):
+    app.config["ALTCHA_HMAC_SECRET"] = ""
+    provider = AltchaCaptchaProvider()
+    with pytest.raises(CaptchaError) as exc_info:
+        provider.verify({"altcha": "some-payload"})
+    assert exc_info.value.reason == "provider_error"

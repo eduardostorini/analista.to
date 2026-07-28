@@ -46,7 +46,7 @@ def _fetch_certificate(host: str) -> dict:
         unverified.verify_mode = ssl.CERT_NONE
         ssock = _connect(host, ip, unverified)
     except (socket.timeout, ConnectionRefusedError, OSError) as exc:
-        raise ToolExecutionError(f"Não foi possível conectar em {host}:{_PORT}: {exc}", "connection_failed") from exc
+        raise ToolExecutionError(f"Could not connect to {host}:{_PORT}: {exc}", "connection_failed") from exc
 
     try:
         cert = ssock.getpeercert()
@@ -56,7 +56,7 @@ def _fetch_certificate(host: str) -> dict:
         ssock.close()
 
     if not cert:
-        raise ToolExecutionError("Não foi possível obter o certificado do servidor.", "no_certificate")
+        raise ToolExecutionError("Could not obtain the server certificate.", "no_certificate")
 
     subject = _dn_to_dict(cert.get("subject", ()))
     issuer = _dn_to_dict(cert.get("issuer", ()))
@@ -88,12 +88,12 @@ def _fetch_certificate(host: str) -> dict:
 class SslCertificateTool(BaseTool):
     slug = "ssl-certificate"
     name = "SSL Certificate Checker"
-    category_slug = "ssl-seguranca"
-    short_description = "Verifique a validade, emissor e data de expiração do certificado SSL/TLS de um domínio."
-    description = "Conecta na porta 443 do domínio e inspeciona o certificado TLS apresentado."
+    category_slug = "ssl-security"
+    short_description = "Check the validity, issuer, and expiration date of the SSL/TLS certificate of a domain."
+    description = "Connects to port 443 of the domain and inspects the TLS certificate presented."
     icon = "shield-check"
     input_type = InputType.DOMAIN
-    input_placeholder = "exemplo.com.br"
+    input_placeholder = "example.com"
     public_url_prefix = "ssl"
     ttl_seconds = 6 * 3600
     rate_limit_per_minute = 5
@@ -110,16 +110,16 @@ class SslCertificateTool(BaseTool):
 
         status_bits = []
         if not data["is_trusted"]:
-            status_bits.append("certificado não confiável")
+            status_bits.append("untrusted certificate")
         if data["is_expired"]:
-            status_bits.append("expirado")
+            status_bits.append("expired")
         elif data["expires_soon"]:
-            status_bits.append(f"expira em {data['days_remaining']} dia(s)")
+            status_bits.append(f"expires in {data['days_remaining']} day(s)")
 
         if status_bits:
-            summary = f"Certificado de {normalized_input}: {', '.join(status_bits)}."
+            summary = f"Certificate of {normalized_input}: {', '.join(status_bits)}."
         else:
-            summary = f"Certificado de {normalized_input} válido por mais {data['days_remaining']} dia(s)."
+            summary = f"Certificate of {normalized_input} valid for {data['days_remaining']} more day(s)."
 
         return ToolResult(success=True, summary=summary, data=data)
 

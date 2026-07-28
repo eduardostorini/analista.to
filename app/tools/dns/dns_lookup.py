@@ -12,13 +12,13 @@ class DnsLookupTool(BaseTool):
     slug = "dns-lookup"
     name = "DNS Lookup"
     category_slug = "dns"
-    short_description = "Consulte de uma vez os principais registros DNS de um domínio."
+    short_description = "Query the main DNS records for a domain in one go."
     description = (
-        "Consulta os registros A, AAAA, MX, TXT, NS, CNAME e SOA de um domínio em uma única análise."
+        "Query A, AAAA, MX, TXT, NS, CNAME and SOA records for a domain in a single analysis."
     )
     icon = "server-cog"
     input_type = InputType.DOMAIN
-    input_placeholder = "exemplo.com.br"
+    input_placeholder = "example.com"
     public_url_prefix = "dns"
     ttl_seconds = 3 * 3600
     rate_limit_per_minute = 15
@@ -34,13 +34,13 @@ class DnsLookupTool(BaseTool):
         if not domain_exists(normalized_input):
             return ToolResult(
                 success=True,
-                summary=f"{normalized_input} não está registrado ou não possui delegação DNS.",
+                summary=f"{normalized_input} is not registered or has no DNS delegation.",
                 data={"domain": normalized_input, "exists": False, "records": {}},
             )
 
         records = {record_type: query_records(normalized_input, record_type) for record_type in _RECORD_TYPES}
         total = sum(len(values) for values in records.values())
-        summary = f"{total} registros DNS encontrados para {normalized_input}."
+        summary = f"{total} DNS records found for {normalized_input}."
 
         return ToolResult(
             success=True,

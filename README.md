@@ -1,40 +1,40 @@
 # Analista.to
 
-Plataforma web de ferramentas técnicas para análise de **DNS, domínio/IP,
-SEO, HTTP/servidor, SSL/segurança e e-mail** — consultas rápidas, explicadas,
-processadas de forma assíncrona e, quando elegíveis, publicadas como páginas
-estáticas otimizadas para buscadores.
+Web platform of technical tools for analysis of **DNS, domain/IP,
+SEO, HTTP/server, SSL/security, and email** — quick queries, explained,
+processed asynchronously, and when eligible, published as search-engine-optimized
+static pages.
 
-> Este é o MVP (Fase 1): 15 ferramentas funcionais sobre uma arquitetura
-> pensada para escalar a mais de 100 ferramentas sem alterar layout, rotas
-> genéricas ou banco de dados a cada nova ferramenta adicionada.
+> This is the MVP (Phase 1): 15 functional tools on an architecture
+> designed to scale to over 100 tools without changing layout, generic
+> routes, or database for each new tool added.
 
-## Sumário
+## Table of Contents
 
-- [Descrição](#descrição)
+- [Description](#description)
 - [Stack](#stack)
-- [Arquitetura](#arquitetura)
-- [Instalação com Docker](#instalação-com-docker)
-- [Comandos principais](#comandos-principais)
-- [Estrutura do projeto](#estrutura-do-projeto)
-- [Como adicionar uma ferramenta](#como-adicionar-uma-ferramenta)
-- [Variáveis de ambiente](#variáveis-de-ambiente)
-- [Segurança](#segurança)
-- [Testes](#testes)
-- [Licença](#licença)
+- [Architecture](#architecture)
+- [Installation with Docker](#installation-with-docker)
+- [Main Commands](#main-commands)
+- [Project Structure](#project-structure)
+- [How to Add a Tool](#how-to-add-a-tool)
+- [Environment Variables](#environment-variables)
+- [Security](#security)
+- [Tests](#tests)
+- [License](#license)
 
-## Descrição
+## Description
 
-O usuário escolhe uma ferramenta, informa um domínio/URL/IP, resolve um
-desafio anti-robô e recebe um relatório técnico em segundos — a consulta roda
-em segundo plano (Celery) com uma barra de status atualizada em tempo real
-via Server-Sent Events (com fallback automático para polling). Resultados
-públicos elegíveis geram uma página estática compartilhável e indexável
-(`/dns/exemplo.com/`, `/ssl/exemplo.com/` etc.), com regras explícitas de
-`index`/`noindex` para nunca gerar páginas doorway ou de baixo valor.
+The user chooses a tool, provides a domain/URL/IP, solves an
+anti-bot challenge, and receives a technical report in seconds — the query runs
+in the background (Celery) with a real-time status bar
+via Server-Sent Events (with automatic fallback to polling). Eligible
+public results generate a shareable and indexable static page
+(`/dns/example.com/`, `/ssl/example.com/`, etc.), with explicit `index`/`noindex`
+rules to never generate doorway or low-value pages.
 
-*(Capturas de tela: veja `docs/screenshots/` — adicione as suas após o
-primeiro `docker compose up`; nenhuma foi versionada neste MVP.)*
+*(Screenshots: see `docs/screenshots/` — add yours after the
+first `docker compose up`; none were versioned in this MVP.)*
 
 ## Stack
 
@@ -42,181 +42,182 @@ primeiro `docker compose up`; nenhuma foi versionada neste MVP.)*
 PostgreSQL 16, Gunicorn (`gthread`), dnspython, httpx, marshmallow,
 argon2-cffi, Flask-Login, Flask-WTF.
 
-**Frontend:** Tailwind CSS, Alpine.js, JavaScript modular (build via esbuild),
-sem React/Vue/jQuery/Bootstrap. Compilado no build da imagem Docker — Node.js
-não é necessário para rodar em produção.
+**Frontend:** Tailwind CSS, Alpine.js, modular JavaScript (build via esbuild),
+no React/Vue/jQuery/Bootstrap. Compiled during the Docker image build — Node.js
+is not required to run in production.
 
-## Arquitetura
+## Architecture
 
-- **Registro central de ferramentas** (`app/tools/registry.py`): cada
-  ferramenta é uma classe Python (`BaseTool`) auto-contida — validação,
-  normalização, execução, resumo e metadados de SEO. A tabela `tools` no
-  banco espelha o registro (via `flask sync-tools`) e guarda só os toggles
-  administráveis (ativa/destaque/rate limit/TTL/indexável).
-- **Fluxo de consulta:** formulário → CAPTCHA + rate limit → `SearchService`
-  deduplica contra o TTL da ferramenta → Celery executa a ferramenta com
-  proteção SSRF completa → status em tempo real via SSE/Redis pubsub →
-  página estática gerada para resultados públicos elegíveis.
-- **SEO programático:** `PageIndexabilityService` decide `index`/`noindex`
-  por regras explícitas (seção 16 da especificação original); sitemaps
-  segmentados por tipo de conteúdo, regenerados por Celery Beat.
-- **Segurança:** guarda de SSRF com resolução + validação de IP antes de
-  qualquer requisição (e a cada redirecionamento), CAPTCHA com múltiplos
-  providers, rate limiting em várias camadas, hash de IP com salt rotativo
-  (nunca texto puro), bloqueio de origens abusivas por hash.
+- **Central tool registry** (`app/tools/registry.py`): each
+  tool is a self-contained Python class (`BaseTool`) — validation,
+  normalization, execution, summary, and SEO metadata. The `tools` table in the
+  database mirrors the registry (via `flask sync-tools`) and stores only the
+  administratable toggles (active/featured/rate limit/TTL/indexable).
+- **Query flow:** form → CAPTCHA + rate limit → `SearchService`
+  deduplicates against the tool's TTL → Celery executes the tool with
+  full SSRF protection → real-time status via SSE/Redis pubsub →
+  static page generated for eligible public results.
+- **Programmatic SEO:** `PageIndexabilityService` decides `index`/`noindex`
+  based on explicit rules (section 16 of the original specification); sitemaps
+  segmented by content type, regenerated by Celery Beat.
+- **Security:** SSRF guard with resolution + IP validation before any
+  request (and on every redirect), CAPTCHA with multiple
+  providers, rate limiting in multiple layers, IP hash with rotating salt
+  (never plaintext), blocking of abusive origins by hash.
 
-Veja [`docs/architecture.md`](docs/architecture.md) para o detalhamento
-completo (modelo de dados, diagrama do fluxo, decisões de design).
+See [`docs/architecture.md`](docs/architecture.md) for the full
+detailed documentation (data model, flow diagram, design decisions).
 
-## Instalação com Docker
+## Installation with Docker
 
-Pré-requisitos: Docker e Docker Compose.
+Prerequisites: Docker and Docker Compose.
 
 ```bash
 cp .env.example .env
-# edite pelo menos: SECRET_KEY, POSTGRES_PASSWORD, REDIS_PASSWORD, IP_HASH_SALTS
+# edit at least: SECRET_KEY, POSTGRES_PASSWORD, REDIS_PASSWORD, IP_HASH_SALTS
 
 docker compose up --build
 ```
 
-`docker-compose.override.yml` é carregado automaticamente neste comando —
-ele adiciona as portas de desenvolvimento (Postgres/Redis) e o serviço
-`analisa_assets` (build de CSS/JS em modo watch). Produção usa só o arquivo
-base, sem overrides (veja abaixo).
+`docker-compose.override.yml` is loaded automatically with this command —
+it adds the development ports (Postgres/Redis) and the `analisa_assets`
+service (CSS/JS build in watch mode). Production uses only the base
+file, without overrides (see below).
 
-A aplicação sobe em `http://localhost:18473` (porta configurável via
-`APP_HTTP_PORT`). Na primeira vez, rode as migrações e sincronize as
-ferramentas:
+The application runs at `http://localhost:18473` (port configurable via
+`APP_HTTP_PORT`). On first run, execute the migrations and sync the
+tools:
 
 ```bash
 docker compose exec analisa_web flask db upgrade
 docker compose exec analisa_web flask sync-tools
 ```
 
-Para gerar o hash da senha do admin:
+To generate the admin password hash:
 
 ```bash
 docker compose exec analisa_web python scripts/hash_admin_password.py
-# copie a linha impressa (ADMIN_PASSWORD_HASH=...) inteira para o seu .env
+# copy the entire printed line (ADMIN_PASSWORD_HASH=...) to your .env
 ```
 
-O comando já imprime o valor com cada `$` duplicado (`$$`) — isso é
-obrigatório, não opcional: o Docker Compose interpreta `$algumacoisa` como
-variável ao ler o `.env` e apaga silenciosamente o que não reconhece, o que
-corrompe um hash Argon2 colado sem escapar (o painel passa a rejeitar toda
-senha, mesmo a correta). Depois de colar, reinicie os serviços para o novo
-valor ser lido:
+The command already prints the value with each `$` doubled (`$$`) — this is
+mandatory, not optional: Docker Compose interprets `$something` as a
+variable when reading the `.env` and silently discards what it doesn't recognize,
+which corrupts an Argon2 hash pasted without escaping (the panel then rejects
+all passwords, even the correct one). After pasting, restart the services so the
+new value is read:
 
 ```bash
 docker compose up -d
 ```
 
-O painel fica em `http://localhost:18473${ADMIN_URL_PREFIX}` (padrão
-`/gestor-x7f2` — troque isso em produção).
+The panel is at `http://localhost:18473${ADMIN_URL_PREFIX}` (default
+`/gestor-x7f2` — change this in production).
 
-### CAPTCHA (Cap, self-hosted)
+### CAPTCHA (Altcha, self-hosted)
 
-O CAPTCHA padrão é o [Cap](https://trycap.dev) (`CAPTCHA_PROVIDER=cap`),
-rodando 100% self-hosted nos serviços `analisa_cap`/`analisa_cap_store`
-deste mesmo compose — sem Google, sem telemetria. É preciso gerar uma
-site key uma única vez, pelo dashboard do Cap:
+The default CAPTCHA is [Altcha](https://altcha.org) (`CAPTCHA_PROVIDER=altcha`),
+running 100% self-hosted — no Google, no telemetry, proof-of-work via KDF
+validated locally on the backend. There is no separate service or dashboard: the
+backend itself exposes the `/api/altcha-challenge` endpoint that generates challenges
+using the `altcha` library.
 
-1. Acesse `http://localhost:${CAP_HTTP_PORT}` (padrão `3010`) e entre com o
-   valor de `CAP_ADMIN_KEY` do seu `.env`.
-2. Clique em **New key**, dê um nome (ex.: `analista-to`) e copie a **site
-   key** e a **secret key** geradas.
-3. Cole em `CAP_SITE_KEY`/`CAP_SECRET_KEY` no `.env` e reinicie:
+Configure the secrets in `.env`:
+
+1. Generate a long, random `ALTCHA_HMAC_SECRET` (minimum 32 characters).
+2. Optionally, set `ALTCHA_HMAC_KEY_SECRET` to enable the
+   *fast verification path* (faster verification on the backend).
+3. Restart:
    ```bash
    docker compose up -d
    ```
 
-Em produção, publique o `analisa_cap` atrás de um domínio/HTTPS próprio e
-ajuste `CAP_PUBLIC_URL` de acordo — o navegador do visitante fala
-diretamente com essa URL para resolver o desafio. Sem uma site key
-configurada, o CAPTCHA rejeita todas as submissões; troque
-`CAPTCHA_PROVIDER=math` temporariamente se quiser testar sem o Cap.
+In production, the widget runs on the same domain as the application — there is no need
+to publish a separate service or configure additional public URLs.
+Without `ALTCHA_HMAC_SECRET` configured, the CAPTCHA rejects all submissions;
+temporarily switch `CAPTCHA_PROVIDER=math` if you want to test without Altcha.
 
-### Produção
+### Production
 
 ```bash
 docker compose -f docker-compose.yml up -d --build
 ```
 
-Passar `-f docker-compose.yml` explicitamente faz o Docker Compose **não**
-carregar `docker-compose.override.yml` automaticamente — sem o serviço
-`analisa_assets` e sem portas de Postgres/Redis publicadas, só a aplicação
-fica exposta. Coloque um proxy com TLS na frente (fora do escopo deste
-compose) se for expor publicamente.
+Passing `-f docker-compose.yml` explicitly makes Docker Compose **not**
+load `docker-compose.override.yml` automatically — without the `analisa_assets`
+service and without Postgres/Redis ports published, only the application
+is exposed. Place a proxy with TLS in front (outside the scope of this
+compose) if you plan to expose it publicly.
 
-## Comandos principais
+## Main Commands
 
-| Comando | Descrição |
+| Command | Description |
 |---|---|
-| `docker compose up --build` | Sobe tudo em desenvolvimento, com hot-reload de assets |
-| `flask db migrate -m "..."` / `flask db upgrade` | Cria/aplica migrações |
-| `flask sync-tools` | Sincroniza `tool_categories`/`tools` a partir do código |
-| `npm run watch` | Build de assets em modo watch (dentro do container `analisa_assets` ou localmente) |
-| `pytest` | Roda a suíte de testes |
-| `celery -A make_celery.celery_app worker` | Worker Celery (já roda como serviço `analisa_worker`) |
-| `celery -A make_celery.celery_app beat` | Agendador (já roda como serviço `analisa_scheduler`) |
+| `docker compose up --build` | Starts everything in development, with asset hot-reload |
+| `flask db migrate -m "..."` / `flask db upgrade` | Creates/applies migrations |
+| `flask sync-tools` | Syncs `tool_categories`/`tools` from code |
+| `npm run watch` | Asset build in watch mode (inside `analisa_assets` container or locally) |
+| `pytest` | Runs the test suite |
+| `celery -A make_celery.celery_app worker` | Celery worker (already runs as `analisa_worker` service) |
+| `celery -A make_celery.celery_app beat` | Scheduler (already runs as `analisa_scheduler` service) |
 
-## Estrutura do projeto
+## Project Structure
 
 ```text
 app/
-├── blueprints/       main (site público), admin (painel), public_pages (resultados/sitemaps), live (status/captcha), health
-├── models/           Modelos SQLAlchemy 2 (Mapped/mapped_column)
+├── blueprints/       main (public site), admin (panel), public_pages (results/sitemaps), live (status/captcha), health
+├── models/           SQLAlchemy 2 models (Mapped/mapped_column)
 ├── security/          SSRF, CAPTCHA, rate limit, hashing, blocklist, headers
 ├── services/          SearchService, JobService, PageIndexabilityService, PageGenerationService, SitemapService
-├── tasks/              Tasks Celery (busca, geração de página, sitemaps, manutenção)
-├── tools/              BaseTool + registry + uma pasta por categoria (dns/, seo/, ssl/, http/, email/, domain/)
-├── templates/          layout/, partials/, pages/, tools/ (um template único por ferramenta), admin/
-└── static/src/         CSS/JS fonte (build gera app/static/dist/)
+├── tasks/              Celery tasks (fetching, page generation, sitemaps, maintenance)
+├── tools/              BaseTool + registry + one folder per category (dns/, seo/, ssl/, http/, email/, domain/)
+├── templates/          layout/, partials/, pages/, tools/ (one template per tool), admin/
+└── static/src/         CSS/JS source (build generates app/static/dist/)
 migrations/            Alembic
-docker/                Scripts de entrypoint (ex.: tuning do Postgres)
+docker/                Entrypoint scripts (e.g., Postgres tuning)
 tests/                 unit/, tools/, security/, test_tool_pages.py
-docs/                  Documentação estendida
+docs/                  Extended documentation
 ```
 
-## Como adicionar uma ferramenta
+## How to Add a Tool
 
-Guia completo em [`docs/adding-a-tool.md`](docs/adding-a-tool.md). Resumo:
+Full guide in [`docs/adding-a-tool.md`](docs/adding-a-tool.md). Summary:
 
-1. Crie `app/tools/<categoria>/<slug>.py` com uma subclasse de `BaseTool`
+1. Create `app/tools/<category>/<slug>.py` with a `BaseTool` subclass
    (`validate_input`, `normalize_input`, `execute`).
-2. Registre a classe em `app/tools/registry.py` (`load_tools()`).
-3. Crie `app/templates/tools/<slug>.html` — layout próprio, ≥500 palavras de
-   conteúdo autoral (aplicado por `tests/test_tool_pages.py`).
-4. Rode `flask sync-tools`.
+2. Register the class in `app/tools/registry.py` (`load_tools()`).
+3. Create `app/templates/tools/<slug>.html` — own layout, ≥500 words of
+   original content (enforced by `tests/test_tool_pages.py`).
+4. Run `flask sync-tools`.
 
-Nenhum outro arquivo (rotas genéricas, sidebar, home, categoria) precisa ser
-alterado.
+No other file (generic routes, sidebar, home, category) needs to be
+modified.
 
-## Variáveis de ambiente
+## Environment Variables
 
-Veja [`.env.example`](.env.example) — todas as variáveis são documentadas
-inline, agrupadas por área (app, Postgres, Redis, CAPTCHA, rate limit, SSRF,
-admin, SEO, observabilidade). Nada fica hardcoded no código.
+See [`.env.example`](.env.example) — all variables are documented
+inline, grouped by area (app, Postgres, Redis, CAPTCHA, rate limit, SSRF,
+admin, SEO, observability). Nothing is hardcoded in the code.
 
-## Segurança
+## Security
 
-Veja [`SECURITY.md`](SECURITY.md) para a política de divulgação de
-vulnerabilidades e um resumo dos controles implementados (SSRF, CAPTCHA,
-rate limiting, hashing de IP, cabeçalhos de segurança, CSRF).
+See [`SECURITY.md`](SECURITY.md) for the vulnerability disclosure policy
+and a summary of the implemented controls (SSRF, CAPTCHA,
+rate limiting, IP hashing, security headers, CSRF).
 
-## Testes
+## Tests
 
 ```bash
 pip install -r requirements-dev.txt
 pytest
 ```
 
-Os testes cobrem: módulos de segurança (SSRF, CAPTCHA, rate limit), as 15
-ferramentas (com mocks de rede), geração de páginas estáticas, sitemaps,
-painel administrativo e o requisito de conteúdo mínimo por página de
-ferramenta. Requer PostgreSQL e Redis acessíveis (veja `tests/conftest.py`
-para as variáveis usadas).
+The tests cover: security modules (SSRF, CAPTCHA, rate limit), the 15
+tools (with network mocks), static page generation, sitemaps,
+admin panel, and the minimum content requirement per tool page. Requires PostgreSQL
+and Redis to be accessible (see `tests/conftest.py`
+for the variables used).
 
-## Licença
+## License
 
 [MIT](LICENSE).

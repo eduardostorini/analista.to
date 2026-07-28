@@ -44,7 +44,7 @@ class RateLimiter:
 
         if count > rule.limit:
             raise RateLimitExceededError(
-                f"Limite de {rule.limit} requisições/{rule.window_seconds}s excedido ({rule.scope})",
+                f"Limit of {rule.limit} requests/{rule.window_seconds}s exceeded ({rule.scope})",
                 rule.scope,
             )
         return count

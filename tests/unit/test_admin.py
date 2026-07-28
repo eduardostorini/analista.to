@@ -52,7 +52,7 @@ def test_toggle_category(client, app, db):
     db.session.commit()
 
     response = client.post(
-        f"{app.config['ADMIN_URL_PREFIX']}/categorias/{category.id}/toggle", follow_redirects=True
+        f"{app.config['ADMIN_URL_PREFIX']}/categories/{category.id}/toggle", follow_redirects=True
     )
     assert response.status_code == 200
     db.session.refresh(category)
@@ -76,7 +76,7 @@ def test_update_tool_persists_admin_fields(client, app, db):
     db.session.commit()
 
     response = client.post(
-        f"{app.config['ADMIN_URL_PREFIX']}/ferramentas/{tool_row.id}/update",
+        f"{app.config['ADMIN_URL_PREFIX']}/tools/{tool_row.id}/update",
         data={
             "category_id": str(category.id),
             "sort_order": "42",

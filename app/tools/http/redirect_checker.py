@@ -9,12 +9,12 @@ from app.tools.validators import clean_url_input, normalize_url
 class RedirectCheckerTool(BaseTool):
     slug = "redirect-checker"
     name = "Redirect Checker"
-    category_slug = "http-servidor"
-    short_description = "Veja a cadeia completa de redirecionamentos HTTP até o destino final."
-    description = "Segue manualmente os redirecionamentos de uma URL, mostrando cada salto."
+    category_slug = "http-server"
+    short_description = "View the complete chain of HTTP redirects to the final destination."
+    description = "Manually follows redirects from a URL, showing each hop."
     icon = "route"
     input_type = InputType.URL
-    input_placeholder = "https://exemplo.com.br/"
+    input_placeholder = "https://example.com/"
     public_url_prefix = "http/redirects"
     ttl_seconds = 3600
     rate_limit_per_minute = 5
@@ -44,10 +44,10 @@ class RedirectCheckerTool(BaseTool):
         }
 
         if data["redirect_count"] == 0:
-            summary = f"{normalized_input} não realiza redirecionamentos (HTTP {response.status_code})."
+            summary = f"{normalized_input} does not redirect (HTTP {response.status_code})."
         else:
             summary = (
-                f"{data['redirect_count']} redirecionamento(s) até {data['final_url']} "
+                f"{data['redirect_count']} redirect(s) to {data['final_url']} "
                 f"(HTTP {response.status_code})."
             )
 

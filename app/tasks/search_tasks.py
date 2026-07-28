@@ -98,10 +98,10 @@ def run_search(self, search_id: int) -> None:
 
     tool = registry.get(search.tool.slug)
     if tool is None:
-        _mark_failed(search, error_code="unknown_tool", error_message="Ferramenta não reconhecida.")
+        _mark_failed(search, error_code="unknown_tool", error_message="Unrecognized tool.")
         return
 
-    JobService.emit(search, SearchStatus.QUERYING, 25, "Consultando serviços")
+    JobService.emit(search, SearchStatus.QUERYING, 25, "Querying services")
     started = time.monotonic()
 
     try:
@@ -127,28 +127,28 @@ def run_search(self, search_id: int) -> None:
             _mark_failed(
                 search,
                 error_code="max_retries_exceeded",
-                error_message="Não foi possível completar a consulta após múltiplas tentativas.",
+                error_message="Could not complete the search after multiple attempts.",
             )
             return
     except Exception:  # pragma: no cover - rede de segurança final
         logger.exception("run_search: erro inesperado na ferramenta %s", tool.slug)
         _mark_failed(
-            search, error_code="unexpected_error", error_message="Erro inesperado ao processar a consulta."
+            search, error_code="unexpected_error", error_message="Unexpected error while processing the search."
         )
         return
 
     duration_ms = int((time.monotonic() - started) * 1000)
-    JobService.emit(search, SearchStatus.ANALYZING, 70, "Analisando resultados")
+    JobService.emit(search, SearchStatus.ANALYZING, 70, "Analyzing results")
 
     if not result.success:
         _mark_failed(
             search,
             error_code=result.error_code or "execution_failed",
-            error_message=result.error_message or "A consulta não retornou um resultado válido.",
+            error_message=result.error_message or "The search did not return a valid result.",
         )
         return
 
-    JobService.emit(search, SearchStatus.GENERATING_REPORT, 85, "Gerando relatório")
+    JobService.emit(search, SearchStatus.GENERATING_REPORT, 85, "Generating report")
     _save_result(search, tool, result, duration_ms)
 
     if tool.is_publicly_indexable:
@@ -156,7 +156,7 @@ def run_search(self, search_id: int) -> None:
         # depois de tentar publicar a página estática — mantém a linha do
         # tempo de eventos em ordem lógica (nunca "completed" seguido de
         # "generating_page").
-        JobService.emit(search, SearchStatus.GENERATING_PAGE, 92, "Criando página pública")
+        JobService.emit(search, SearchStatus.GENERATING_PAGE, 92, "Creating public page")
         self.app.send_task(GENERATE_PAGE_TASK, args=[search.id])
     else:
-        JobService.emit(search, SearchStatus.COMPLETED, 100, "Concluído")
+        JobService.emit(search, SearchStatus.COMPLETED, 100, "Completed")

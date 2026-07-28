@@ -1,17 +1,17 @@
 {% extends "layout/base.html" %}
 {% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
 
-{% block title %}WHOIS e RDAP{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
-{% block meta_description %}Consulte registrador, datas de registro e expiração e nameservers de qualquer domínio via RDAP/WHOIS.{% endblock %}
+{% block title %}WHOIS & RDAP{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Query registrar, registration and expiration dates, and nameservers for any domain via RDAP/WHOIS.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
 {% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
 
 {% block content %}
-{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
 {{ breadcrumbs(crumbs) }}
 
 <header class="mb-8 max-w-2xl text-center mx-auto">
-  <h1 class="text-3xl">WHOIS e RDAP</h1>
+  <h1 class="text-3xl">WHOIS and RDAP</h1>
   <p class="mt-2 text-slate-600">{{ tool.description }}</p>
 </header>
 
@@ -20,10 +20,10 @@
 {% if mode == "form" %}
 <form method="post" class="card mx-auto mb-10 max-w-xl space-y-4">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domínio</label>
+  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
   <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
-  {{ captcha_widget(captcha_provider, cap_public_url, cap_site_key) }}
-  <button type="submit" class="btn-primary w-full">Consultar WHOIS</button>
+  {{ captcha_widget(captcha_provider) }}
+  <button type="submit" class="btn-primary w-full">Query WHOIS</button>
 </form>
 {% endif %}
 
@@ -31,8 +31,8 @@
 
 {% if mode == "failed" %}
 <div class="card mx-auto mb-10 max-w-xl border-rose-200 bg-rose-50">
-  <p class="badge-danger mb-2">Falhou</p>
-  <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+  <p class="badge-danger mb-2">Failed</p>
+  <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
 </div>
 {% endif %}
 
@@ -44,14 +44,14 @@
       {{ copy_button("#result-content") }}
     </div>
     {% if not data.registered %}
-      <p class="badge-success">Domínio disponível — não está registrado</p>
+      <p class="badge-success">Domain available — not registered</p>
     {% else %}
       <dl class="grid gap-4 sm:grid-cols-2">
-        <div><dt class="text-xs text-slate-400">Registrador</dt><dd class="font-medium text-slate-700">{{ data.registrar or "—" }}</dd></div>
-        <div><dt class="text-xs text-slate-400">Fonte dos dados</dt><dd class="font-medium text-slate-700">{{ data.source | upper }}</dd></div>
-        <div><dt class="text-xs text-slate-400">Registrado em</dt><dd class="font-medium text-slate-700">{{ data.registered_at or "—" }}</dd></div>
-        <div><dt class="text-xs text-slate-400">Expira em</dt><dd class="font-medium text-slate-700">{{ data.expires_at or "—" }}</dd></div>
-        <div><dt class="text-xs text-slate-400">Última atualização</dt><dd class="font-medium text-slate-700">{{ data.updated_at or "—" }}</dd></div>
+        <div><dt class="text-xs text-slate-400">Registrar</dt><dd class="font-medium text-slate-700">{{ data.registrar or "—" }}</dd></div>
+        <div><dt class="text-xs text-slate-400">Data source</dt><dd class="font-medium text-slate-700">{{ data.source | upper }}</dd></div>
+        <div><dt class="text-xs text-slate-400">Registered on</dt><dd class="font-medium text-slate-700">{{ data.registered_at or "—" }}</dd></div>
+        <div><dt class="text-xs text-slate-400">Expires on</dt><dd class="font-medium text-slate-700">{{ data.expires_at or "—" }}</dd></div>
+        <div><dt class="text-xs text-slate-400">Last updated</dt><dd class="font-medium text-slate-700">{{ data.updated_at or "—" }}</dd></div>
         <div><dt class="text-xs text-slate-400">Status</dt><dd class="font-medium text-slate-700">{{ data.status | join(", ") if data.status else "—" }}</dd></div>
       </dl>
       {% if data.nameservers %}
@@ -68,86 +68,86 @@
 
 {% if mode == "form" %}
 <section class="prose-tool mx-auto max-w-3xl space-y-4">
-  <h2>O que é a consulta WHOIS/RDAP?</h2>
-  <p>
-    Todo domínio registrado publicamente tem um conjunto de dados administrativos guardados pelo
-    registro responsável por sua extensão (.com, .com.br, .io etc.): quem registrou, qual
-    empresa (registrador) intermediou o registro, quando ele foi criado, quando expira e quais
-    servidores de nomes (nameservers) estão delegados para ele. Historicamente, esses dados eram
-    consultados pelo protocolo WHOIS, um protocolo de texto simples, sem um formato padronizado
-    entre os diferentes registros. O RDAP (Registration Data Access Protocol) é o sucessor
-    moderno do WHOIS, com respostas estruturadas em JSON e um formato mais consistente entre
-    diferentes TLDs. Esta ferramenta tenta primeiro o RDAP — hoje suportado pela maioria dos TLDs
-    genéricos e por um número crescente de ccTLDs — e cai automaticamente para uma consulta WHOIS
-    tradicional na porta 43 quando o RDAP não está disponível para a extensão do domínio
-    informado.
-  </p>
-  <h2>Como interpretar o resultado</h2>
-  <p>
-    Se o domínio não estiver registrado, a ferramenta indica isso claramente — o que significa
-    que ele está disponível para registro (sujeito à disponibilidade em tempo real no
-    registrador). Quando registrado, os campos mais importantes para observar são a
-    <strong>data de expiração</strong> (domínios não renovados a tempo podem entrar em período de
-    graça e depois ficar novamente disponíveis publicamente, o que representa risco de sequestro
-    de marca) e os <strong>nameservers</strong>, que indicam para qual provedor de DNS o domínio
-    está efetivamente delegado — útil para confirmar se uma migração de provedor já foi
-    concluída. O campo "status" reflete flags administrativas do registro (como bloqueios contra
-    transferência ou exclusão acidental) definidas por ICANN/registro/registrador.
-  </p>
-  <h2>Casos de uso comuns</h2>
-  <p>
-    Profissionais de domínio usam esta ferramenta para verificar se um nome está disponível antes
-    de tentar registrá-lo, para confirmar a data de expiração de domínios próprios e evitar perdê-
-    los por esquecimento, para identificar o registrador responsável por um domínio de terceiros
-    em disputas ou processos de aquisição, e para auditar rapidamente quais nameservers um
-    domínio está usando sem precisar acessar o painel do registrador. Times jurídicos e de
-    segurança também recorrem a consultas WHOIS/RDAP como parte de investigações sobre a
-    titularidade de domínios suspeitos.
-  </p>
-  <h2>Limitações</h2>
-  <p>
-    Desde a entrada em vigor de regulamentações de privacidade como o GDPR, a maioria dos
-    registradores oculta dados pessoais do titular (nome, e-mail, endereço) nas respostas
-    públicas de WHOIS/RDAP, exibindo apenas dados do serviço de privacidade ou do próprio
-    registrador — por isso, esta ferramenta não mostra informações de contato pessoal. Alguns
-    TLDs de países específicos ainda não suportam RDAP e usam formatos WHOIS proprietários que
-    esta ferramenta pode não conseguir interpretar completamente; nesses casos, campos individuais
-    podem aparecer vazios mesmo com o domínio registrado.
-  </p>
-  <h2>Evitando a perda acidental de um domínio</h2>
-  <p>
-    Um dos usos mais valiosos desta ferramenta é preventivo: monitorar periodicamente a data de
-    expiração de domínios importantes para o seu negócio. É surpreendentemente comum uma empresa
-    perder um domínio valioso simplesmente porque o cartão de cobrança do registrador expirou, o
-    e-mail de renovação caiu em spam, ou a pessoa responsável pela renovação deixou a empresa sem
-    repassar essa responsabilidade. Depois que um domínio expira e passa pelo período de graça sem
-    renovação, ele volta ao mercado e pode ser registrado por qualquer pessoa — incluindo
-    especuladores de domínio ou concorrentes. Verificar regularmente a data de expiração através
-    desta ferramenta, independentemente do painel do seu registrador, é uma camada extra de
-    segurança contra esse tipo de perda.
-  </p>
+  <h2>What is the WHOIS/RDAP query?</h2>
+<p>
+     Every publicly registered domain has a set of administrative data held by the
+     registry responsible for its extension (.com, .com.br, .io etc.): who registered
+     it, which company (registrar) mediated the registration, when it was created, when
+     it expires, and which nameservers are delegated to it. Historically, this data was
+     queried via the WHOIS protocol, a simple text protocol with no standardized format
+     across different registries. RDAP (Registration Data Access Protocol) is the modern
+     successor to WHOIS, with structured JSON responses and a more consistent format
+     across different TLDs. This tool tries RDAP first — currently supported by most
+     generic TLDs and a growing number of ccTLDs — and falls back to a traditional WHOIS
+     query on port 43 when RDAP is not available for the queried domain's extension.
+   </p>
+   <h2>How to interpret the result</h2>
+   <p>
+     If the domain is not registered, the tool clearly indicates this — which means
+     it is available for registration (subject to real-time availability at the
+     registrar). When registered, the most important fields to watch are the
+     <strong>expiration date</strong> (domains not renewed in time can enter a grace
+     period and then become publicly available again, which represents a risk of brand
+     hijacking) and the <strong>nameservers</strong>, which indicate which DNS provider
+     the domain is effectively delegated to — useful for confirming whether a provider
+     migration has been completed. The "status" field reflects administrative flags from
+     the registry (such as locks against transfer or accidental deletion) defined by
+     ICANN/registry/registrar.
+   </p>
+   <h2>Common use cases</h2>
+<p>
+     Domain professionals use this tool to check if a name is available before
+     attempting to register it, to confirm the expiration date of their own domains
+     and avoid losing them through oversight, to identify the registrar responsible
+     for a third-party domain in disputes or acquisition processes, and to quickly
+     audit which nameservers a domain is using without needing to access the registrar's
+     panel. Legal and security teams also resort to WHOIS/RDAP queries as part of
+     investigations into the ownership of suspicious domains.
+   </p>
+ <h2>Limitations</h2>
+    <p>
+     Since privacy regulations such as the GDPR went into effect, most registrars hide
+     personal data of the registrant (name, email, address) from public WHOIS/RDAP
+     responses, displaying only the privacy service or registrar's own data — that is
+     why this tool does not show personal contact information. Some country-specific
+     TLDs still do not support RDAP and use proprietary WHOIS formats that this tool
+     may not be able to fully interpret; in those cases, individual fields may appear
+     empty even when the domain is registered.
+   </p>
+   <h2>Preventing accidental domain loss</h2>
+<p>
+     One of the most valuable uses of this tool is preventive: periodically monitor
+     the expiration date of domains that are important to your business. It is surprisingly
+     common for a company to lose a valuable domain simply because the registrar's billing
+     card expired, the renewal email landed in spam, or the person responsible for renewal
+     left the company without passing on that responsibility. Once a domain expires and
+     passes through the grace period without renewal, it returns to the market and can be
+     registered by anyone — including domain speculators or competitors. Regularly checking
+     the expiration date through this tool, independent of your registrar's panel, is an
+     extra layer of protection against this kind of loss.
+   </p>
 </section>
 {% endif %}
 
 {% set faqs = [
-  ("Por que não vejo o e-mail ou nome do titular do domínio?", "Por normas de privacidade (como o GDPR), a maioria dos registradores oculta dados pessoais nas respostas públicas de WHOIS/RDAP."),
-  ("O domínio aparece como disponível, mas não consigo registrar. Por quê?", "A disponibilidade pode mudar entre a consulta e a tentativa de registro, e alguns registradores aplicam períodos de reserva (ex.: pending delete) antes da liberação efetiva."),
-  ("Qual a diferença entre RDAP e WHOIS?", "RDAP é o sucessor moderno do WHOIS, com respostas estruturadas em JSON e mais padronizadas entre TLDs. Esta ferramenta usa RDAP quando disponível e cai para WHOIS tradicional como alternativa."),
-] %}
-{% if mode == "form" %}
-<section class="mx-auto mt-10 max-w-3xl">
-  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
-  {{ faq_accordion(faqs) }}
-</section>
-{% endif %}
+   ("Why can't I see the domain owner's email or name?", "Due to privacy regulations (such as the GDPR), most registrars hide personal data from public WHOIS/RDAP responses."),
+   ("The domain shows as available but I can't register it. Why?", "Availability may change between the query and the registration attempt, and some registrars apply reservation periods (e.g., pending delete) before effective release."),
+   ("What is the difference between RDAP and WHOIS?", "RDAP is the modern successor to WHOIS, with structured JSON responses and more standardization across TLDs. This tool uses RDAP when available and falls back to traditional WHOIS as an alternative."),
+ ] %}
+ {% if mode == "form" %}
+ <section class="mx-auto mt-10 max-w-3xl">
+   <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+   {{ faq_accordion(faqs) }}
+ </section>
+ {% endif %}
 
 <section class="mx-auto mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
     {{ related_tools_list(related_tools) }}
   </div>
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
     {{ recent_searches_list(tool, recent_searches) }}
   </div>
 </section>

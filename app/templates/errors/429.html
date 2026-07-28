@@ -1,11 +1,11 @@
 {% extends "layout/base.html" %}
-{% block title %}Muitas requisições — {{ site_name }}{% endblock %}
+{% block title %}Too many requests — {{ site_name }}{% endblock %}
 {% block robots_meta %}<meta name="robots" content="noindex, follow">{% endblock %}
 {% block content %}
 <div class="card text-center py-16">
-  <p class="badge-warning mb-4">Erro 429</p>
-  <h1 class="text-3xl mb-3">Muitas requisições</h1>
-  <p class="text-slate-600 mb-6">Você atingiu o limite de consultas para esta ferramenta. Aguarde um instante e tente novamente.</p>
-  <a href="/" class="btn-primary">Voltar para a página inicial</a>
+<p class="badge-warning mb-4">Error 429</p>
+      <h1 class="text-3xl mb-3">Too many requests</h1>
+      <p class="text-slate-600 mb-6">You have reached the query limit for this tool. Wait a moment and try again.</p>
+      <a href="/" class="btn-primary">Back to home</a>
 </div>
 {% endblock %}

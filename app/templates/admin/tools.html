@@ -1,10 +1,10 @@
 {% extends "admin/base.html" %}
-{% block title %}Ferramentas{% endblock %}
+{% block title %}Tools{% endblock %}
 {% block content %}
-<h1 class="mb-2 text-2xl text-brand-900">Ferramentas</h1>
+<h1 class="mb-2 text-2xl text-brand-900">Tools</h1>
 <p class="mb-6 text-sm text-slate-500">
-  Nome, descrição e handler vêm do código. Ative/desative, destaque, ajuste limites e
-  indexabilidade por aqui — esses valores não são sobrescritos pelo <code>flask sync-tools</code>.
+  Name, description and handler come from code. Activate/deactivate, feature, adjust limits and
+  indexability here — these values are not overwritten by <code>flask sync-tools</code>.
 </p>
 
 <div class="space-y-4">
@@ -18,7 +18,7 @@
     </div>
 
     <div>
-      <label class="mb-1 block text-xs text-slate-500">Categoria</label>
+      <label class="mb-1 block text-xs text-slate-500">Category</label>
       <select name="category_id" class="input">
         {% for category in categories %}
         <option value="{{ category.id }}" {{ "selected" if category.id == tool.category_id else "" }}>{{ category.name }}</option>
@@ -27,7 +27,7 @@
     </div>
 
     <div>
-      <label class="mb-1 block text-xs text-slate-500">Ordem</label>
+      <label class="mb-1 block text-xs text-slate-500">Order</label>
       <input type="number" name="sort_order" value="{{ tool.sort_order }}" class="input">
     </div>
 
@@ -37,16 +37,16 @@
     </div>
 
     <div>
-      <label class="mb-1 block text-xs text-slate-500">TTL do cache (s)</label>
+      <label class="mb-1 block text-xs text-slate-500">Cache TTL (s)</label>
       <input type="number" min="0" name="result_ttl_seconds" value="{{ tool.result_ttl_seconds }}" class="input">
     </div>
 
     <div class="sm:col-span-6 flex flex-wrap gap-4 text-sm">
-      <label class="flex items-center gap-2"><input type="checkbox" name="is_active" {{ "checked" if tool.is_active else "" }}> Ativa</label>
-      <label class="flex items-center gap-2"><input type="checkbox" name="is_featured" {{ "checked" if tool.is_featured else "" }}> Em destaque</label>
-      <label class="flex items-center gap-2"><input type="checkbox" name="is_publicly_indexable" {{ "checked" if tool.is_publicly_indexable else "" }}> Gera página pública indexável</label>
-      <label class="flex items-center gap-2"><input type="checkbox" name="requires_captcha" {{ "checked" if tool.requires_captcha else "" }}> Exige CAPTCHA</label>
-      <button type="submit" class="btn-primary ml-auto">Salvar</button>
+      <label class="flex items-center gap-2"><input type="checkbox" name="is_active" {{ "checked" if tool.is_active else "" }}> Active</label>
+      <label class="flex items-center gap-2"><input type="checkbox" name="is_featured" {{ "checked" if tool.is_featured else "" }}> Featured</label>
+      <label class="flex items-center gap-2"><input type="checkbox" name="is_publicly_indexable" {{ "checked" if tool.is_publicly_indexable else "" }}> Generate indexable public page</label>
+      <label class="flex items-center gap-2"><input type="checkbox" name="requires_captcha" {{ "checked" if tool.requires_captcha else "" }}> Requires CAPTCHA</label>
+      <button type="submit" class="btn-primary ml-auto">Save</button>
     </div>
   </form>
   {% endfor %}

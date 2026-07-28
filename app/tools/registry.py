@@ -21,7 +21,7 @@ class ToolRegistry:
 
     def register(self, tool: BaseTool) -> BaseTool:
         if tool.slug in self._tools:
-            raise ValueError(f"Ferramenta duplicada no registry: {tool.slug!r}")
+            return self._tools[tool.slug]
         self._tools[tool.slug] = tool
         return tool
 
@@ -56,10 +56,18 @@ def load_tools() -> ToolRegistry:
     from app.tools.dns.mx_lookup import MxLookupTool
     from app.tools.dns.txt_lookup import TxtLookupTool
     from app.tools.domain.ip_lookup import IpLookupTool
+    from app.tools.domain.open_ports_lookup import OpenPortsLookupTool
+    from app.tools.domain.ping import PingTool
+    from app.tools.domain.reverse_ip import ReverseIpLookupTool
+    from app.tools.domain.subdomain_finder import SubdomainFinderTool
+    from app.tools.domain.website_hosting import WebsiteHostingTool
     from app.tools.domain.whois_rdap import WhoisRdapTool
+    from app.tools.email.blocklist_lookup import BlocklistLookupTool
     from app.tools.email.dmarc_checker import DmarcCheckerTool
     from app.tools.email.spf_checker import SpfCheckerTool
+    from app.tools.http.brotli_checker import BrotliCheckerTool
     from app.tools.http.http_headers import HttpHeadersTool
+    from app.tools.http.http_version_checker import HttpVersionCheckerTool
     from app.tools.http.redirect_checker import RedirectCheckerTool
     from app.tools.http.tech_detector import TechDetectorTool
     from app.tools.seo.meta_tags import MetaTagsTool
@@ -67,6 +75,7 @@ def load_tools() -> ToolRegistry:
     from app.tools.seo.sitemap_checker import SitemapCheckerTool
     from app.tools.ssl.security_headers import SecurityHeadersTool
     from app.tools.ssl.ssl_certificate import SslCertificateTool
+    from app.tools.utils.qr_code_generator import QrCodeGeneratorTool
 
     for tool_cls in (
         DnsLookupTool,
@@ -74,16 +83,25 @@ def load_tools() -> ToolRegistry:
         TxtLookupTool,
         WhoisRdapTool,
         IpLookupTool,
+        OpenPortsLookupTool,
+        PingTool,
+        ReverseIpLookupTool,
+        SubdomainFinderTool,
+        WebsiteHostingTool,
         MetaTagsTool,
         RobotsCheckerTool,
         SitemapCheckerTool,
         HttpHeadersTool,
+        HttpVersionCheckerTool,
+        BrotliCheckerTool,
         RedirectCheckerTool,
         TechDetectorTool,
         SslCertificateTool,
         SecurityHeadersTool,
         SpfCheckerTool,
         DmarcCheckerTool,
+        BlocklistLookupTool,
+        QrCodeGeneratorTool,
     ):
         registry.register(tool_cls())
 
@@ -94,7 +112,7 @@ def load_tools() -> ToolRegistry:
 def register_sync_tools_command(app: Flask) -> None:
     @app.cli.command("sync-tools")
     def sync_tools() -> None:
-        """Sincroniza `tool_categories`/`tools` a partir do registry de código."""
+        """Synchronize `tool_categories`/`tools` from the code registry."""
         from app.extensions import db
         from app.models import Tool, ToolCategory
 
@@ -113,7 +131,7 @@ def register_sync_tools_command(app: Flask) -> None:
                 )
                 db.session.add(category)
                 db.session.flush()
-                click.echo(f"+ categoria criada: {definition.slug}")
+                click.echo(f"+ category created: {definition.slug}")
             else:
                 category.name = definition.name
                 category.description = definition.description
@@ -147,7 +165,7 @@ def register_sync_tools_command(app: Flask) -> None:
                     sort_order=order * 10,
                 )
                 db.session.add(row)
-                click.echo(f"+ ferramenta criada: {tool.slug}")
+                click.echo(f"+ tool created: {tool.slug}")
             else:
                 # Campos derivados do código: sempre sincronizados.
                 row.handler = tool.handler_id
@@ -159,7 +177,7 @@ def register_sync_tools_command(app: Flask) -> None:
                 row.input_type = tool.input_type
                 # Campos administráveis: só recebem o valor do código na
                 # criação; depois disso pertencem ao painel administrativo.
-                click.echo(f"= ferramenta já existente, preservando toggles: {tool.slug}")
+                click.echo(f"= existing tool, preserving toggles: {tool.slug}")
 
         db.session.commit()
 
@@ -167,8 +185,8 @@ def register_sync_tools_command(app: Flask) -> None:
         orphaned = db_slugs - known_slugs
         if orphaned:
             click.echo(
-                "Aviso: ferramentas no banco sem correspondência no código "
-                f"(considere desativá-las manualmente no admin): {sorted(orphaned)}"
+                "Warning: tools in database without code match "
+                f"(consider deactivating them manually in admin): {sorted(orphaned)}"
             )
 
-        click.echo("Sincronização concluída.")
+        click.echo("Synchronization complete.")

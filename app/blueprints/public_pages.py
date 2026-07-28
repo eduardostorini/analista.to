@@ -9,6 +9,7 @@ protegido por CAPTCHA/rate limit.
 from __future__ import annotations
 
 import datetime as dt
+import re
 from pathlib import Path
 
 from flask import Blueprint, Response, abort, current_app, render_template, send_file, url_for
@@ -20,6 +21,10 @@ from app.models.enums import TERMINAL_SEARCH_STATUSES, IndexStatus, SearchStatus
 from app.tools.registry import load_tools, registry
 
 public_pages_bp = Blueprint("public_pages", __name__)
+
+# Mesmo charset produzido por `BaseTool.public_slug()` — usado para rejeitar
+# qualquer tentativa de path traversal antes de tocar o filesystem.
+_SLUG_RE = re.compile(r"[a-z0-9.\-]+")
 
 
 @public_pages_bp.before_app_request
@@ -61,6 +66,21 @@ def sitemap(name: str | None = None):
     return send_file(file_path, mimetype="application/xml")
 
 
+@public_pages_bp.get("/screenshots/<tool_slug>/<slug>.png")
+def screenshot(tool_slug: str, slug: str):
+    if not _SLUG_RE.fullmatch(tool_slug) or not _SLUG_RE.fullmatch(slug):
+        abort(404)
+
+    screenshots_dir = Path(current_app.config["SCREENSHOTS_DIR"]).resolve()
+    file_path = (screenshots_dir / tool_slug / f"{slug}.png").resolve()
+    if screenshots_dir not in file_path.parents or not file_path.is_file():
+        abort(404)
+
+    response = send_file(file_path, mimetype="image/png")
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
+
+
 def _search_status_mode(status: SearchStatus) -> str:
     if status == SearchStatus.COMPLETED:
         return "result"
@@ -88,7 +108,8 @@ def public_result_page(prefix: str, slug: str):
         db.session.query(GeneratedPage)
         .join(Search, GeneratedPage.search_id == Search.id)
         .filter(GeneratedPage.slug == slug, Search.tool.has(slug=tool.slug))
-        .one_or_none()
+        .order_by(GeneratedPage.updated_at.desc())
+        .first()
     )
 
     if page is not None:

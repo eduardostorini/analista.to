@@ -78,12 +78,7 @@ def home():
     )
 
 
-@main_bp.get("/roadmap/")
-def roadmap():
-    return render_template("pages/roadmap.html")
-
-
-@main_bp.get("/documentacao/")
+@main_bp.get("/docs/")
 def docs():
     return render_template("pages/docs.html")
 
@@ -124,12 +119,12 @@ def _render_category_page(category: ToolCategory, page: int):
     )
 
 
-@main_bp.route("/ferramentas/<slug>/", methods=["GET", "POST"])
+@main_bp.route("/tools/<slug>/", methods=["GET", "POST"])
 def category_or_tool_page(slug: str):
-    """`/ferramentas/<slug>/` é compartilhado por categorias e ferramentas
-    (ambas de nível único no menu — seções 9 e 10 da especificação), então
-    a resolução é feita aqui em vez de duas rotas Flask com o mesmo padrão
-    de URL (o que seria ambíguo para o Werkzeug)."""
+    """/tools/<slug>/ is shared by categories and tools
+    (both single-level in the menu — sections 9 and 10 of the spec), so
+    resolution is done here instead of two Flask routes with the same URL
+    pattern (which would be ambiguous for Werkzeug)."""
     category = db.session.query(ToolCategory).filter_by(slug=slug, is_active=True).one_or_none()
     if category is not None:
         if request.method == "POST":
@@ -154,6 +149,8 @@ def category_or_tool_page(slug: str):
 
 def _handle_submit(tool, tool_row: Tool):
     raw_input = (request.form.get("input_value") or "").strip()
+    if tool.secondary_input_field:
+        raw_input = f"{request.form.get(tool.secondary_input_field, '')}::{raw_input}"
     ip_hash = hash_ip(_client_ip())
 
     if is_blocked(ip_hash):

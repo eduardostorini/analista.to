@@ -1,25 +1,25 @@
 ---
-name: Relatar um bug
-about: Algo não está funcionando como esperado
+name: Report a bug
+about: Something is not working as expected
 title: "[bug] "
 labels: bug
 ---
 
-**Descrição**
-Descreva o problema com clareza.
+**Description**
+Describe the problem clearly.
 
-**Como reproduzir**
-1. Vá para '...'
-2. Informe '...'
-3. Veja o erro
+**How to reproduce**
+1. Go to '...'
+2. Enter '...'
+3. See the error
 
-**Comportamento esperado**
-O que deveria acontecer.
+**Expected behavior**
+What should happen.
 
-**Ambiente**
-- Versão/commit:
-- Navegador (se aplicável):
-- `docker compose` ou execução local?
+**Environment**
+- Version/commit:
+- Browser (if applicable):
+- `docker compose` or local execution?
 
 **Logs/screenshots**
-Se aplicável, cole trechos relevantes de log (sem segredos) ou screenshots.
+If applicable, paste relevant log snippets (no secrets) or screenshots.

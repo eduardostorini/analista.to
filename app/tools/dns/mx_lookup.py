@@ -19,11 +19,11 @@ class MxLookupTool(BaseTool):
     slug = "mx-lookup"
     name = "MX Lookup"
     category_slug = "dns"
-    short_description = "Veja quais servidores recebem e-mail para um domínio, em ordem de prioridade."
-    description = "Consulta os registros MX (Mail Exchanger) de um domínio."
+    short_description = "Check which mail servers receive email for a domain, in priority order."
+    description = "Queries the MX (Mail Exchanger) records of a domain."
     icon = "mail"
     input_type = InputType.DOMAIN
-    input_placeholder = "exemplo.com.br"
+    input_placeholder = "example.com"
     public_url_prefix = "dns/mx"
     ttl_seconds = 3 * 3600
     rate_limit_per_minute = 15
@@ -39,7 +39,7 @@ class MxLookupTool(BaseTool):
         if not domain_exists(normalized_input):
             return ToolResult(
                 success=True,
-                summary=f"{normalized_input} não está registrado ou não possui delegação DNS.",
+                summary=f"{normalized_input} is not registered or has no DNS delegation.",
                 data={"domain": normalized_input, "exists": False, "records": []},
             )
 
@@ -47,9 +47,9 @@ class MxLookupTool(BaseTool):
         records = sorted((_parse_mx_record(r) for r in raw_records), key=lambda r: r["priority"])
 
         if not records:
-            summary = f"{normalized_input} não possui registros MX configurados."
+            summary = f"{normalized_input} has no MX records configured."
         else:
-            summary = f"{len(records)} servidor(es) de e-mail configurado(s) para {normalized_input}."
+            summary = f"{len(records)} mail server(s) configured for {normalized_input}."
 
         return ToolResult(
             success=True,

@@ -4,18 +4,18 @@ const SSE_RECONNECT_DELAY_MS = 1500;
 const MAX_SSE_FAILURES_BEFORE_POLL = 2;
 
 const STATUS_LABELS = {
-  queued: "Consulta adicionada à fila",
-  validating: "Aguardando validação",
-  captcha_check: "Verificando CAPTCHA",
-  processing: "Processando",
-  querying: "Consultando serviços",
-  analyzing: "Analisando resultados",
-  generating_report: "Gerando relatório",
-  generating_page: "Criando página pública",
-  completed: "Concluído",
-  failed: "Falhou",
-  expired: "Expirado",
-  cancelled: "Cancelado",
+  queued: "Search added to queue",
+  validating: "Awaiting validation",
+  captcha_check: "Verifying CAPTCHA",
+  processing: "Processing",
+  querying: "Querying services",
+  analyzing: "Analyzing results",
+  generating_report: "Generating report",
+  generating_page: "Creating public page",
+  completed: "Completed",
+  failed: "Failed",
+  expired: "Expired",
+  cancelled: "Cancelled",
 };
 
 export function jobStatus() {
@@ -75,8 +75,8 @@ export function jobStatus() {
           this._closeSource();
           return;
         }
+        this._closeSource();
         if (this._sseFailures >= MAX_SSE_FAILURES_BEFORE_POLL) {
-          this._closeSource();
           this.startPolling();
         } else {
           setTimeout(() => {
@@ -98,7 +98,7 @@ export function jobStatus() {
             this._applyUpdate(await response.json());
           }
         } catch (err) {
-          /* mantém último estado conhecido e tenta novamente no próximo ciclo */
+          /* keeps last known state and retries on next cycle */
         }
         if (!this.isTerminal) {
           this._pollTimer = setTimeout(poll, POLL_INTERVAL_MS);
@@ -111,7 +111,7 @@ export function jobStatus() {
       this.status = data.status || this.status;
       this.progress = typeof data.progress === "number" ? data.progress : this.progress;
       this.message = data.message || "";
-      if (this.isFailure) this.errorMessage = data.message || "A consulta não pôde ser concluída.";
+      if (this.isFailure) this.errorMessage = data.message || "The search could not be completed.";
       if (this.isTerminal) {
         this._closeSource();
         if (this._pollTimer) {

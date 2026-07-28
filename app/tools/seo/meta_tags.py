@@ -16,13 +16,13 @@ def _meta_content(soup: BeautifulSoup, **attrs) -> str | None:
 
 class MetaTagsTool(BaseTool):
     slug = "meta-tags"
-    name = "Title e Meta Tags"
+    name = "Title and Meta Tags"
     category_slug = "seo"
-    short_description = "Analise title, meta description, canonical, Open Graph e Twitter Cards de uma página."
-    description = "Extrai e avalia as principais tags de SEO on-page de uma URL."
+    short_description = "Analyze title, meta description, canonical, Open Graph, and Twitter Cards of a page."
+    description = "Extracts and evaluates the main on-page SEO tags from a URL."
     icon = "file-search"
     input_type = InputType.URL
-    input_placeholder = "https://exemplo.com.br/"
+    input_placeholder = "https://example.com/"
     public_url_prefix = "seo/meta-tags"
     ttl_seconds = 3600
     rate_limit_per_minute = 10
@@ -35,15 +35,15 @@ class MetaTagsTool(BaseTool):
         return normalize_url(cleaned_input)
 
     def execute(self, normalized_input: str) -> ToolResult:
-        response = SafeHTTPClient().get(normalized_input)
+        response = SafeHTTPClient().get(normalized_input, max_response_bytes=5 * 1024 * 1024)
         if response.status_code >= 400:
             raise ToolExecutionError(
-                f"A página respondeu com status {response.status_code}.", "http_error"
+                f"The page responded with status {response.status_code}.", "http_error"
             )
 
         content_type = response.headers.get("content-type", "")
         if "html" not in content_type.lower():
-            raise ToolExecutionError("A URL informada não retornou conteúdo HTML.", "not_html")
+            raise ToolExecutionError("The provided URL did not return HTML content.", "not_html")
 
         soup = BeautifulSoup(response.content, "lxml")
 
@@ -90,23 +90,23 @@ class MetaTagsTool(BaseTool):
 
         issues = []
         if not title:
-            issues.append("Página sem tag <title>.")
+            issues.append("Page has no <title> tag.")
         elif not (30 <= len(title) <= 60):
-            issues.append("O title está fora da faixa recomendada de 30-60 caracteres.")
+            issues.append("The title is outside the recommended range of 30-60 characters.")
         if not description:
-            issues.append("Página sem meta description.")
+            issues.append("Page has no meta description.")
         elif not (70 <= len(description) <= 160):
-            issues.append("A meta description está fora da faixa recomendada de 70-160 caracteres.")
+            issues.append("The meta description is outside the recommended range of 70-160 characters.")
         if not canonical:
-            issues.append("Página sem link canonical.")
+            issues.append("Page has no canonical link.")
         if len(h1_list) == 0:
-            issues.append("Página sem tag H1.")
+            issues.append("Page has no H1 tag.")
         elif len(h1_list) > 1:
-            issues.append("Página com mais de uma tag H1.")
+            issues.append("Page has more than one H1 tag.")
         data["issues"] = issues
 
         summary = title or normalized_input
         if issues:
-            summary += f" — {len(issues)} ponto(s) de atenção encontrados."
+            summary += f" — {len(issues)} point(s) of attention found."
 
         return ToolResult(success=True, summary=summary, data=data, raw={"html_length": len(response.content)})

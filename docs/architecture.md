@@ -1,108 +1,105 @@
-# Arquitetura
+# Architecture
 
-## Visão geral
+## Overview
 
 ```mermaid
 flowchart LR
-  U[Usuário] -->|formulário| Web[analisa_web · Flask + Gunicorn]
-  Web -->|enfileira| Redis[(Redis: broker/cache/pubsub)]
+  U[User] -->|form| Web[analisa_web · Flask + Gunicorn]
+  Web -->|enqueues| Redis[(Redis: broker/cache/pubsub)]
   Redis --> Worker[analisa_worker · Celery]
-  Worker -->|SSRF-safe| Internet((DNS / HTTP / TLS externos))
+  Worker -->|SSRF-safe| Internet((DNS / HTTP / TLS externals))
   Worker --> DB[(PostgreSQL)]
   Worker -->|status| Redis
   Web -->|SSE/polling| Redis
-  Worker -->|página estática| Disk[/GENERATED_PAGES_DIR/]
-  Web -->|serve arquivo| Disk
+  Worker -->|static page| Disk[/GENERATED_PAGES_DIR/]
+  Web -->|serves file| Disk
   Scheduler[analisa_scheduler · Celery Beat] --> Redis
 ```
 
-Sem Nginx nesta fase: o próprio Gunicorn serve rotas dinâmicas, assets
-buildados e páginas estáticas geradas (`app/blueprints/public_pages.py`
-tenta o arquivo em disco antes de renderizar dinamicamente).
+No Nginx in this phase: Gunicorn itself serves dynamic routes, built
+assets, and generated static pages (`app/blueprints/public_pages.py`
+tries the file on disk before rendering dynamically).
 
-## Modelo de dados
+## Data model
 
-Sete entidades principais (`app/models/`):
+Seven main entities (`app/models/`):
 
-| Tabela | Papel |
+| Table | Role |
 |---|---|
-| `tool_categories` | Metadados de categoria, sincronizados do código |
-| `tools` | Espelha o registro de código; guarda toggles administráveis |
-| `searches` | Uma linha por consulta, com `public_id` aleatório e `dedupe_key` |
-| `search_results` | Resultado normalizado (JSONB) + bruto + resumo |
-| `generated_pages` | Página estática pública, com `index_status` |
-| `job_events` | Histórico de status de cada consulta (para a barra de progresso) |
-| `abuse_events` | Rate limit excedido, CAPTCHA falho, bloqueio de SSRF |
+| `tool_categories` | Category metadata, synced from code |
+| `tools` | Mirrors the code registry; stores administratable toggles |
+| `searches` | One row per query, with random `public_id` and `dedupe_key` |
+| `search_results` | Normalized result (JSONB) + raw + summary |
+| `generated_pages` | Public static page, with `index_status` |
+| `job_events` | Status history for each query (for the progress bar) |
+| `abuse_events` | Rate limit exceeded, CAPTCHA failed, SSRF blocked |
 
-`ip_hash`/`user_agent_hash` usam HMAC-SHA256 com salt rotativo
-(`IP_HASH_SALTS`) — o IP nunca é persistido em texto puro.
+`ip_hash`/`user_agent_hash` use HMAC-SHA256 with rotating salt
+(`IP_HASH_SALTS`) — the IP is never persisted in plaintext.
 
-## Ciclo de vida de uma consulta
+## Query lifecycle
 
-1. **Validação e antiabuso** (`app/blueprints/main/routes.py`): CAPTCHA,
-   rate limiting em várias camadas (`app/security/rate_limit.py`), checagem
-   de bloqueio por hash (`app/security/blocklist.py`).
-2. **Deduplicação** (`SearchService.submit`): calcula `dedupe_key` =
-   `sha256(tool_slug + normalized_input + analyzer_version)`. Se existir uma
-   busca `completed` dentro do TTL da ferramenta, reaproveita o resultado
-   (sem reprocessar) e só registra métricas.
-3. **Enfileiramento e redirecionamento**: cria `Search` (`status=queued`),
-   chama `celery_app.send_task` (decoplado por nome de task,
-   `app/tasks/task_names.py`, para não criar import circular entre
-   `services/` e `tasks/`) e redireciona o navegador imediatamente para a
-   **URL canônica e legível** do resultado (`/<prefix>/<slug>/`, ex.:
-   `/dns/exemplo.com/`) — nunca para uma URL baseada no `public_id`
-   aleatório. Essa mesma URL serve tanto a barra de status enquanto a
-   consulta está pendente quanto o resultado final assim que fica pronto:
-   `app/blueprints/public_pages.py::public_result_page` decide o que
-   renderizar, primeiro tentando a página estática já gerada e, na
-   ausência dela, localizando a `Search` mais recente cujo
-   `tool.public_slug(normalized_input)` bate com o slug da URL.
-4. **Execução** (`app/tasks/search_tasks.py`): `tool.execute()` roda dentro
-   da task, protegido por `SafeHTTPClient`/`resolve_host_ips`
-   (`app/security/ssrf.py`). Timeout, backoff exponencial e limite de
-   tentativas só se aplicam a falhas transitórias de rede — falhas
-   definitivas (bloqueio SSRF, resposta grande demais) marcam `failed` na
-   hora.
-5. **Status em tempo real**: cada mudança grava um `JobEvent` e publica em
-   Redis pubsub (`job:<public_id>`); `app/blueprints/live.py` expõe isso via
-   SSE (com snapshot em Redis para quem conecta depois do evento, e fallback
-   para polling no client — `app/static/src/js/components/job-status.js`).
-   Não é uma API pública do produto, apenas um endpoint interno que a própria
-   página consulta para atualizar a barra de status.
-6. **Página pública** (`app/services/page_generation.py`): se a ferramenta é
-   indexável, uma segunda task renderiza o mesmo template Jinja da
-   ferramenta em `mode="result"`, decide `index`/`noindex`
-   (`PageIndexabilityService`) e grava o HTML em
+1. **Validation and anti-abuse** (`app/blueprints/main/routes.py`): CAPTCHA,
+   rate limiting in multiple layers (`app/security/rate_limit.py`), hash-based
+   blocklist check (`app/security/blocklist.py`).
+2. **Deduplication** (`SearchService.submit`): calculates `dedupe_key` =
+   `sha256(tool_slug + normalized_input + analyzer_version)`. If a
+   `completed` search exists within the tool's TTL, the result is reused
+   (without reprocessing) and only metrics are recorded.
+3. **Enqueueing and redirecting**: creates a `Search` (`status=queued`),
+   calls `celery_app.send_task` (decoupled by task name,
+   `app/tasks/task_names.py`, to avoid circular imports between
+   `services/` and `tasks/`) and immediately redirects the browser to the
+   **canonical, readable** result URL (`/<prefix>/<slug>/`, e.g.,
+   `/dns/example.com/`) — never to a URL based on the random `public_id`.
+   This same URL serves both the status bar while the query is pending and
+   the final result once ready: `app/blueprints/public_pages.py::public_result_page`
+   decides what to render, first trying the already-generated static page and,
+   in its absence, locating the most recent `Search` whose
+   `tool.public_slug(normalized_input)` matches the URL slug.
+4. **Execution** (`app/tasks/search_tasks.py`): `tool.execute()` runs inside
+   the task, protected by `SafeHTTPClient`/`resolve_host_ips`
+   (`app/security/ssrf.py`). Timeout, exponential backoff, and attempt limit
+   only apply to transient network failures — definitive failures (SSRF block,
+   response too large) mark `failed` immediately.
+5. **Real-time status**: each change writes a `JobEvent` and publishes to
+   Redis pubsub (`job:<public_id>`); `app/blueprints/live.py` exposes this via
+   SSE (with a Redis snapshot for those who connect after the event, and fallback
+   to polling on the client — `app/static/src/js/components/job-status.js`).
+   This is not a public product API, just an internal endpoint that the page
+   itself queries to update the status bar.
+6. **Public page** (`app/services/page_generation.py`): if the tool is indexable,
+   a second task renders the same Jinja template the tool uses in
+   `mode="result"`, decides `index`/`noindex`
+   (`PageIndexabilityService`) and writes the HTML to
    `GENERATED_PAGES_DIR/<tool>/<slug>/index.html`.
-7. **Sitemaps** (`app/services/sitemap_service.py`): Celery Beat regenera
-   periodicamente sitemaps segmentados (estático, categorias, ferramentas,
-   páginas paginadas por `SITEMAP_MAX_URLS_PER_FILE`), incluindo só páginas
-   com `index_status=index`.
+7. **Sitemaps** (`app/services/sitemap_service.py`): Celery Beat periodically
+   regenerates segmented sitemaps (static, categories, tools,
+   paginated pages by `SITEMAP_MAX_URLS_PER_FILE`), including only pages
+   with `index_status=index`.
 
-## Padrão de ferramenta
+## Tool pattern
 
-Cada ferramenta é uma subclasse de `BaseTool`
-(`app/tools/base.py`) com:
+Each tool is a subclass of `BaseTool`
+(`app/tools/base.py`) with:
 
-- `validate_input(raw) -> cleaned` — levanta `ToolValidationError`.
-- `normalize_input(cleaned) -> str` — usado para dedupe e slug da URL.
-- `execute(normalized) -> ToolResult` — roda na task Celery; `ToolResult.data`
-  é o que fica em `search_results.normalized_result` (JSONB) e é o que o
-  template da ferramenta renderiza.
-- `seo_metadata`, `is_indexable`, `public_slug` — controlam a página pública.
+- `validate_input(raw) -> cleaned` — raises `ToolValidationError`.
+- `normalize_input(cleaned) -> str` — used for dedupe and URL slug.
+- `execute(normalized) -> ToolResult` — runs in the Celery task; `ToolResult.data`
+  is what ends up in `search_results.normalized_result` (JSONB) and is what the
+  tool template renders.
+- `seo_metadata`, `is_indexable`, `public_slug` — control the public page.
 
-O template (`app/templates/tools/<slug>.html`) é **próprio de cada
-ferramenta** — não há um template genérico compartilhado. Macros reutilizáveis
-(breadcrumbs, captcha, barra de status, FAQ, JSON-LD) ficam em
-`app/templates/tools/_tool_macros.html`, mas a composição/ordem é livre por
-ferramenta. Um teste (`tests/test_tool_pages.py`) garante que cada ferramenta
-registrada tem um template dedicado com pelo menos 500 palavras de conteúdo
-autoral.
+The template (`app/templates/tools/<slug>.html`) is **specific to each
+tool** — there is no shared generic template. Reusable macros
+(breadcrumbs, captcha, status bar, FAQ, JSON-LD) live in
+`app/templates/tools/_tool_macros.html`, but the composition/order is free per
+tool. A test (`tests/test_tool_pages.py`) ensures every registered tool has a
+dedicated template with at least 500 words of original content.
 
-Veja [`adding-a-tool.md`](adding-a-tool.md) para o passo a passo de como
-adicionar uma nova ferramenta.
+See [`adding-a-tool.md`](adding-a-tool.md) for the step-by-step guide to
+adding a new tool.
 
-## Segurança
+## Security
 
-Ver [`SECURITY.md`](../SECURITY.md) na raiz do repositório.
+See [`SECURITY.md`](../SECURITY.md) at the repository root.

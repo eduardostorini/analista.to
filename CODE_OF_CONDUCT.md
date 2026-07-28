@@ -1,37 +1,37 @@
-# Código de Conduta
+# Code of Conduct
 
-## Nosso compromisso
+## Our commitment
 
-Como membros, colaboradores e mantenedores deste projeto, nos comprometemos
-a fazer da participação uma experiência livre de assédio para todos,
-independentemente de idade, corpo, deficiência, etnia, identidade e
-expressão de gênero, nível de experiência, nacionalidade, aparência
-pessoal, raça, religião ou identidade e orientação sexual.
+As members, contributors, and maintainers of this project, we commit to
+making participation a harassment-free experience for everyone,
+regardless of age, body, disability, ethnicity, gender identity and
+expression, experience level, nationality, personal appearance, race,
+religion, or sexual identity and orientation.
 
-## Nossos padrões
+## Our standards
 
-Exemplos de comportamento que contribuem para um ambiente positivo:
+Examples of behavior that contributes to a positive environment:
 
-- Demonstrar empatia e gentileza com outras pessoas.
-- Respeitar opiniões, pontos de vista e experiências diferentes.
-- Dar e aceitar feedback construtivo com elegância.
-- Assumir responsabilidade e pedir desculpas por erros.
+- Demonstrating empathy and kindness toward others.
+- Respecting different opinions, viewpoints, and experiences.
+- Giving and accepting constructive feedback gracefully.
+- Taking responsibility and apologizing for mistakes.
 
-Exemplos de comportamento inaceitável:
+Examples of unacceptable behavior:
 
-- Uso de linguagem ou imagens sexualizadas, e atenção ou investidas sexuais
-  indesejadas.
-- Comentários provocativos/depreciativos e ataques pessoais ou políticos.
-- Assédio público ou privado.
-- Publicar informações privadas de terceiros sem permissão explícita.
+- Use of sexualized language or imagery, and unwelcome sexual attention or
+  advances.
+- Provocative/derogatory comments and personal or political attacks.
+- Public or private harassment.
+- Publishing others' private information without explicit permission.
 
-## Aplicação
+## Enforcement
 
-Casos de comportamento abusivo podem ser reportados para
-**conduct@analista.to**. Todas as reclamações serão revisadas e investigadas
-prontamente e de forma justa.
+Instances of abusive behavior may be reported to
+**conduct@analista.to**. All complaints will be reviewed and investigated
+promptly and fairly.
 
-## Atribuição
+## Attribution
 
-Adaptado do [Contributor Covenant](https://www.contributor-covenant.org),
-versão 2.1.
+Adapted from the [Contributor Covenant](https://www.contributor-covenant.org),
+version 2.1.

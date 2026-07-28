@@ -2,12 +2,12 @@
 {% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
 
 {% block title %}Redirect Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
-{% block meta_description %}Veja a cadeia completa de redirecionamentos HTTP de uma URL até o destino final.{% endblock %}
+{% block meta_description %}See the complete HTTP redirect chain of a URL to the final destination.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
 {% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
 
 {% block content %}
-{% set crumbs = [("Início", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
 {{ breadcrumbs(crumbs) }}
 
 <header class="mb-8 max-w-2xl text-center mx-auto">
@@ -22,8 +22,8 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">URL</label>
   <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
-  {{ captcha_widget(captcha_provider, cap_public_url, cap_site_key) }}
-  <button type="submit" class="btn-primary w-full">Rastrear redirecionamentos</button>
+  {{ captcha_widget(captcha_provider) }}
+  <button type="submit" class="btn-primary w-full">Trace redirects</button>
 </form>
 {% endif %}
 
@@ -31,8 +31,8 @@
 
 {% if mode == "failed" %}
 <div class="card mx-auto mb-10 max-w-xl border-rose-200 bg-rose-50">
-  <p class="badge-danger mb-2">Falhou</p>
-  <p class="text-sm text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</p>
+  <p class="badge-danger mb-2">Failed</p>
+  <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
 </div>
 {% endif %}
 
@@ -40,7 +40,7 @@
   {% set data = result.normalized_result %}
   <div id="result-content" class="mx-auto mb-10 max-w-2xl space-y-4">
     <div class="flex items-center justify-between">
-      <p class="text-sm text-slate-500">{{ data.redirect_count }} redirecionamento(s) · {{ "HTTPS em toda a cadeia" if data.uses_https_throughout else "cadeia usa HTTP em algum ponto" }}</p>
+      <p class="text-sm text-slate-500">{{ data.redirect_count }} redirect(s) · {{ "HTTPS throughout the chain" if data.uses_https_throughout else "chain uses HTTP somewhere" }}</p>
       {{ copy_button("#result-content") }}
     </div>
     <ol class="space-y-3">
@@ -59,81 +59,81 @@
 
 {% if mode == "form" %}
 <section class="prose-tool mx-auto max-w-3xl space-y-4">
-  <h2>O que é o Redirect Checker?</h2>
+  <h2>What is Redirect Checker?</h2>
   <p>
-    Um redirecionamento HTTP acontece quando um servidor responde a uma requisição com um código
-    de status na faixa 3xx (como 301, 302, 307 ou 308) e um cabeçalho <code>Location</code>
-    indicando um novo endereço para onde o cliente deve seguir. É uma técnica legítima e muito
-    usada — para unificar www e sem www, forçar HTTPS, redirecionar após uma reestruturação de
-    URLs, ou encurtar links — mas cadeias de redirecionamento longas ou mal configuradas afetam a
-    velocidade de carregamento e podem confundir buscadores. O Redirect Checker segue manualmente,
-    salto a salto, toda a cadeia de redirecionamentos a partir da URL informada, até chegar a uma
-    resposta final que não seja mais um redirecionamento.
+    An HTTP redirect happens when a server responds to a request with a status
+    code in the 3xx range (such as 301, 302, 307, or 308) and a <code>Location</code>
+    header indicating a new address for the client to follow. It is a legitimate and widely
+    used technique — to unify www and non-www, force HTTPS, redirect after a URL
+    restructuring, or shorten links — but long or misconfigured redirect chains affect
+    loading speed and can confuse search engines. The Redirect Checker manually traces,
+    hop by hop, the entire redirect chain from the provided URL, until it reaches a final
+    response that is no longer a redirect.
   </p>
-  <h2>Como interpretar o resultado</h2>
+  <h2>How to interpret the result</h2>
   <p>
-    Cada item da lista representa um salto: o código de status daquela etapa e, quando aplicável,
-    para qual URL ela aponta em seguida. Um redirecionamento <strong>301 (Moved Permanently)</strong>
-    sinaliza aos buscadores que a mudança é definitiva e que o valor de SEO da URL antiga deve ser
-    transferido para a nova; um <strong>302 (Found)</strong> ou <strong>307 (Temporary Redirect)</strong>
-    indica uma mudança temporária, sem essa transferência de relevância. Cadeias com três ou mais
-    saltos são um sinal de alerta: cada salto adicional soma latência de rede e, em casos extremos,
-    buscadores podem parar de seguir a cadeia antes de chegar ao destino final. O indicador de uso
-    de HTTPS em toda a cadeia é importante porque um redirecionamento que passa por HTTP em
-    qualquer ponto, mesmo que termine em HTTPS, expõe a requisição intermediária sem criptografia.
+    Each item in the list represents a hop: the status code of that step and, when applicable,
+    which URL it points to next. A <strong>301 (Moved Permanently)</strong>
+    redirect signals to search engines that the change is permanent and that the SEO value of the old URL should be
+    transferred to the new one; a <strong>302 (Found)</strong> or <strong>307 (Temporary Redirect)</strong>
+    indicates a temporary change, without that transfer of relevance. Chains with three or more
+    hops are a warning sign: each additional hop adds network latency and, in extreme cases,
+    search engines may stop following the chain before reaching the final destination. The HTTPS
+    usage indicator throughout the chain is important because a redirect that passes through HTTP
+    at any point, even if it ends at HTTPS, exposes the intermediate request without encryption.
   </p>
-  <h2>Casos de uso comuns</h2>
+  <h2>Common use cases</h2>
   <p>
-    Esta ferramenta é usada para validar que uma migração de domínio ou de HTTP para HTTPS está
-    redirecionando corretamente e sem saltos desnecessários, para depurar por que um link
-    compartilhado está demorando para carregar, e para auditar encurtadores de link ou campanhas
-    de marketing antes de divulgá-los amplamente, garantindo que o destino final é o esperado e
-    seguro. Times de SEO também usam para confirmar que redirecionamentos 301 (e não 302) estão
-    sendo aplicados corretamente após reestruturações de URL, preservando a relevância acumulada
-    das páginas antigas.
+    This tool is used to validate that a domain migration or HTTP to HTTPS migration is
+    redirecting correctly and without unnecessary hops, to debug why a shared
+    link is taking time to load, and to audit link shorteners or marketing
+    campaigns before widely promoting them, ensuring the final destination is the expected and
+    safe one. SEO teams also use it to confirm that 301 redirects (and not 302) are
+    being applied correctly after URL restructuring, preserving the accumulated relevance
+    of old pages.
   </p>
-  <h2>Limitações</h2>
+  <h2>Limitations</h2>
   <p>
-    Por proteção contra abuso (SSRF), o número de redirecionamentos seguidos é limitado, e cada
-    salto tem seu destino revalidado antes de ser seguido — se algum endereço na cadeia apontar
-    para uma rede privada ou interna, o rastreamento é interrompido nesse ponto por segurança.
-    Redirecionamentos baseados em JavaScript (não em cabeçalhos HTTP reais) não são detectados por
-    esta ferramenta, já que ela não executa scripts no navegador.
+    For abuse protection (SSRF), the number of followed redirects is limited, and each
+    hop has its destination revalidated before being followed — if any address in the chain points
+    to a private or internal network, the tracing is interrupted at that point for security.
+    JavaScript-based redirects (not real HTTP headers) are not detected by
+    this tool, as it does not execute scripts in the browser.
   </p>
-  <h2>Redirecionamentos e SEO</h2>
+  <h2>Redirects and SEO</h2>
   <p>
-    Redirecionamentos bem planejados são parte essencial de qualquer reestruturação de site: ao
-    migrar de HTTP para HTTPS, unificar versões www e sem www, ou reorganizar URLs após um
-    redesign, é o redirecionamento 301 que preserva o valor acumulado de SEO das páginas antigas,
-    direcionando tanto usuários quanto buscadores para o novo endereço correto. Erros comuns
-    incluem redirecionar tudo para a página inicial em vez do conteúdo equivalente mais próximo
-    (o que prejudica a experiência do usuário e desperdiça relevância acumulada), criar loops de
-    redirecionamento (A aponta para B, que aponta de volta para A), e encadear múltiplos
-    redirecionamentos desnecessários que poderiam ser resolvidos com um único salto direto da
-    origem ao destino final.
+    Well-planned redirects are an essential part of any site restructuring: when
+    migrating from HTTP to HTTPS, unifying www and non-www versions, or reorganizing URLs after a
+    redesign, it is the 301 redirect that preserves the accumulated SEO value of old pages,
+    directing both users and search engines to the new correct address. Common errors
+    include redirecting everything to the homepage instead of the closest equivalent content
+    (which harms user experience and wastes accumulated relevance), creating redirect loops
+    (A points to B, which points back to A), and chaining multiple
+    unnecessary redirects that could be resolved with a single direct hop from
+    origin to final destination.
   </p>
 </section>
 {% endif %}
 
 {% set faqs = [
-  ("Qual a diferença entre redirecionamento 301 e 302?", "301 é permanente e transfere o valor de SEO para a nova URL; 302 é temporário e não transfere esse valor."),
-  ("Quantos redirecionamentos são considerados demais?", "Como regra prática, mais de 2 ou 3 saltos já começam a impactar velocidade e podem fazer alguns rastreadores desistirem antes do destino final."),
-  ("A ferramenta segue redirecionamentos feitos por JavaScript?", "Não. Apenas redirecionamentos reais via cabeçalho HTTP Location são detectados."),
-] %}
+   ("What is the difference between 301 and 302 redirects?", "301 is permanent and transfers SEO value to the new URL; 302 is temporary and does not transfer that value."),
+   ("How many redirects are considered too many?", "As a practical rule, more than 2 or 3 hops already start impacting speed and may cause some crawlers to give up before the final destination."),
+   ("Does the tool follow JavaScript-based redirects?", "No. Only real redirects via HTTP Location header are detected."),
+ ] %}
 {% if mode == "form" %}
 <section class="mx-auto mt-10 max-w-3xl">
-  <h2 class="mb-4 text-xl">Perguntas frequentes</h2>
+  <h2 class="mb-4 text-xl">Frequently asked questions</h2>
   {{ faq_accordion(faqs) }}
 </section>
 {% endif %}
 
 <section class="mx-auto mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
     {{ related_tools_list(related_tools) }}
   </div>
   <div>
-    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
     {{ recent_searches_list(tool, recent_searches) }}
   </div>
 </section>

@@ -1,0 +1,215 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Brotli Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check whether a website compresses its responses with Brotli, and what it falls back to otherwise.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Brotli Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain or IP</label>
+        <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+        <p class="mt-1 text-xs text-slate-400">Examples: example.com, agenciamuvi.com.br</p>
+      </div>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check Brotli</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}
+      {{ status_bar(search) }}
+    {% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs text-slate-400">Domain queried</p>
+            <p class="font-mono text-lg text-brand-900">{{ data.url }}</p>
+          </div>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.online %}
+        <p class="badge-danger">Did not respond to HTTP or HTTPS requests within the timeout.</p>
+        {% else %}
+        <span class="badge-{{ 'success' if data.supports_brotli else 'warning' }}">
+          Brotli {{ "supported" if data.supports_brotli else "not detected" }}
+        </span>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                <th class="py-2 pr-4">Field</th>
+                <th class="py-2">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">URL</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.url }}</td>
+              </tr>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Encoding used (Brotli offered)</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.encoding_with_brotli_offered }}</td>
+              </tr>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Encoding used (gzip-only fallback)</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.encoding_gzip_only }}</td>
+              </tr>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Response status code</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.status_code }}</td>
+              </tr>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Content-Type</td>
+                <td class="py-2 font-mono text-xs text-slate-600">{{ data.content_type or "—" }}</td>
+              </tr>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Vary: Accept-Encoding</td>
+                <td class="py-2">
+                  {% if data.vary_includes_accept_encoding %}
+                  <span class="badge-success">Present</span>
+                  {% else %}
+                  <span class="badge-warning">Missing</span>
+                  {% endif %}
+                </td>
+              </tr>
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Connection scheme</td>
+                <td class="py-2 text-slate-600">{{ data.scheme | upper }}</td>
+              </tr>
+              {% if data.server %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">Server</td>
+                <td class="py-2 text-slate-600">{{ data.server }}</td>
+              </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is the Brotli Checker?</h2>
+      <p>
+        Brotli is a compression algorithm created by Google that typically shrinks text-based
+        web content — HTML, CSS, JavaScript, JSON — noticeably more than the older, more common
+        gzip algorithm, without costing extra decompression time in the browser. This tool sends
+        a request to the domain you provide, explicitly telling the server "I can accept Brotli"
+        through the standard <code>Accept-Encoding</code> request header, and then reports which
+        compression algorithm the server actually chose to use in its response. It also repeats
+        the request without offering Brotli, to show what the server falls back to, and checks
+        whether the response correctly includes <code>Vary: Accept-Encoding</code>, a detail that
+        matters more than it might seem.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        "Brotli supported" means the server returned a response with <code>Content-Encoding: br</code>
+        when we explicitly advertised support for it — a strong, direct signal, not a guess based
+        on the server's name or technology stack. If the encoding shown for the Brotli-offered
+        request is "gzip" or "deflate" instead, it means the server is capable of compression but
+        either does not have Brotli enabled, or has it enabled only for specific content types or
+        paths that this particular page does not match. A result of "none" for both attempts
+        usually means the response body is too small to be worth compressing, is already a
+        compressed format (like an image or a video), or the server has compression disabled
+        entirely. The Vary header check matters for correctness: if a shared cache or CDN stores a
+        Brotli-compressed response and later serves it to a client that only accepts gzip, without
+        <code>Vary: Accept-Encoding</code> telling the cache to key responses by encoding, the wrong
+        clients can end up receiving content they cannot decode.
+      </p>
+      <h2>Why Brotli matters for performance</h2>
+      <p>
+        Smaller responses transfer faster, which directly improves page load times, especially on
+        slower mobile connections where bandwidth is the bottleneck rather than server processing
+        power. Brotli typically achieves compression ratios around 15-25% better than gzip on
+        typical HTML, CSS, and JavaScript, thanks to a larger built-in dictionary tuned specifically
+        for web content and a more sophisticated compression scheme. Because nearly every modern
+        browser supports Brotli decoding, and decompressing it costs about the same as gzip on the
+        client side, enabling it is one of the few web performance wins that costs virtually
+        nothing once configured — the main investment is slightly higher CPU usage on the server
+        when compressing dynamically, which most sites offset by pre-compressing static assets at
+        build time instead of on every request.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        Site owners and developers use this tool to confirm that a CDN, reverse proxy, or origin
+        server configuration change actually enabled Brotli as intended, since it is a common
+        assumption that a modern hosting stack has it on by default when a specific module or
+        directive was never actually turned on. Performance audits use it alongside cache-header
+        and HTTP version checks to build a complete picture of a site's delivery optimization.
+        It is also useful when comparing infrastructure between your own site and a competitor's,
+        or when validating that a migration between hosting providers did not silently regress
+        compression settings that were previously fine-tuned.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        This check reflects a single request to the site's root URL; some servers apply different
+        compression rules to different paths, file types, or response sizes, so a different page
+        on the same site could behave differently. Very small responses are frequently left
+        uncompressed by design, since the overhead of compression can outweigh the savings below a
+        certain size threshold, which is normal and not a misconfiguration. Finally, a small
+        minority of corporate proxies or older intermediaries occasionally strip or rewrite
+        compression-related headers in transit, which could make a Brotli-enabled origin server
+        appear otherwise when tested from certain networks.
+      </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+      ("Is Brotli better than gzip?", "For most text-based web content, yes — Brotli typically compresses HTML, CSS, and JavaScript around 15-25% smaller than gzip at a comparable decompression cost, which is why most modern CDNs and servers support it."),
+      ("Why does my server show gzip even though I enabled Brotli?", "Common causes are a CDN or reverse proxy in front of the origin that only supports gzip, Brotli enabled only for static files but not for the dynamically generated page being tested, or a module that needs to be explicitly turned on in the web server configuration."),
+      ("What does Vary: Accept-Encoding do?", "It tells caches and CDNs to store separate copies of a response for each compression method requested, preventing a client that cannot decode Brotli from accidentally receiving a Brotli-compressed cached copy."),
+      ("Does every browser support Brotli?", "All current major browsers do, but only over HTTPS in most of them — testing a plain HTTP site may show no Brotli even if the server supports it, since some servers only enable it for encrypted connections."),
+    ] %}
+    {% if mode == "form" %}
+    <section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

@@ -6,15 +6,15 @@ os.environ.setdefault("FLASK_ENV", "testing")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault(
     "TEST_DATABASE_URL",
-    "postgresql+psycopg://analisa:change-me-strong-password@localhost:15439/analisa_to_test",
+    "postgresql+psycopg://analisa:Ww4NnlHBkAS1coYU9TSG4ePracEwZsPK@localhost:15439/analisa_to_test",
 )
 os.environ.setdefault("IP_HASH_SALTS", "1:test-salt-one,2:test-salt-two")
 os.environ.setdefault("IP_HASH_CURRENT_SALT_ID", "1")
-os.environ.setdefault("REDIS_URL", "redis://:change-me-redis-password@localhost:16389/0")
-os.environ.setdefault("CACHE_REDIS_URL", "redis://:change-me-redis-password@localhost:16389/5")
-os.environ.setdefault("RATE_LIMIT_REDIS_URL", "redis://:change-me-redis-password@localhost:16389/6")
-os.environ.setdefault("CELERY_BROKER_URL", "redis://:change-me-redis-password@localhost:16389/7")
-os.environ.setdefault("CELERY_RESULT_BACKEND", "redis://:change-me-redis-password@localhost:16389/8")
+os.environ.setdefault("REDIS_URL", "redis://:6f25175c8e95aa473cbdaf0865e9c03eafe807a5d9553975f4af4507e8c361ac@localhost:16389/0")
+os.environ.setdefault("CACHE_REDIS_URL", "redis://:6f25175c8e95aa473cbdaf0865e9c03eafe807a5d9553975f4af4507e8c361ac@localhost:16389/5")
+os.environ.setdefault("RATE_LIMIT_REDIS_URL", "redis://:6f25175c8e95aa473cbdaf0865e9c03eafe807a5d9553975f4af4507e8c361ac@localhost:16389/6")
+os.environ.setdefault("CELERY_BROKER_URL", "redis://:6f25175c8e95aa473cbdaf0865e9c03eafe807a5d9553975f4af4507e8c361ac@localhost:16389/7")
+os.environ.setdefault("CELERY_RESULT_BACKEND", "redis://:6f25175c8e95aa473cbdaf0865e9c03eafe807a5d9553975f4af4507e8c361ac@localhost:16389/8")
 os.environ.setdefault("CAPTCHA_PROVIDER", "none")
 
 import pytest

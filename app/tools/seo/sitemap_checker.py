@@ -19,12 +19,12 @@ def _strip_ns(tag: str) -> str:
 
 def _parse_sitemap_xml(raw_bytes: bytes) -> dict:
     if b"<!DOCTYPE" in raw_bytes[:2000] or b"<!ENTITY" in raw_bytes[:2000]:
-        raise ToolExecutionError("Sitemap contém declarações XML não permitidas.", "unsafe_xml")
+        raise ToolExecutionError("Sitemap contains disallowed XML declarations.", "unsafe_xml")
 
     try:
         root = ET.fromstring(raw_bytes)
     except ET.ParseError as exc:
-        raise ToolExecutionError(f"XML do sitemap inválido: {exc}", "invalid_xml") from exc
+        raise ToolExecutionError(f"Invalid sitemap XML: {exc}", "invalid_xml") from exc
 
     root_tag = _strip_ns(root.tag)
 
@@ -71,11 +71,11 @@ class SitemapCheckerTool(BaseTool):
     slug = "sitemap-checker"
     name = "Sitemap Checker"
     category_slug = "seo"
-    short_description = "Valide o sitemap XML de um domínio e veja quantas URLs ele declara."
-    description = "Busca e valida o sitemap.xml de um domínio, incluindo suporte a sitemap index."
+    short_description = "Validate the XML sitemap of a domain and see how many URLs it declares."
+    description = "Fetches and validates the sitemap.xml of a domain, including sitemap index support."
     icon = "list-tree"
     input_type = InputType.DOMAIN
-    input_placeholder = "exemplo.com.br"
+    input_placeholder = "example.com"
     public_url_prefix = "seo/sitemap"
     ttl_seconds = 6 * 3600
     rate_limit_per_minute = 10
@@ -89,12 +89,12 @@ class SitemapCheckerTool(BaseTool):
 
     def execute(self, normalized_input: str) -> ToolResult:
         url = f"https://{normalized_input}/sitemap.xml"
-        response = SafeHTTPClient().get(url)
+        response = SafeHTTPClient().get(url, max_response_bytes=_SITEMAP_SIZE_LIMIT_BYTES)
 
         if response.status_code >= 400:
             return ToolResult(
                 success=True,
-                summary=f"Não foi possível encontrar um sitemap.xml em {normalized_input} (HTTP {response.status_code}).",
+                summary=f"Could not find a sitemap.xml on {normalized_input} (HTTP {response.status_code}).",
                 data={"domain": normalized_input, "exists": False},
             )
 
@@ -103,11 +103,11 @@ class SitemapCheckerTool(BaseTool):
 
         issues = []
         if parsed["url_count"] > _SITEMAP_URL_LIMIT:
-            issues.append(f"O sitemap excede o limite de {_SITEMAP_URL_LIMIT} URLs por arquivo.")
+            issues.append(f"The sitemap exceeds the limit of {_SITEMAP_URL_LIMIT} URLs per file.")
         if size_bytes > _SITEMAP_SIZE_LIMIT_BYTES:
-            issues.append("O sitemap excede o limite recomendado de 50MB.")
+            issues.append("The sitemap exceeds the recommended limit of 50MB.")
         if parsed["type"] == "unknown":
-            issues.append("O XML não é um <urlset> nem um <sitemapindex> reconhecido.")
+            issues.append("The XML is not a recognized <urlset> or <sitemapindex>.")
 
         data = {
             "domain": normalized_input,
@@ -120,9 +120,9 @@ class SitemapCheckerTool(BaseTool):
             "issues": issues,
         }
 
-        summary = f"Sitemap de {normalized_input}: {parsed['url_count']} URL(s) declaradas ({parsed['type']})."
+        summary = f"Sitemap of {normalized_input}: {parsed['url_count']} URL(s) declared ({parsed['type']})."
         if issues:
-            summary += f" {len(issues)} ponto(s) de atenção."
+            summary += f" {len(issues)} point(s) of attention."
 
         return ToolResult(success=True, summary=summary, data=data, raw={"size_bytes": size_bytes})
 

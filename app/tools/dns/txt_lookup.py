@@ -25,11 +25,11 @@ class TxtLookupTool(BaseTool):
     slug = "txt-lookup"
     name = "TXT Lookup"
     category_slug = "dns"
-    short_description = "Liste todos os registros TXT de um domínio, com identificação do tipo (SPF, verificação etc.)."
-    description = "Consulta os registros TXT de um domínio e classifica seu propósito quando reconhecível."
+    short_description = "List all TXT records of a domain, with type identification (SPF, verification, etc.)."
+    description = "Queries the TXT records of a domain and classifies their purpose when recognizable."
     icon = "file-text"
     input_type = InputType.DOMAIN
-    input_placeholder = "exemplo.com.br"
+    input_placeholder = "example.com"
     public_url_prefix = "dns/txt"
     ttl_seconds = 3 * 3600
     rate_limit_per_minute = 15
@@ -45,7 +45,7 @@ class TxtLookupTool(BaseTool):
         if not domain_exists(normalized_input):
             return ToolResult(
                 success=True,
-                summary=f"{normalized_input} não está registrado ou não possui delegação DNS.",
+                summary=f"{normalized_input} is not registered or has no DNS delegation.",
                 data={"domain": normalized_input, "exists": False, "records": []},
             )
 
@@ -53,9 +53,9 @@ class TxtLookupTool(BaseTool):
         records = [{"value": value, "type": _classify(value)} for value in cleaned]
 
         summary = (
-            f"{len(records)} registro(s) TXT encontrado(s) para {normalized_input}."
+            f"{len(records)} TXT record(s) found for {normalized_input}."
             if records
-            else f"{normalized_input} não possui registros TXT."
+            else f"{normalized_input} has no TXT records."
         )
 
         return ToolResult(

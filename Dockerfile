@@ -21,7 +21,7 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # Stage 2: dependências Python isoladas, para reduzir a imagem final.
 # ---------------------------------------------------------------------------
-FROM python:3.12-slim AS python-deps
+FROM python:3.12-slim-bookworm AS python-deps
 
 WORKDIR /wheels
 
@@ -36,7 +36,7 @@ RUN pip wheel --no-cache-dir --wheel-dir /wheels/dist -r requirements.txt
 # ---------------------------------------------------------------------------
 # Stage 3: imagem de runtime, sem Node e sem toolchain de build.
 # ---------------------------------------------------------------------------
-FROM python:3.12-slim AS runtime
+FROM python:3.12-slim-bookworm AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -59,7 +59,7 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels/dist -r requireme
 COPY --chown=analisa:analisa . .
 COPY --from=assets --chown=analisa:analisa /build/app/static/dist ./app/static/dist
 
-RUN mkdir -p /data/generated-pages /data/sitemaps /app/logs /app/backups \
+RUN mkdir -p /data/generated-pages /data/sitemaps /data/screenshots /app/logs /app/backups \
     && chown -R analisa:analisa /data /app/logs /app/backups
 
 USER analisa
@@ -72,3 +72,23 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--worker-class", "gthread", \
      "--workers", "2", "--threads", "4", "--timeout", "60", \
      "--access-logfile", "-", "--error-logfile", "-", "wsgi:app"]
+
+# ---------------------------------------------------------------------------
+# Stage 4: variante usada apenas pelo `analisa_worker` — adiciona o Chromium
+# do Playwright (usado pelo Website Hosting Checker para capturar um print do
+# site). Não é necessária em `analisa_web`/`analisa_scheduler`, então fica
+# isolada nesta stage para não inflar as outras imagens.
+# ---------------------------------------------------------------------------
+FROM runtime AS runtime-worker
+
+# Caminho fixo e legível por qualquer usuário — por padrão o Playwright
+# instala em `$HOME/.cache/ms-playwright`, mas o `RUN` abaixo roda como root
+# (necessário para `--with-deps`) enquanto o processo em produção roda como
+# `analisa` (USER definido no stage `runtime`), então o cache do root nunca
+# seria encontrado em tempo de execução.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+USER root
+RUN playwright install --with-deps chromium \
+    && chmod -R o+rX /ms-playwright
+USER analisa
