@@ -1,0 +1,194 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}SMTP Server Test{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Connect to a domain's primary mail server and check its banner, ESMTP capabilities and STARTTLS support.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">SMTP Server Test</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="note">
+      Only test mail servers you own or are authorized to test. This tool performs a read-only
+      connectivity/capability check (banner + EHLO + STARTTLS) — it never authenticates, sends mail,
+      or attempts relay.
+    </div>
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Test SMTP server</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-lg text-brand-900">{{ data.domain }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.has_mx %}
+          <p class="badge-danger">No MX records — no mail server to test</p>
+        {% else %}
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="badge-neutral font-mono">{{ data.mx_host }} (priority {{ data.mx_priority }})</span>
+            <span class="badge-neutral font-mono">{{ data.ip }}</span>
+            <span class="badge-{{ 'success' if data.supports_starttls else 'danger' }}">{{ 'STARTTLS supported' if data.supports_starttls else 'STARTTLS not supported' }}</span>
+            {% if data.starttls_negotiated %}<span class="badge-success">{{ data.tls_protocol }}</span>{% endif %}
+          </div>
+
+          <div>
+            <p class="mb-1 text-xs text-slate-400">Server banner</p>
+            <p class="break-all rounded-lg bg-slate-50 p-3 font-mono text-xs text-slate-600">{{ data.banner }}</p>
+          </div>
+
+          {% if data.starttls_negotiated %}
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p class="mb-1 text-xs text-slate-400">TLS protocol</p>
+              <p class="font-mono text-sm text-slate-700">{{ data.tls_protocol }}</p>
+            </div>
+            <div>
+              <p class="mb-1 text-xs text-slate-400">TLS cipher</p>
+              <p class="font-mono text-sm text-slate-700">{{ data.tls_cipher }}</p>
+            </div>
+          </div>
+          {% endif %}
+
+          <div>
+            <p class="mb-1 text-xs text-slate-400">ESMTP capabilities</p>
+            <div class="flex flex-wrap gap-2">
+              {% for cap in data.capabilities %}<span class="badge-neutral font-mono">{{ cap }}</span>{% endfor %}
+            </div>
+          </div>
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+       <h2>What is the SMTP Server Test?</h2>
+       <p>
+         This tool connects directly to port 25 of a domain's primary (lowest-priority) MX host and
+         performs a read-only diagnostic conversation: it reads the server's opening banner, sends
+         an <code>EHLO</code> command to see which ESMTP extensions the server advertises, and, if
+         the server offers <code>STARTTLS</code>, attempts the TLS handshake to observe which
+         protocol version and cipher suite are actually negotiated. The session then ends with a
+         plain <code>QUIT</code>. At no point does this tool send <code>MAIL FROM</code>,
+         <code>RCPT TO</code>, <code>DATA</code>, or any <code>AUTH</code> command — it never
+         attempts to send mail, relay a message, or authenticate against the server. Only test mail
+         servers you own or are explicitly authorized to test; connecting to a server you do not
+         control to probe its configuration may violate its owner's acceptable use policy even when
+         the probe itself is harmless and read-only.
+       </p>
+       <h2>How to interpret the result</h2>
+       <p>
+         A successful connection shows the raw banner the server presents to any connecting client
+         (which often reveals the mail server software and version, useful context on its own), the
+         full list of ESMTP capabilities it advertises such as <code>SIZE</code> (maximum accepted
+         message size), <code>PIPELINING</code>, <code>8BITMIME</code>, and — most importantly for
+         security purposes — whether <code>STARTTLS</code> is present at all. If the server offers
+         STARTTLS, this tool completes the handshake and reports the negotiated TLS protocol version
+         and cipher suite, which reveals whether the server still permits outdated, weak protocol
+         versions. A server without STARTTLS listed accepts only unencrypted plaintext delivery,
+         meaning any mail sent to it travels the network path in the clear and can be read or
+         altered in transit by anyone positioned on that path.
+       </p>
+       <h2>Common use cases</h2>
+       <p>
+         This tool is used by domain and mail server administrators to confirm that a newly deployed
+         or reconfigured mail server actually advertises STARTTLS and negotiates a modern TLS
+         version before relying on it to receive production mail, and to quickly check a server's
+         banner and capability list without needing to open a manual <code>telnet</code> or
+         <code>openssl s_client</code> session. It is also useful when investigating whether a
+         legacy mail server on the domain's MX record list is holding back the domain's overall
+         transport security — for example, a modern primary MX alongside a decades-old backup MX
+         that still only accepts plaintext connections.
+       </p>
+       <h2>Limitations</h2>
+       <p>
+         This tool only tests the single MX host with the lowest priority number (the primary
+         destination); a domain frequently has multiple MX records, and secondary or backup mail
+         servers may be configured very differently — use the MX Lookup tool first to see the full
+         list, and be aware other hosts in that list are not covered by a single run of this tool.
+         It also cannot verify whether the certificate presented during the STARTTLS handshake is
+         trusted by public certificate authorities in a way that blocks the connection outright —
+         it reports the negotiated protocol and cipher regardless of certificate trust, since the
+         goal is visibility into the transport configuration, not a pass/fail judgment on the
+         certificate itself (use the SSL Certificate Checker for that, on a domain that serves
+         HTTPS).
+       </p>
+       <h2>Why STARTTLS support matters</h2>
+       <p>
+         Even where a domain has not adopted stricter mechanisms like MTA-STS or DANE, simply
+         offering STARTTLS with a reasonably modern TLS configuration is the baseline expectation
+         for any mail server accepting production email in 2026 — its absence means every message
+         delivered to that server, regardless of how carefully the sender protects its own
+         infrastructure, crosses the network unencrypted. Because STARTTLS in the absence of MTA-STS
+         is only opportunistic (a network attacker can strip the announcement before a client ever
+         sees it, silently forcing a plaintext fallback), confirming STARTTLS is advertised is a
+         necessary first step, but domains that handle sensitive mail should pair it with the
+         MTA-STS Checker and TLS-RPT Checker tools to close the downgrade attack window entirely.
+       </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+       ("Does this tool send any email?", "No. It only reads the server's banner and EHLO response and, if offered, completes a STARTTLS handshake to report the negotiated protocol — it never sends MAIL FROM, RCPT TO, DATA or AUTH."),
+       ("Which MX host does it test?", "The MX record with the lowest priority number for the domain, which is the mail server other systems will try to deliver to first."),
+       ("What does it mean if STARTTLS is not supported?", "The server only accepts plaintext SMTP connections, so any mail delivered to it travels the network unencrypted and can potentially be intercepted or altered in transit."),
+     ] %}
+     {% if mode == "form" %}
+ <section class="mt-10">
+       <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+       {{ faq_accordion(faqs) }}
+     </section>
+ {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

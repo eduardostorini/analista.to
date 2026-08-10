@@ -1,0 +1,188 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}MTA-STS Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check whether a domain publishes an MTA-STS DNS record and a valid policy file that requires encrypted mail delivery.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">MTA-STS Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check MTA-STS</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-lg text-brand-900">{{ data.domain }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.has_dns_record %}
+          <p class="badge-danger">MTA-STS not enabled</p>
+        {% else %}
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="badge-success">DNS record found</span>
+            {% if data.dns_record_id %}<span class="badge-neutral font-mono">id={{ data.dns_record_id }}</span>{% endif %}
+            {% if data.has_policy_file %}
+              <span class="badge-{{ 'success' if data.policy_mode == 'enforce' else ('neutral' if data.policy_mode == 'testing' else 'danger') }}">mode={{ data.policy_mode or 'unknown' }}</span>
+            {% else %}
+              <span class="badge-danger">Policy file unreachable</span>
+            {% endif %}
+          </div>
+
+          {% if data.has_policy_file %}
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p class="mb-1 text-xs text-slate-400">Policy version</p>
+              <p class="font-mono text-sm text-slate-700">{{ data.policy_version or "—" }}</p>
+            </div>
+            <div>
+              <p class="mb-1 text-xs text-slate-400">Max age (seconds)</p>
+              <p class="font-mono text-sm text-slate-700">{{ data.policy_max_age if data.policy_max_age is not none else "—" }}</p>
+            </div>
+          </div>
+          <div>
+            <p class="mb-1 text-xs text-slate-400">Authorized MX hosts</p>
+            <div class="flex flex-wrap gap-2">
+              {% for mx in data.policy_mx %}<span class="badge-neutral font-mono">{{ mx }}</span>{% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+       <h2>What is MTA-STS?</h2>
+       <p>
+         MTA-STS (Mail Transfer Agent Strict Transport Security, RFC 8461) is a mechanism that lets
+         a domain require that any inbound SMTP mail delivery use TLS with a certificate that
+         actually validates against the domain, instead of the plain "opportunistic" STARTTLS that
+         most mail servers fall back to by default. Opportunistic TLS has a well-known weakness: an
+         attacker positioned on the network path can simply strip the STARTTLS announcement from the
+         plaintext SMTP conversation before it ever begins, silently downgrading the connection to
+         unencrypted delivery — since STARTTLS was never a guarantee, receiving servers accept the
+         downgrade without complaint. MTA-STS closes this gap by publishing two independent pieces
+         of configuration: a DNS TXT record at <code>_mta-sts.&lt;domain&gt;</code> that announces a
+         policy exists (and its version, via an <code>id=</code> tag that changes whenever the
+         policy is updated), and an HTTPS-hosted policy file at
+         <code>https://mta-sts.&lt;domain&gt;/.well-known/mta-sts.txt</code> that lists the actual
+         mode and the exact set of MX hostnames authorized to receive mail for the domain. Because
+         the policy file is fetched over HTTPS with normal certificate validation, an attacker who
+         can only manipulate the SMTP path cannot forge or strip it.
+       </p>
+       <h2>How to interpret the result</h2>
+       <p>
+         This checker validates both halves independently. If no DNS record is found, MTA-STS is
+         simply not enabled for the domain — sending servers have no way to know a strict policy is
+         expected and will fall back to ordinary opportunistic TLS. If the DNS record exists, the
+         tool fetches the policy file and reports its <code>mode</code>: <code>enforce</code> means
+         other mail servers must refuse to deliver mail if they cannot establish a validated TLS
+         connection to one of the listed MX hosts; <code>testing</code> means failures are reported
+         (if TLS-RPT is also configured) but delivery still proceeds even on failure, intended as a
+         safe rollout phase; <code>none</code> means the policy is defined but explicitly disabled,
+         which is functionally equivalent to not having MTA-STS at all. A DNS record present without
+         a reachable policy file is itself a misconfiguration worth flagging — it usually means the
+         <code>mta-sts</code> subdomain's certificate is invalid, DNS for it is missing, or the file
+         is not being served correctly.
+       </p>
+       <h2>Common use cases</h2>
+       <p>
+         This tool is used when rolling out MTA-STS for the first time, to confirm both the DNS
+         record and the policy file are correctly published and mutually consistent before trusting
+         that inbound mail delivery is actually protected. It is also useful when auditing a
+         domain's mail security posture alongside SPF, DKIM and DMARC (which protect against sender
+         spoofing but say nothing about transport encryption), and when diagnosing delivery
+         complaints from senders who report TLS negotiation failures against a domain that recently
+         changed its MX hosts without updating the corresponding <code>mx:</code> entries in the
+         policy file.
+       </p>
+       <h2>Limitations</h2>
+       <p>
+         This tool reports what the domain currently publishes; it cannot tell you whether every
+         sending mail server on the internet actually honors MTA-STS, since support depends on the
+         sender implementing RFC 8461 (major providers like Gmail and Outlook do). It also does not
+         verify that the MX hosts listed in the policy file match the domain's actual DNS MX
+         records — that comparison is worth doing manually with the MX Lookup tool, since a stale
+         policy file listing decommissioned mail servers can cause legitimate mail from
+         MTA-STS-aware senders to be rejected outright.
+       </p>
+       <h2>MTA-STS and TLS-RPT work together</h2>
+       <p>
+         MTA-STS on its own is a one-way street: once enforcement is turned on, the domain owner has
+         no visibility into connections that fail against the policy unless TLS-RPT (RFC 8460) is
+         also configured, since sending servers only report failures back if a reporting address is
+         published. For this reason, best practice is to deploy MTA-STS starting in
+         <code>testing</code> mode together with a working TLS-RPT record, review the reports for a
+         period to confirm no legitimate mail server is failing the TLS requirement, and only then
+         switch to <code>mode: enforce</code>. Use the TLS-RPT Checker alongside this tool to confirm
+         that reporting is actually in place before relying on enforce mode.
+       </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+       ("What happens if the DNS record exists but the policy file can't be fetched?", "Sending servers that already cached a valid policy may still enforce it until it expires, but new senders will typically fall back to normal opportunistic TLS — this is reported as a point of attention since it likely indicates a misconfiguration on the mta-sts subdomain."),
+       ("Is mode: testing the same as not having MTA-STS?", "No. In testing mode, TLS negotiation failures are still detected and reported (if TLS-RPT is configured), but delivery is not blocked — it is a safe way to validate a policy before switching to enforce."),
+       ("Does MTA-STS replace SPF, DKIM and DMARC?", "No. MTA-STS only protects the transport layer (encrypting mail in transit to the correct MX hosts). SPF, DKIM and DMARC protect against sender spoofing — the two are complementary, not interchangeable."),
+     ] %}
+     {% if mode == "form" %}
+ <section class="mt-10">
+       <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+       {{ faq_accordion(faqs) }}
+     </section>
+ {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

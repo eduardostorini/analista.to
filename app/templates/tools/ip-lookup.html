@@ -95,7 +95,9 @@
         brings together two complementary pieces of information about an IP address: <strong>reverse DNS</strong> (PTR
         record), which is the domain name officially associated with that IP by its operator, and approximate
         <strong>geolocation and provider</strong> data (ASN, responsible organization, and
-        estimated location), obtained from public IP routing and geolocation databases.
+        estimated location), obtained from public IP routing and geolocation databases. Having detailed
+        information about your active IP is crucial for understanding how data flows from your browser or server
+        across various transit networks.
       </p>
       <h2>How to interpret the result</h2>
       <p>
@@ -117,7 +119,9 @@
         identify whether a request comes from a cloud provider (possible bot/scraper) or
         from a residential connection, confirm the reverse DNS of their own servers (important for
         email sending reputation, since many receiving servers check the PTR),
-        or simply understand where a connection comes from when investigating a security incident.
+        or simply understand where a connection comes from when investigating a security incident. It is
+        also commonly used by network engineers to verify regional routing configurations or check if their
+        assigned IP ranges are correctly identified in external mapping databases.
       </p>
       <h2>Limitations</h2>
       <p>
@@ -126,7 +130,8 @@
         security reasons (SSRF protection), this tool does not perform any direct connection
         to the provided IP — only reverse DNS queries and a public
         geolocation database, so temporary unavailability of these external sources may leave
-        some fields blank.
+        some fields blank. In addition, proxies, virtual private networks (VPNs), and Tor relays can mask the
+        actual user location, rendering database-derived geolocation estimates incorrect for those connections.
       </p>
       <h2>ASN and the structure of the internet</h2>
       <p>
@@ -139,7 +144,8 @@
         more reliable than geolocation itself, because it reflects who effectively operates
         that block of addresses — information formally registered with regional internet
         registries (such as LACNIC in Latin America), unlike the estimated physical
-        location, which depends on commercial third-party databases that are not always up to date.
+        location, which depends on commercial third-party databases that are not always up to date. This system forms
+        the structural backbone of worldwide routing.
       </p>
     </section>
 {% endif %}

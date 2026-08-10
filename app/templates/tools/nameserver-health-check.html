@@ -1,0 +1,206 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Nameserver Health Check{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check that every nameserver for a domain is reachable and reports a consistent SOA serial, revealing lame delegations and unsynchronized zones.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Nameserver Health Check</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check nameservers</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-lg text-brand-900">{{ data.domain }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.exists %}
+          <p class="badge-danger">Domain is not registered or has no DNS delegation</p>
+        {% else %}
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="badge-neutral">{{ data.nameserver_count }} nameserver(s)</span>
+            <span class="badge-{{ 'success' if data.serials_consistent else 'danger' }}">
+              {{ 'SOA serials consistent' if data.serials_consistent else 'SOA serial mismatch' }}
+            </span>
+          </div>
+
+          {% if data.nameservers %}
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead>
+                <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                  <th class="py-2 pr-4">Nameserver</th>
+                  <th class="py-2 pr-4">IP</th>
+                  <th class="py-2 pr-4">Reachable</th>
+                  <th class="py-2 pr-4">SOA serial</th>
+                  <th class="py-2 pr-4">Time</th>
+                  <th class="py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for ns in data.nameservers %}
+                <tr class="border-b border-slate-100 align-top">
+                  <td class="py-2 pr-4 font-medium text-slate-700">{{ ns.host }}</td>
+                  <td class="py-2 pr-4 font-mono text-xs text-slate-500">{{ ns.ip or '—' }}</td>
+                  <td class="py-2 pr-4">
+                    <span class="badge-{{ 'success' if ns.reachable else 'danger' }}">{{ 'Yes' if ns.reachable else 'No' }}</span>
+                  </td>
+                  <td class="py-2 pr-4 font-mono text-xs text-slate-500">{{ ns.soa_serial or '—' }}</td>
+                  <td class="py-2 pr-4 text-slate-500">{{ ns.response_time_ms ~ ' ms' if ns.response_time_ms is not none else '—' }}</td>
+                  <td class="py-2"><span class="badge-neutral">{{ ns.status }}</span></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% endif %}
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is a nameserver health check?</h2>
+      <p>
+        Every domain is delegated to a set of authoritative nameservers, listed in its NS
+        records, and every one of those nameservers is supposed to be able to answer
+        queries about the domain identically and reliably. In practice, this is not always
+        true: a nameserver can be temporarily or permanently unreachable, misconfigured to
+        not actually serve the zone it is delegated for (a condition known as "lame
+        delegation"), or simply out of sync with the others because a recent zone update
+        was pushed to some nameservers but not all of them. A Nameserver Health Check
+        queries every nameserver listed for a domain directly and independently — bypassing
+        any single resolver's cache — and compares how each one responds, which is the most
+        direct way to catch these problems before they cause intermittent resolution
+        failures for real users.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        Each row in the results table represents one nameserver delegated for the domain.
+        The "reachable" column shows whether that specific nameserver responded correctly
+        to an SOA (Start of Authority) query, which every authoritative nameserver for a
+        zone must be able to answer; a "No" here, combined with a status like
+        <code>timeout</code>, <code>no_nameservers</code>, or <code>no_answer</code>, is a
+        strong signal of a lame or broken delegation for that specific server. The "SOA
+        serial" column shows the zone's version number as reported by each nameserver — a
+        higher serial means a more recent version of the zone data. If all reachable
+        nameservers report the same serial, the zone is fully synchronized; if serials
+        differ, some nameservers are still serving an older version of the zone, which
+        typically resolves itself once the zone transfer between the primary and secondary
+        nameservers completes, but can also indicate a broken or stalled zone transfer if
+        it persists.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        DNS administrators run this check immediately after adding, removing, or migrating
+        a nameserver to confirm the new one is correctly serving the zone and that the
+        change has fully propagated across every delegated server, not just the primary
+        one. It is also a standard step when diagnosing intermittent DNS resolution
+        problems reported by only some users — since which nameserver answers a given
+        query is effectively random from the resolver's perspective, a single lame
+        nameserver among several healthy ones can cause a fraction of all queries to fail
+        or return stale data, a pattern that is otherwise very difficult to reproduce and
+        diagnose without checking each nameserver individually. Hosting providers and
+        registrars use similar checks internally to monitor the health of secondary DNS
+        services they offer, and security auditors use it to flag domains with a single
+        point of failure (all nameservers on the same network or provider) or with
+        unreachable or misconfigured delegations that could be exploited or that indicate
+        neglected infrastructure.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        This check queries each nameserver's currently-resolved IP address at the moment
+        of the request; if a nameserver hostname itself has no A record, it is reported as
+        unresolvable rather than checked directly, since there is no IP address to query
+        over IPv4 without resolving one first. A nameserver responding correctly to a
+        single SOA query at one point in time does not guarantee it is consistently
+        healthy — transient network issues, rate limiting on the nameserver, or a brief
+        maintenance window can all cause a temporary failure that does not reflect the
+        server's normal operating condition, so a single failed check is worth
+        re-confirming before concluding a nameserver is permanently broken. This tool also
+        does not verify IPv6 (AAAA) reachability for nameservers, only IPv4.
+      </p>
+      <h2>What causes SOA serial mismatches</h2>
+      <p>
+        In a standard DNS setup, one nameserver acts as the primary (holding the
+        authoritative, editable copy of the zone) and the others act as secondaries that
+        periodically pull updates from the primary via a zone transfer, governed by the
+        refresh, retry, and expire intervals published in the zone's SOA record. A serial
+        mismatch simply means one or more secondaries have not yet completed their next
+        scheduled transfer since the last change — usually resolving itself within the
+        configured refresh interval, often just a few minutes. A persistent mismatch that
+        does not resolve after that interval has passed typically points to a firewall
+        blocking zone transfer traffic between the primary and a secondary, an incorrect
+        transfer configuration (such as an IP allowlist that was not updated), or a
+        secondary nameserver that has stopped polling for updates entirely.
+      </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+      ("What does 'lame delegation' mean?", "It means a nameserver is listed in a domain's NS records but does not actually respond as an authoritative server for that zone — usually because it was removed from the DNS provider's configuration without also being removed from the domain's delegation at the registrar."),
+      ("Why do my nameservers show different SOA serials?", "This usually just means a recent zone change has not yet propagated to every secondary nameserver via zone transfer, which normally resolves within the refresh interval defined in the SOA record. A mismatch that persists for a long time can indicate a blocked or misconfigured zone transfer."),
+      ("Is it bad to have only one nameserver?", "Yes. Best practice is to have at least two nameservers, ideally on different networks or providers, so that if one becomes unreachable the domain can still be resolved by the others."),
+    ] %}
+    {% if mode == "form" %}
+    <section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

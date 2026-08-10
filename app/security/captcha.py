@@ -80,7 +80,7 @@ class MathCaptchaProvider(CaptchaProvider):
         answer = a + b
         nonce = secrets.token_urlsafe(9)
         token = self._serializer().dumps({"answer": answer, "nonce": nonce})
-        return {"question": f"What is {a} + {b}?", "token": token}
+        return {"question": f"Quanto é {a} + {b}?", "token": token}
 
     def verify(self, payload: dict) -> None:
         token = payload.get("math_token")

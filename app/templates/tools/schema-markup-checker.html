@@ -1,0 +1,197 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Schema Markup Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Validate a page's JSON-LD structured data and check for common required fields.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Schema Markup Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Page URL</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check structured data</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="break-all font-mono text-sm text-brand-900">{{ data.url }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.has_structured_data %}
+          <p class="badge-warning">No JSON-LD structured data found</p>
+        {% else %}
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="badge-neutral">{{ data.block_count }} block(s)</span>
+            {% for t in data.total_types_found %}<span class="badge-neutral font-mono">{{ t }}</span>{% endfor %}
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead>
+                <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                  <th class="py-2 pr-4">#</th>
+                  <th class="py-2 pr-4">Status</th>
+                  <th class="py-2 pr-4">Types</th>
+                  <th class="py-2">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for block in data.blocks %}
+                <tr class="border-b border-slate-100 align-top">
+                  <td class="py-2 pr-4 text-slate-500">{{ block.index }}</td>
+                  <td class="py-2 pr-4">
+                    <span class="badge-{{ 'success' if block.valid else 'danger' }}">{{ 'valid' if block.valid else 'invalid' }}</span>
+                  </td>
+                  <td class="py-2 pr-4 font-mono text-xs text-slate-700">{{ block.types | join(", ") if block.types else "—" }}</td>
+                  <td class="py-2 text-xs">
+                    {% for err in block.errors %}<p class="text-rose-600">{{ err }}</p>{% endfor %}
+                    {% for warn in block.warnings %}<p class="text-amber-700">{{ warn }}</p>{% endfor %}
+                    {% if not block.errors and not block.warnings %}<span class="text-slate-400">—</span>{% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+       <h2>What is schema markup?</h2>
+       <p>
+         Schema markup, most commonly implemented today as JSON-LD (JavaScript Object Notation for Linked
+         Data), is structured data embedded in a page's HTML via a
+         <code>&lt;script type="application/ld+json"&gt;</code> block, following the shared vocabulary
+         defined at schema.org. Instead of forcing a search engine to infer what a page is about purely
+         from visible text and layout, structured data explicitly labels the page's content — this is a
+         "Product" with this name, this price, and this availability; this is an "Article" with this
+         headline, this author, and this publish date; this is a list of "FAQPage" questions and answers.
+         Search engines use this explicit data to power rich results in search listings — star ratings,
+         prices, breadcrumb trails, FAQ dropdowns, event dates — and increasingly as a machine-readable
+         summary of the page for other purposes. The {{ site_name }} Schema Markup Checker fetches the
+         submitted page, locates every JSON-LD block (including items nested inside an
+         <code>@graph</code> array), validates that each one is syntactically correct JSON, and performs
+         a light check for fields commonly expected on well-known schema.org types.
+       </p>
+       <h2>How to interpret the result</h2>
+       <p>
+         Each row in the result table corresponds to one <code>&lt;script type="application/ld+json"&gt;</code>
+         block found on the page. A block marked invalid failed to parse as JSON at all — this is a hard
+         error, usually caused by a missing comma, an unescaped quote, or a templating bug that
+         concatenated broken values into the block, and it means search engines will likely ignore that
+         entire block. A block marked valid is syntactically correct JSON, and the tool lists every
+         <code>@type</code> it declares. For a handful of common types — Organization, LocalBusiness,
+         Product, Article, and FAQPage — the tool also checks for fields that are typically expected for
+         that type to be useful (for example, an Article missing <code>headline</code>,
+         <code>author</code>, or <code>datePublished</code>). These are shown as warnings, not errors:
+         they do not mean the JSON-LD is broken, only that it may be incomplete relative to common
+         practice and to what search engines look for when deciding whether to grant a rich result.
+       </p>
+       <h2>Common use cases</h2>
+       <p>
+         E-commerce teams use this tool to verify that Product schema is correctly emitted on every
+         product page template, since a missing <code>offers</code> or <code>review</code> field can be
+         the difference between showing a price and star rating directly in search results or not.
+         Publishers use it to confirm that Article schema carries a proper <code>headline</code>,
+         <code>author</code>, and <code>datePublished</code>, which search engines use for news and
+         top-stories placements. Local businesses use it to check LocalBusiness or Organization markup
+         for the name, URL, and contact details that feed knowledge panels. It is also a routine step
+         after a CMS migration or template redesign, since structured data is often generated by a
+         specific plugin or code path that can silently break — producing malformed JSON — without any
+         visible symptom on the rendered page itself.
+       </p>
+       <h2>Limitations</h2>
+       <p>
+         This tool checks JSON syntax validity and a small, deliberately limited set of recommended
+         fields for a handful of common types; it is not a full replacement for schema.org's own
+         validation or Google's Rich Results Test, which check hundreds of type-specific requirements
+         and simulate exactly which rich result (if any) a given page qualifies for. A block can be
+         syntactically valid JSON-LD, and pass every check this tool performs, and still fail to earn a
+         rich result because of type-specific requirements this tool does not check, content-quality
+         guidelines, or values that do not match the actual visible content of the page — search engines
+         penalize structured data that misrepresents what a user actually sees. This tool also only
+         reads JSON-LD; some sites use the older Microdata or RDFa formats instead, which are not
+         inspected here.
+       </p>
+       <h2>Why invalid JSON-LD is worse than no JSON-LD</h2>
+       <p>
+         It is worth stressing that a JSON-LD block that fails to parse is not simply "ignored gracefully"
+         in every case — depending on how a particular crawler or validator handles malformed JSON, a
+         single broken block can sometimes prevent otherwise valid structured data elsewhere on the page
+         from being read correctly, and it always represents a wasted opportunity since the intended rich
+         result will not be granted. Because structured data is typically generated automatically by a
+         CMS, theme, or plugin rather than hand-written, it is easy for a template bug — an unescaped
+         apostrophe in a product name, a price rendered without quotes, a locale-specific decimal
+         separator — to silently corrupt every page that uses that template. Periodically re-validating
+         JSON-LD after content or template changes catches these regressions before they accumulate
+         across thousands of pages.
+       </p>
+    </section>
+{% endif %}
+
+{% set faqs = [
+       ("Does structured data guarantee a rich result in Google?", "No. Valid, complete structured data makes a page eligible for a rich result, but Google decides whether and when to display one based on many additional factors, including overall page quality and search demand."),
+       ("What is @graph and why does it matter?", "@graph is a JSON-LD convention for bundling multiple related entities (for example a WebSite and an Organization) into a single script block instead of using several separate blocks. This tool automatically looks inside @graph arrays and reports every entity it finds."),
+       ("My block is valid JSON but still has warnings — is that a problem?", "Warnings mean the block is missing a field that is commonly expected for that schema type (for example a Product without offers or review), not that the JSON itself is broken. Filling in the missing fields improves your chances of qualifying for a rich result."),
+     ] %}
+     {% if mode == "form" %}
+ <section class="mt-10">
+       <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+       {{ faq_accordion(faqs) }}
+     </section>
+ {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

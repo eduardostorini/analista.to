@@ -1,0 +1,179 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}DMARC Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check the DMARC policy of a domain — enforcement level, percentage, alignment and report addresses — and how unauthenticated email is handled.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">DMARC Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check DMARC</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-lg text-brand-900">{{ data.domain }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.has_dmarc %}
+          <p class="badge-danger">No DMARC record found</p>
+        {% else %}
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="badge-{{ 'success' if data.policy == 'reject' else ('neutral' if data.policy == 'quarantine' else 'danger') }}">p={{ data.policy or 'invalid' }}</span>
+            {% if data.subdomain_policy %}<span class="badge-neutral">sp={{ data.subdomain_policy }}</span>{% endif %}
+            <span class="badge-{{ 'success' if data.percentage == 100 else 'danger' }}">pct={{ data.percentage }}%</span>
+            <span class="badge-neutral">adkim={{ data.dkim_alignment }}</span>
+            <span class="badge-neutral">aspf={{ data.spf_alignment }}</span>
+          </div>
+          <p class="break-all rounded-lg bg-slate-50 p-3 font-mono text-xs text-slate-600">{{ data.record }}</p>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p class="mb-1 text-xs text-slate-400">Aggregate reports (rua)</p>
+              <p class="break-all font-mono text-sm text-slate-700">{{ data.aggregate_reports_to or "—" }}</p>
+            </div>
+            <div>
+              <p class="mb-1 text-xs text-slate-400">Forensic reports (ruf)</p>
+              <p class="break-all font-mono text-sm text-slate-700">{{ data.forensic_reports_to or "—" }}</p>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+       <h2>What is DMARC?</h2>
+       <p>
+         DMARC (Domain-based Message Authentication, Reporting & Conformance) is an email
+         authentication standard published as a TXT record at <code>_dmarc.&lt;domain&gt;</code>
+         that ties together the results of SPF and DKIM and tells receiving mail servers what to
+         do when a message fails both — and, critically, whether the domain shown in the message's
+         visible "From" header actually matches the domain that was authenticated. Without DMARC,
+         SPF and DKIM only prove that a specific sending server or signing key was authorized; they
+         say nothing about whether the address a human recipient actually sees was the one that
+         passed. DMARC closes that gap by requiring "alignment" between the authenticated domain and
+         the visible one, and by giving domain owners a policy (<code>p=</code>) to instruct
+         receivers on how strictly to enforce it, plus a reporting address (<code>rua=</code>) to
+         receive daily summaries of every message claiming to be from the domain — authenticated or
+         not. The {{ site_name }} DMARC Checker fetches this record, parses every tag, and flags
+         configuration choices that leave a domain exposed to spoofing or that were never tightened
+         beyond the initial "monitoring only" phase.
+       </p>
+       <h2>How to interpret the result</h2>
+       <p>
+         The <code>p=</code> tag is the core of the policy: <code>none</code> means the domain is
+         only being monitored — spoofed mail is still delivered normally to inboxes, with reports
+         sent back to the owner for visibility; <code>quarantine</code> asks receivers to treat
+         failing mail as suspicious, typically routing it to spam; <code>reject</code> asks
+         receivers to refuse failing mail outright at the SMTP level. The optional
+         <code>sp=</code> tag overrides this policy specifically for subdomains, useful when a
+         domain sends mail from many subdomains with different trust levels. <code>pct=</code>
+         (default 100) applies the policy to only that percentage of failing messages, letting
+         teams ramp up enforcement gradually instead of switching straight from monitoring to full
+         rejection. <code>adkim=</code> and <code>aspf=</code> control alignment strictness: "s"
+         (strict) requires an exact domain match, while "r" (relaxed, the default) accepts a
+         match on the organizational domain, allowing subdomains to align with the parent.
+       </p>
+       <h2>Common use cases</h2>
+       <p>
+         This tool is used to confirm a domain is actually protected against direct-domain
+         spoofing before relying on that assumption — a surprising number of domains, including
+         well-known ones, publish DMARC only at <code>p=none</code> indefinitely, which provides
+         reporting but zero enforcement. It is also used mid-rollout, when a team is deliberately
+         raising <code>pct=</code> in stages from a small percentage toward 100 while watching
+         aggregate reports for false positives, and as a pre-migration check before switching email
+         providers, since a new provider's messages need to pass SPF or DKIM in alignment with the
+         visible From domain or they will be caught by the very policy the domain owner published.
+       </p>
+       <h2>Limitations</h2>
+       <p>
+         This tool validates the syntax and structure of the DMARC record itself; it cannot tell
+         you whether a specific message you received actually passed DMARC — for that, inspect the
+         <code>Authentication-Results</code> header of the message with the Email Header Analyzer.
+         It also does not evaluate the aggregate (<code>rua</code>) or forensic (<code>ruf</code>)
+         reports a domain receives, which is where the real evidence of spoofing attempts and
+         legitimate-but-misaligned senders (like a forgotten marketing platform) actually shows up
+         over time — those reports need to be collected and reviewed separately, often through a
+         dedicated DMARC monitoring service.
+       </p>
+       <h2>Rolling out DMARC safely</h2>
+       <p>
+         Moving straight to <code>p=reject</code> without first monitoring aggregate reports is a
+         common and costly mistake — it is easy to forget a legitimate sending source (an old CRM,
+         a support ticketing tool, a payroll provider) that has been sending mail on the domain's
+         behalf without proper SPF/DKIM alignment for years. The recommended path is to publish
+         <code>p=none</code> first with a working <code>rua=</code> address, review the reports for
+         a few weeks to identify every legitimate sender, fix alignment for each one, then move to
+         <code>p=quarantine</code> at a low <code>pct=</code>, and only reach <code>p=reject</code>
+         at <code>pct=100</code> once reports show no more legitimate failures. This tool is meant
+         to be used repeatedly through that process, not just once.
+       </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+       ("What does p=none actually do?", "It only monitors — unauthenticated mail is still delivered normally, but the domain owner receives reports via the rua= address. It does not reject or quarantine anything."),
+       ("Why is there no rua= address a problem?", "Without an rua= address, the domain owner receives no aggregate reports and has no visibility into who is sending mail as the domain, legitimately or not — including spoofing attempts."),
+       ("What is the difference between DMARC and SPF/DKIM?", "SPF and DKIM authenticate the sending server or signing key. DMARC ties those results to the domain shown to the recipient and tells receivers what to do on failure — SPF and DKIM alone do not provide that enforcement layer."),
+     ] %}
+     {% if mode == "form" %}
+ <section class="mt-10">
+       <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+       {{ faq_accordion(faqs) }}
+     </section>
+ {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

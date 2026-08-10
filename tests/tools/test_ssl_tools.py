@@ -12,7 +12,7 @@ _REQUEST = httpx.Request("GET", "https://example.com/")
 
 def test_security_headers_scores_and_flags_missing_critical(mocker):
     mock_client = mocker.patch("app.tools.ssl.security_headers.SafeHTTPClient")
-    mock_client.return_value.get.return_value = httpx.Response(
+    mock_client.return_value.request.return_value = httpx.Response(
         200,
         headers={"X-Content-Type-Options": "nosniff", "X-Frame-Options": "SAMEORIGIN"},
         request=_REQUEST,
@@ -28,7 +28,7 @@ def test_security_headers_scores_and_flags_missing_critical(mocker):
 
 def test_security_headers_full_score(mocker):
     mock_client = mocker.patch("app.tools.ssl.security_headers.SafeHTTPClient")
-    mock_client.return_value.get.return_value = httpx.Response(
+    mock_client.return_value.request.return_value = httpx.Response(
         200,
         headers={
             "Strict-Transport-Security": "max-age=63072000",

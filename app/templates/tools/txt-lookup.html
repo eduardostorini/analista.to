@@ -71,6 +71,9 @@
      Console, Microsoft 365, and marketing tools. {{ site_name }} TXT Lookup fetches all
      TXT records published at the root of the informed domain and tries to automatically
      identify the purpose of each one, based on known patterns at the start of the value.
+     These records act as a simple but highly effective metadata container that allows
+     different internet protocols to safely query properties of a domain name without having
+     to contact the web servers directly, making it extremely lightweight and efficient.
    </p>
    <h2>How to interpret the result</h2>
    <p>
@@ -82,7 +85,8 @@
      Google. Records classified as "other" cover everything from verification for other platforms
      (Facebook, Adobe, Stripe, Zoom, among dozens of services) to internal company notes — there
      is nothing wrong with having multiple TXT records coexisting, since each application reads only
-     what it recognizes and ignores the rest.
+     what it recognizes and ignores the rest. Maintaining a clear understanding of these records
+     prevents duplicate configurations or outdated verifications from remaining active indefinitely.
    </p>
    <h2>Common use cases</h2>
    <p>
@@ -91,7 +95,8 @@
      before clicking "verify" in a service panel, or to locate forgotten integration records from
      old services that can be safely removed. Security teams also review TXT records during audits,
      since excessively permissive SPF configurations or abandoned verification records can indicate
-     domain governance issues.
+     domain governance issues. It is also an important tool when troubleshooting email delivery failures
+     or validation errors during new SaaS application setups that require custom DNS verifications.
    </p>
    <h2>Limitations</h2>
    <p>
@@ -99,7 +104,8 @@
      intermediate resolvers — in that case, the displayed value may appear incomplete even though the
      published record is correct. Automatic classification is based on known patterns and may not
      recognize proprietary or very recent formats, falling into the "other" category in such cases. As
-     with any DNS query, recent changes may take up to the configured TTL to fully propagate.
+     with any DNS query, recent changes may take up to the configured TTL to fully propagate. In addition,
+     some security setups restrict direct DNS queries, which might cause external lookups to show empty or stale values.
    </p>
    <h2>TXT as domain ownership verification mechanism</h2>
    <p>
@@ -109,7 +115,8 @@
      of the domain — only after that record is published and propagated does the platform grant
      full access to the features linked to the domain. This mechanism is preferred over other
      verification methods (like file upload) precisely because it does not require access to the web
-     server, only the DNS panel, making it compatible with any type of hosting or site architecture.
+     server, only the DNS panel, making it compatible with any type of hosting or site architecture. It remains
+     a foundational protocol for modern domain identity administration.
    </p>
  </section>
 {% endif %}

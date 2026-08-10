@@ -57,6 +57,10 @@ def load_tools() -> ToolRegistry:
     from app.tools.dns.txt_lookup import TxtLookupTool
     from app.tools.dns.traceroute import TracerouteTool
     from app.tools.dns.reverse_nameserver_lookup import ReverseNameserverLookupTool
+    from app.tools.dns.dmarc_lookup import DmarcLookupTool
+    from app.tools.dns.dns_propagation_checker import DnsPropagationCheckerTool
+    from app.tools.dns.dnssec_checker import DnssecCheckerTool
+    from app.tools.dns.nameserver_health_check import NameserverHealthCheckTool
     from app.tools.domain.ip_lookup import IpLookupTool
     from app.tools.domain.open_ports_lookup import OpenPortsLookupTool
     from app.tools.domain.ping import PingTool
@@ -66,18 +70,34 @@ def load_tools() -> ToolRegistry:
     from app.tools.domain.whois_rdap import WhoisRdapTool
     from app.tools.email.blocklist_lookup import BlocklistLookupTool
     from app.tools.email.spf_checker import SpfCheckerTool
+    from app.tools.email.dkim_checker import DkimCheckerTool
+    from app.tools.email.header_analyzer import EmailHeaderAnalyzerTool
+    from app.tools.email.mta_sts_checker import MtaStsCheckerTool
+    from app.tools.email.tls_rpt_checker import TlsRptCheckerTool
+    from app.tools.email.smtp_server_test import SmtpServerTestTool
     from app.tools.http.brotli_checker import BrotliCheckerTool
     from app.tools.http.http_headers import HttpHeadersTool
     from app.tools.http.http_version_checker import HttpVersionCheckerTool
     from app.tools.http.redirect_checker import RedirectCheckerTool
     from app.tools.http.tech_detector import TechDetectorTool
+    from app.tools.http.cors_checker import CorsCheckerTool
+    from app.tools.http.uptime_checker import WebsiteUptimeCheckerTool
     from app.tools.seo.meta_tags import MetaTagsTool
     from app.tools.seo.robots_checker import RobotsCheckerTool
     from app.tools.seo.sitemap_checker import SitemapCheckerTool
     from app.tools.seo.page_size_checker import PageSizeCheckerTool
     from app.tools.seo.open_graph_checker import OpenGraphCheckerTool
+    from app.tools.seo.canonical_checker import CanonicalCheckerTool
+    from app.tools.seo.hreflang_checker import HreflangCheckerTool
+    from app.tools.seo.schema_checker import SchemaMarkupCheckerTool
+    from app.tools.seo.broken_link_checker import BrokenLinkCheckerTool
+    from app.tools.seo.website_audit import WebsiteAuditTool
     from app.tools.ssl.security_headers import SecurityHeadersTool
     from app.tools.ssl.ssl_certificate import SslCertificateTool
+    from app.tools.ssl.ssl_deep_test import SslDeepTestTool
+    from app.tools.ssl.hsts_checker import HstsCheckerTool
+    from app.tools.ssl.csp_checker import CspCheckerTool
+    from app.tools.performance.pagespeed_checker import PageSpeedCheckerTool
     from app.tools.utils.qr_code_generator import QrCodeGeneratorTool
     from app.tools.utils.hash_generator import HashGeneratorTool
 
@@ -87,6 +107,10 @@ def load_tools() -> ToolRegistry:
         TxtLookupTool,
         TracerouteTool,
         ReverseNameserverLookupTool,
+        DmarcLookupTool,
+        DnsPropagationCheckerTool,
+        DnssecCheckerTool,
+        NameserverHealthCheckTool,
         WhoisRdapTool,
         IpLookupTool,
         OpenPortsLookupTool,
@@ -99,15 +123,31 @@ def load_tools() -> ToolRegistry:
         SitemapCheckerTool,
         PageSizeCheckerTool,
         OpenGraphCheckerTool,
+        CanonicalCheckerTool,
+        HreflangCheckerTool,
+        SchemaMarkupCheckerTool,
+        BrokenLinkCheckerTool,
+        WebsiteAuditTool,
         HttpHeadersTool,
         HttpVersionCheckerTool,
         BrotliCheckerTool,
         RedirectCheckerTool,
         TechDetectorTool,
+        CorsCheckerTool,
+        WebsiteUptimeCheckerTool,
         SslCertificateTool,
+        SslDeepTestTool,
         SecurityHeadersTool,
+        HstsCheckerTool,
+        CspCheckerTool,
         SpfCheckerTool,
+        DkimCheckerTool,
+        EmailHeaderAnalyzerTool,
+        MtaStsCheckerTool,
+        TlsRptCheckerTool,
+        SmtpServerTestTool,
         BlocklistLookupTool,
+        PageSpeedCheckerTool,
         QrCodeGeneratorTool,
         HashGeneratorTool,
     ):

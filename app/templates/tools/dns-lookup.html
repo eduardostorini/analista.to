@@ -87,62 +87,69 @@
 
     {% if mode == "form" %}
 <section class="prose-tool mt-10 space-y-4">
-       <h2>What is DNS Lookup?</h2>
-       <p>
-         DNS (Domain Name System) is the system that translates human-readable
-         domain names like <code>example.com</code> into information that servers
-         and applications use to communicate — the most well-known is the IP
-         address, but DNS carries much more than that. The {{ site_name }} DNS Lookup
-         queries, in a single analysis, the seven most commonly used record types
-         for domain administration: <strong>A</strong> (IPv4 address),
-         <strong>AAAA</strong> (IPv6 address), <strong>MX</strong> (mail servers),
-         <strong>TXT</strong> (verification, SPF, and other arbitrary strings),
-         <strong>NS</strong> (nameservers responsible for the domain),
-         <strong>CNAME</strong> (aliases for another name), and
-         <strong>SOA</strong> (administrative zone data, such as the primary
-         server and the refresh interval). Instead of running seven separate
-         <code>dig</code> or <code>nslookup</code> commands, you get everything
-         organized in a single table.
-       </p>
-       <h2>How to interpret the result</h2>
-       <p>
-         If the domain has no responding nameservers (NS), it is treated as having
-         no active DNS delegation — which typically means the domain is not
-         registered, has been removed, or the zone has not yet been published by
-         the registrar. When the domain exists, each table row shows the record
-         type and the values found; types with no records appear with a dash, which
-         is normal — not every domain needs, for example, an AAAA (IPv6) or MX
-         (email) record. Pay special attention to the NS: if the nameservers shown
-         are not what you expected (e.g., still pointing to the registrar instead of
-         your hosting provider), this usually indicates that the DNS migration is not
-         complete or that propagation is still in progress. Multiple A records
-         generally indicate load balancing across multiple servers; a CNAME should
-         never coexist with other records at the same name, so if you expected to
-         see a CNAME but did not find it alongside other types, review the zone
-         configuration.
-       </p>
-       <h2>Common use cases</h2>
-       <p>
-         This tool is useful for confirming that a hosting or email provider
-         migration has propagated, for diagnosing why a site is not accessible, for
-         quickly auditing the DNS configuration of a third-party domain before an
-         integration, or simply for understanding how a domain is structured without
-         needing to install command-line tools. Support teams also use DNS Lookup as
-         the first step when investigating "the site won't open" or "email isn't
-         arriving" complaints, since many of these problems stem from incorrect or
-         outdated DNS records.
-       </p>
-       <h2>Limitations</h2>
-       <p>
-         The results reflect what the public DNS servers queried by {{ site_name }}
-         see at the time of the query. Because DNS is distributed and uses cache (TTL)
-         at multiple layers, it is possible that different resolvers around the world
-         still show old values for some hours after a change — this phenomenon is
-         called DNS propagation. If you just changed a record and it does not yet
-         appear updated here, wait for the TTL configured in the zone (typically
-         between a few minutes and a few hours) and try again.
-       </p>
-     </section>
+        <h2>What is DNS Lookup?</h2>
+        <p>
+          DNS (Domain Name System) is the system that translates human-readable
+          domain names like <code>example.com</code> into information that servers
+          and applications use to communicate — the most well-known is the IP
+          address, but DNS carries much more than that. The {{ site_name }} DNS Lookup
+          queries, in a single analysis, the seven most commonly used record types
+          for domain administration: <strong>A</strong> (IPv4 address),
+          <strong>AAAA</strong> (IPv6 address), <strong>MX</strong> (mail servers),
+          <strong>TXT</strong> (verification, SPF, and other arbitrary strings),
+          <strong>NS</strong> (nameservers responsible for the domain),
+          <strong>CNAME</strong> (aliases for another name), and
+          <strong>SOA</strong> (administrative zone data, such as the primary
+          server and the refresh interval). Instead of running seven separate
+          <code>dig</code> or <code>nslookup</code> commands, you get everything
+          organized in a single table. In addition to these common records, DNS
+          lookup helps developers, system administrators, and security experts
+          investigate routing details and connectivity status across different networks.
+        </p>
+        <h2>How to interpret the result</h2>
+        <p>
+          If the domain has no responding nameservers (NS), it is treated as having
+          no active DNS delegation — which typically means the domain is not
+          registered, has been removed, or the zone has not yet been published by
+          the registrar. When the domain exists, each table row shows the record
+          type and the values found; types with no records appear with a dash, which
+          is normal — not every domain needs, for example, an AAAA (IPv6) or MX
+          (email) record. Pay special attention to the NS: if the nameservers shown
+          are not what you expected (e.g., still pointing to the registrar instead of
+          your hosting provider), this usually indicates that the DNS migration is not
+          complete or that propagation is still in progress. Multiple A records
+          generally indicate load balancing across multiple servers; a CNAME should
+          never coexist with other records at the same name, so if you expected to
+          see a CNAME but did not find it alongside other types, review the zone
+          configuration. Managing your DNS records correctly is essential for maintaining
+          consistent domain uptime, ensuring that visitors reach your correct server IP,
+          and preventing issues with email systems which depend on MX, SPF, and DKIM.
+        </p>
+        <h2>Common use cases</h2>
+        <p>
+          This tool is useful for confirming that a hosting or email provider
+          migration has propagated, for diagnosing why a site is not accessible, for
+          quickly auditing the DNS configuration of a third-party domain before an
+          integration, or simply for understanding how a domain is structured without
+          needing to install command-line tools. Support teams also use DNS Lookup as
+          the first step when investigating "the site won't open" or "email isn't
+          arriving" complaints, since many of these problems stem from incorrect or
+          outdated DNS records. Furthermore, verifying your DNS records helps identify
+          security issues, domain spoofing attempts, or stale records that point to
+          decommissioned servers. This proactive maintenance ensures a solid security baseline.
+        </p>
+        <h2>Limitations</h2>
+        <p>
+          The results reflect what the public DNS servers queried by {{ site_name }}
+          see at the time of the query. Because DNS is distributed and uses cache (TTL)
+          at multiple layers, it is possible that different resolvers around the world
+          still show old values for some hours after a change — this phenomenon is
+          called DNS propagation. If you just changed a record and it does not yet
+          appear updated here, wait for the TTL configured in the zone (typically
+          between a few minutes and a few hours) and try again. Each geographic location
+          and ISP might cache these responses, leading to temporary discrepancies that resolve themselves over time.
+        </p>
+      </section>
 {% endif %}
 
 {% set faqs = [

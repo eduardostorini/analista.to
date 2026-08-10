@@ -1,0 +1,200 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}DNSSEC Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check whether a domain has DNSSEC enabled, inspect its DNSKEY and DS records, and verify whether its chain of trust is intact.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">DNSSEC Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check DNSSEC</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-lg text-brand-900">{{ data.domain }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <span class="badge-{{ 'success' if data.is_signed else 'danger' }}">{{ 'DNSSEC enabled' if data.is_signed else 'DNSSEC not enabled' }}</span>
+          {% if data.is_signed %}
+          <span class="badge-{{ 'success' if data.has_ds else 'danger' }}">{{ 'DS record present' if data.has_ds else 'No DS record' }}</span>
+          <span class="badge-{{ 'success' if data.ad_flag_validated else ('neutral' if data.ad_flag_validated is none else 'warning') }}">
+            {% if data.ad_flag_validated is none %}AD flag: undetermined{% elif data.ad_flag_validated %}AD flag: validated{% else %}AD flag: not set{% endif %}
+          </span>
+          {% endif %}
+        </div>
+
+        {% if data.dnskey_records %}
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                <th class="py-2 pr-4">Key type</th>
+                <th class="py-2 pr-4">Flags</th>
+                <th class="py-2">Algorithm</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for key in data.dnskey_records %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 font-medium text-slate-700">{{ key.key_type }}</td>
+                <td class="py-2 pr-4 font-mono text-xs text-slate-500">{{ key.flags }}</td>
+                <td class="py-2 font-mono text-xs text-slate-500">{{ key.algorithm }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+      <h2>What is DNSSEC?</h2>
+      <p>
+        DNSSEC (Domain Name System Security Extensions) is a set of extensions to the
+        standard DNS protocol that adds cryptographic signatures to DNS responses,
+        allowing a resolver to verify that the answer it received for a query really came
+        from the domain's authoritative nameservers and was not altered or forged in
+        transit. Ordinary DNS has no built-in authenticity mechanism: any party positioned
+        between a resolver and the internet — a compromised network, a rogue Wi-Fi
+        hotspot, an attacker performing DNS cache poisoning — can, in principle, inject a
+        forged response that points a domain to the wrong IP address, redirecting traffic
+        to a malicious server without the user noticing. DNSSEC closes this gap by having
+        the domain's zone owner sign its records with a private key and publish the
+        corresponding public key (and a fingerprint of that key, called a DS record, at
+        the parent zone) so any resolver can verify the signature and build a
+        cryptographic chain of trust from the DNS root all the way down to the specific
+        record being queried.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        This tool checks for the presence of DNSKEY records (the public keys published by
+        the zone) and DS records (the fingerprint of those keys published by the parent
+        zone, which links the domain into the chain of trust). If no DNSKEY records exist,
+        the domain simply does not have DNSSEC enabled — a common and, for most domains,
+        acceptable state. If DNSKEY records exist but no DS record is found, the domain is
+        signing its own records but the parent zone has not been told to trust that
+        signature, which means most validating resolvers will treat the domain as if
+        DNSSEC were not enabled at all — this is a classic misconfiguration that occurs
+        when DNSSEC is enabled at the DNS provider but the resulting DS record was never
+        submitted to the domain registrar. The tool also performs a live query with the
+        EDNS "DO" (DNSSEC OK) bit set and checks whether the resolver's response carries
+        the AD (Authenticated Data) flag, which is the resolver's own confirmation that it
+        successfully validated the signature chain for that query.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        System administrators use this tool right after enabling DNSSEC at their DNS
+        provider to confirm the DS record has been correctly submitted to the registrar
+        and is visible in the chain of trust, since a missing or mismatched DS record
+        silently disables the protection while giving no error to the person who enabled
+        it. Security teams use it during vendor and third-party domain audits to check
+        whether partners or acquired domains have DNSSEC properly configured, particularly
+        for domains used in financial services, government, or other high-assurance
+        contexts where DNS spoofing protection is a compliance requirement. It is also
+        useful when diagnosing DNS resolution failures that only affect DNSSEC-validating
+        resolvers (such as those provided by some ISPs and public DNS services) — a broken
+        DNSSEC chain, rather than a plain missing record, can cause a domain to resolve
+        correctly on some networks and fail entirely (SERVFAIL) on others.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        The AD flag check depends on the recursive resolver used for the query actually
+        performing DNSSEC validation itself; if that resolver does not validate DNSSEC at
+        all, the AD flag will never be set even for a domain with a perfectly intact
+        chain, which this tool reports as "undetermined" rather than a false failure. This
+        tool does not verify the cryptographic signatures byte-by-byte the way a full
+        validating resolver does — it reports the presence of the expected records and the
+        resolver's own validation flag as strong signals, which is sufficient for the vast
+        majority of diagnostic purposes but is not a substitute for a dedicated DNSSEC
+        analyzer when investigating a subtle signing bug. It also does not check for
+        specific algorithm deprecations or key rollover timing issues, which require
+        inspecting signature validity windows over time rather than a single point-in-time
+        query.
+      </p>
+      <h2>Why most domains still don't use DNSSEC</h2>
+      <p>
+        Despite being standardized for over two decades, DNSSEC adoption remains uneven
+        across the internet, largely because it adds operational complexity: keys must be
+        rotated periodically, the DS record must be kept in sync between the DNS provider
+        and the registrar whenever keys change, and a misconfiguration can take an entire
+        domain offline for every DNSSEC-validating resolver in the world, which is a much
+        more severe failure mode than an unsigned domain simply lacking the protection.
+        Domains that handle sensitive transactions, government services, or that are
+        frequent targets of DNS spoofing and cache-poisoning attacks generally benefit the
+        most from enabling it, while the operational risk of a misconfigured chain of
+        trust is the main reason many domain owners choose to leave it disabled or delay
+        adoption.
+      </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+      ("My domain has DNSKEY records but this tool still reports an issue — why?", "This usually means the DS record was never published at the parent zone (registrar), so the chain of trust is broken even though the zone itself is signed. Check your registrar's DNSSEC settings and make sure the DS record matches your current DNSKEY."),
+      ("Is DNSSEC required for my domain?", "No, DNSSEC is optional. It protects against DNS spoofing and cache-poisoning attacks, which makes it valuable for high-assurance domains, but the majority of domains on the internet still operate without it."),
+      ("What does 'AD flag not set' mean?", "It means the resolver used for this query did not mark the response as DNSSEC-validated. This can happen if the resolver itself does not perform DNSSEC validation, or if the domain's chain of trust has a genuine problem — compare it against the DNSKEY/DS results above to tell the two apart."),
+    ] %}
+    {% if mode == "form" %}
+    <section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

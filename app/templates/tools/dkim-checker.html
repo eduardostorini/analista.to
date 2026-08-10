@@ -1,0 +1,186 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}DKIM Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check the DKIM public key published for a domain and selector, including key type, size and validity.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">DKIM Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
+        <input
+          id="input_value" name="input_value" type="text" required class="input"
+          placeholder="{{ tool.input_placeholder }}"
+          value="{{ (submitted_value.split('::', 1)[1] if '::' in submitted_value else submitted_value) if submitted_value else '' }}"
+        >
+      </div>
+      <div>
+        <label for="selector" class="mb-1 block text-sm font-medium text-slate-700">DKIM selector</label>
+        <input
+          id="selector" name="selector" type="text" required class="input"
+          placeholder="default, google, s1..."
+          value="{{ (submitted_value.split('::', 1)[0] if '::' in submitted_value else '') if submitted_value else '' }}"
+        >
+        <p class="mt-1 text-xs text-slate-400">
+          The selector is provider-specific — check your email provider's DKIM setup instructions,
+          or look for a header like <code>DKIM-Signature: ... s=&lt;selector&gt;</code> in a message you sent.
+        </p>
+      </div>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check DKIM</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-lg text-brand-900">{{ data.selector }}._domainkey.{{ data.domain }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.has_dkim %}
+          <p class="badge-danger">No DKIM record found for this selector</p>
+        {% elif not data.has_key %}
+          <p class="badge-danger">Selector revoked (empty public key)</p>
+        {% else %}
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="badge-neutral">{{ (data.key_type or "rsa") | upper }}</span>
+            {% if data.key_size %}
+              <span class="badge-{{ 'success' if data.key_size >= 1024 else 'danger' }}">{{ data.key_size }} bits</span>
+            {% else %}
+              <span class="badge-neutral">Key size unknown</span>
+            {% endif %}
+            {% if data.hash_algorithms %}<span class="badge-neutral">h={{ data.hash_algorithms }}</span>{% endif %}
+          </div>
+          <p class="break-all rounded-lg bg-slate-50 p-3 font-mono text-xs text-slate-600">{{ data.record }}</p>
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+       <h2>What is DKIM?</h2>
+       <p>
+         DKIM (DomainKeys Identified Mail) is an email authentication standard that lets a domain
+         cryptographically sign outgoing messages, so that a receiving server can verify the
+         message left the domain's sending infrastructure unmodified and was not forged. Unlike
+         SPF, which authorizes servers by IP address, DKIM works by having the sending server
+         attach a digital signature (in a <code>DKIM-Signature</code> header) computed over parts
+         of the message using a private key; the receiving server then fetches the corresponding
+         public key from DNS, at <code>&lt;selector&gt;._domainkey.&lt;domain&gt;</code>, and
+         verifies the signature against it. The "selector" is simply a label chosen by whoever
+         configured DKIM for the domain — a domain can publish multiple selectors at once, for
+         example one per email service it uses, and rotate keys by publishing a new selector without
+         disrupting mail signed under the old one. This tool fetches the public key TXT record for
+         a specific domain and selector pair and reports the key's type, size and validity.
+       </p>
+       <h2>How to interpret the result</h2>
+       <p>
+         A healthy result shows a public key (the <code>p=</code> tag) that successfully decodes as
+         an RSA or Ed25519 key of adequate size — 2048-bit RSA is the current common baseline, and
+         anything below 1024 bits is flagged as weak, since it falls short of modern cryptographic
+         recommendations and is increasingly rejected or discounted by major receivers. An empty
+         <code>p=</code> tag is a deliberate and valid DKIM state: it means the selector has been
+         revoked, typically because the key was rotated or a mail service was decommissioned, and
+         any message claiming that selector should now fail verification. A missing record entirely
+         (no TXT record found at that name) most often means the selector you entered is wrong
+         rather than that DKIM is unconfigured — selectors are provider-specific and not
+         standardized, so double-check the exact selector your provider uses before concluding DKIM
+         is absent.
+       </p>
+       <h2>Common use cases</h2>
+       <p>
+         This tool is used whenever you need to confirm a specific DKIM selector is correctly
+         published, most commonly right after configuring a new transactional or marketing email
+         service and adding its recommended DNS records — a typo in the selector or an incomplete
+         copy-paste of a long base64 public key are both common setup mistakes this check catches
+         immediately. It is also used during key rotation, to confirm a new selector is live and
+         resolvable before switching the sending infrastructure over to sign with it, and while
+         auditing an inherited domain's email setup, to catalog which selectors are still active
+         versus revoked but potentially forgotten in signing configuration elsewhere.
+       </p>
+       <h2>Limitations</h2>
+       <p>
+         Because DKIM selectors are not discoverable by DNS alone — there is no record that lists
+         "all selectors used by this domain" — this tool can only check one selector you already
+         know, typically found in the <code>DKIM-Signature</code> header of a message the domain
+         actually sent (look for the <code>s=</code> tag) or in your email provider's own setup
+         documentation. It also validates the key's structure and size but does not verify an
+         actual message signature — that requires the full signed message and is better suited to
+         the Email Header Analyzer, which can parse the signature-related headers of a specific
+         message alongside its Authentication-Results verdict.
+       </p>
+       <h2>DKIM alone does not prevent spoofing</h2>
+       <p>
+         A valid DKIM signature only proves the signed content was not altered and was signed by
+         the domain that owns the matching private key — it does not, by itself, guarantee the
+         message's visible "From" address matches the signing domain, since a message can carry a
+         valid DKIM signature from one domain while displaying an entirely different address to the
+         recipient. That alignment check is exactly what DMARC adds on top of DKIM (and SPF), which
+         is why the three are meant to be deployed together rather than DKIM being treated as
+         sufficient authentication on its own.
+       </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+       ("Where do I find my domain's DKIM selector?", "Check your email provider's DKIM setup instructions, or look at the DKIM-Signature header of a message the domain sent — the s= tag holds the selector."),
+       ("What does an empty public key (p=) mean?", "The selector has been deliberately revoked, typically after key rotation or decommissioning a mail service. It is a valid, expected state, not an error."),
+       ("What key size should I use for DKIM?", "2048-bit RSA is the current common baseline. Keys below 1024 bits are considered weak and flagged by this tool."),
+     ] %}
+     {% if mode == "form" %}
+ <section class="mt-10">
+       <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+       {{ faq_accordion(faqs) }}
+     </section>
+ {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

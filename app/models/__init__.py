@@ -14,6 +14,7 @@ from app.models.search import Search
 from app.models.search_result import SearchResult
 from app.models.tool import Tool
 from app.models.tool_category import ToolCategory
+from app.models.monitoring import MonitoredDomain, MonitoringAlert
 
 __all__ = [
     "AbuseEvent",
@@ -29,4 +30,6 @@ __all__ = [
     "TERMINAL_SEARCH_STATUSES",
     "Tool",
     "ToolCategory",
+    "MonitoredDomain",
+    "MonitoringAlert",
 ]

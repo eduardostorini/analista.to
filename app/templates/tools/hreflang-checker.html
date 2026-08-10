@@ -1,0 +1,191 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Hreflang Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check a page's hreflang alternate tags for correct language/region codes and completeness.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Hreflang Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Page URL</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check hreflang</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="break-all font-mono text-sm text-brand-900">{{ data.url }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.has_hreflang %}
+          <p class="badge-warning">No hreflang tags found</p>
+        {% else %}
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="badge-neutral">{{ data.tag_count }} tag(s)</span>
+            <span class="badge-{{ 'success' if data.has_x_default else 'warning' }}">{{ 'x-default present' if data.has_x_default else 'no x-default' }}</span>
+            <span class="badge-{{ 'success' if data.self_referencing else 'warning' }}">{{ 'self-referencing' if data.self_referencing else 'not self-referencing' }}</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead>
+                <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                  <th class="py-2 pr-4">Hreflang</th>
+                  <th class="py-2 pr-4">Format</th>
+                  <th class="py-2">Href</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for tag in data.tags %}
+                <tr class="border-b border-slate-100 align-top">
+                  <td class="py-2 pr-4 font-mono text-slate-700">{{ tag.hreflang }}</td>
+                  <td class="py-2 pr-4">
+                    <span class="badge-{{ 'success' if tag.valid_format else 'danger' }}">{{ 'valid' if tag.valid_format else 'invalid' }}</span>
+                  </td>
+                  <td class="py-2 break-all font-mono text-xs text-slate-600">{{ tag.href }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+       <h2>What is hreflang?</h2>
+       <p>
+         Hreflang is an HTML attribute, used inside <code>&lt;link rel="alternate" hreflang="..."&gt;</code>
+         tags in a page's <code>&lt;head&gt;</code> (it can also be declared via HTTP header or in an XML
+         sitemap), that tells search engines which language and, optionally, which regional variant a page
+         is written for, and which other URLs on the site are equivalent versions in other
+         languages or regions. A site that publishes content in English, Brazilian Portuguese, and
+         European Portuguese, for example, uses hreflang to link all three versions of the same page
+         together, so that a search engine can serve the right one to each user based on their language
+         and location settings rather than showing everyone the same default version, or worse, showing
+         multiple competing translations as unrelated duplicate content. The {{ site_name }} Hreflang
+         Checker fetches the submitted page, extracts every <code>hreflang</code> alternate tag it
+         declares, and validates the setup against the most common requirements and pitfalls of
+         international SEO.
+       </p>
+       <h2>How to interpret the result</h2>
+       <p>
+         Each row in the result table shows one declared alternate: its language/region code, whether
+         that code follows a valid format, and the URL it points to. A valid code is either a bare
+         language code such as <code>en</code> or <code>pt</code>, a language plus region such as
+         <code>pt-BR</code> or <code>en-US</code>, or the special value <code>x-default</code>, which
+         designates the fallback page to show when no other declared variant matches the user's
+         language. The tool also flags three common configuration mistakes: duplicate codes (the same
+         language/region declared more than once, which is contradictory and confuses crawlers about
+         which URL is authoritative for that variant); a missing <code>x-default</code> when two or
+         more language variants exist, which leaves undefined what should be shown to a visitor whose
+         language does not match any of the declared alternates; and a missing self-reference, meaning
+         the page you checked does not list itself among its own alternates — hreflang implementations
+         require every page in a set to reference all other pages in the set, including itself.
+       </p>
+       <h2>Common use cases</h2>
+       <p>
+         International and multilingual sites use this tool before and after a translation rollout to
+         confirm that every locale correctly cross-references its siblings, since a single broken or
+         missing reciprocal link can quietly remove a whole language variant from consideration in
+         search results for that market. E-commerce companies expanding into new countries use it to
+         validate that country-specific storefronts (for example <code>/us/</code>, <code>/uk/</code>,
+         <code>/br/</code>) are properly linked so that shoppers are matched to the correct currency
+         and shipping region from search results. It is also a standard step in technical SEO audits for
+         any site targeting more than one language, and useful when debugging reports that the "wrong"
+         language version of a page is ranking in a particular country.
+       </p>
+       <h2>Limitations</h2>
+       <p>
+         This tool only reads hreflang tags declared as <code>&lt;link&gt;</code> elements in the raw
+         HTML response; it does not execute JavaScript, so tags injected after page load by a
+         client-side framework will not be detected, and it does not read hreflang annotations declared
+         via HTTP headers (used mainly for non-HTML resources like PDFs) or inside XML sitemaps, which are
+         the two other valid ways to declare hreflang. Crucially, this tool can only validate the page you
+         submit — it cannot verify that the pages it points to reciprocally link back, since hreflang
+         requires every page in a cluster to reference every other page, including itself. A complete
+         audit means running this check on every URL in the language cluster and cross-referencing the
+         results by hand or with a dedicated site-wide crawler.
+       </p>
+       <h2>Getting language and region codes right</h2>
+       <p>
+         A subtle but common error is confusing language codes with region codes, or using invalid or
+         made-up combinations. Hreflang codes should follow ISO 639-1 for the language (two letters, such
+         as <code>en</code>, <code>pt</code>, <code>es</code>) optionally followed by a hyphen and an
+         ISO 3166-1 Alpha-2 region code (two letters, such as <code>BR</code>, <code>US</code>, <code>MX</code>).
+         It is valid to target a language without a region (<code>pt</code> for all Portuguese speakers)
+         or a language with a region (<code>pt-BR</code> specifically for Brazil), but it is invalid to
+         specify a region without a language, and it is a common mistake to swap the order and write
+         something like <code>BR-pt</code> instead of <code>pt-BR</code>. Search engines silently ignore
+         hreflang tags with malformed codes rather than erroring loudly, which is exactly why an automated
+         format check like this one is valuable — the mistake produces no visible symptom until you notice
+         the expected audience simply is not being served the intended page.
+       </p>
+    </section>
+{% endif %}
+
+{% set faqs = [
+       ("Do I need an x-default tag?", "It is not mandatory, but strongly recommended whenever you have two or more language/region variants. It defines the fallback page shown to users whose language does not match any declared alternate."),
+       ("Why does hreflang matter if canonical tags already point search engines to a preferred URL?", "Canonical tags say 'these are duplicates, index only this one.' Hreflang says 'these are equivalent but distinct versions for different audiences, index and serve all of them appropriately.' Using canonical instead of hreflang across language variants can accidentally remove translated pages from a market's search results."),
+       ("Can I declare hreflang in the XML sitemap instead of the HTML head?", "Yes, this is a valid alternative supported by major search engines, and can be more practical for very large sites. This tool currently checks only the HTML <link> tags; sitemap-declared hreflang should be checked separately."),
+     ] %}
+     {% if mode == "form" %}
+ <section class="mt-10">
+       <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+       {{ faq_accordion(faqs) }}
+     </section>
+ {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

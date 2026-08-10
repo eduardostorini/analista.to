@@ -1,0 +1,186 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}CSP Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check a page's Content-Security-Policy header (or meta tag) and flag risky directives like unsafe-inline or wildcard sources.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">CSP Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">URL</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check CSP</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="truncate font-mono text-sm text-brand-900">{{ data.url }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.has_csp %}
+          <p class="badge-danger">No Content-Security-Policy found</p>
+        {% else %}
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="badge-success">CSP present</span>
+            <span class="badge-neutral">source: {{ data.source }}</span>
+          </div>
+          <p class="break-all rounded-lg bg-slate-50 p-3 font-mono text-xs text-slate-600">{{ data.raw_value }}</p>
+          <div>
+            <p class="mb-1 text-xs text-slate-400">Directives</p>
+            <div class="overflow-hidden rounded-lg border border-slate-200">
+              <table class="w-full text-sm">
+                <thead class="bg-slate-50 text-left text-xs uppercase text-slate-400">
+                  <tr><th class="px-4 py-2">Directive</th><th class="px-4 py-2">Values</th></tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  {% for name, values in data.directives.items() %}
+                  <tr>
+                    <td class="px-4 py-2 font-mono">{{ name }}</td>
+                    <td class="px-4 py-2 font-mono text-xs text-slate-600">{{ values | join(' ') if values else "—" }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+<h2>What is a Content-Security-Policy?</h2>
+      <p>
+        Content-Security-Policy (CSP) is an HTTP response header — or, less commonly, an equivalent
+        <code>&lt;meta http-equiv="Content-Security-Policy"&gt;</code> tag in the page's HTML — that
+        tells the browser exactly which origins are allowed to supply scripts, styles, images, fonts,
+        frames, and other resources for a page. It is one of the most effective defenses against
+        Cross-Site Scripting (XSS), because even if an attacker manages to inject a malicious
+        <code>&lt;script&gt;</code> tag into a page, a well-configured CSP can prevent the browser from
+        ever executing it, since the injected script's origin (or the fact that it is inline at all)
+        will not match the allowed policy. This tool fetches the given URL, reads the CSP header and
+        checks for an equivalent meta tag, parses every directive, and flags configurations known to
+        significantly weaken the policy's protection.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        Each directive restricts a specific type of resource — <code>script-src</code> for
+        JavaScript, <code>style-src</code> for CSS, <code>img-src</code> for images, and so on —
+        while <code>default-src</code> acts as the fallback for any directive that is not explicitly
+        listed. This tool specifically flags three well-documented weaknesses: <code>'unsafe-inline'</code>,
+        which allows inline <code>&lt;script&gt;</code> blocks and event handlers to run, defeating a
+        large part of CSP's XSS protection; <code>'unsafe-eval'</code>, which permits the browser to
+        execute strings as code via <code>eval()</code> and similar functions, a common vector for
+        obfuscated malicious payloads; and a bare wildcard (<code>*</code>) in <code>script-src</code>
+        or <code>default-src</code>, which allows loading executable code from literally any origin on
+        the internet. It also flags the absence of a <code>default-src</code> fallback entirely, since
+        without it, any resource type not explicitly restricted is left completely unrestricted by
+        the policy.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        Development and security teams use this tool to verify that a CSP rollout was actually
+        deployed as intended in production, to review third-party or vendor pages before an
+        integration, and to catch regressions where a previously strict policy was loosened (often
+        temporarily, "just to fix a bug") and never tightened back up. It is also useful when
+        auditing a site ahead of a security assessment, since a present-but-weak CSP can create a
+        false sense of protection if not reviewed for these specific pitfalls.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        This tool parses the policy actually delivered by the server for the single URL requested; it
+        does not execute the page or attempt to trigger a real XSS to validate enforcement, and it
+        does not evaluate <code>Content-Security-Policy-Report-Only</code> as equivalent to an
+        enforced policy (report-only policies log violations but do not block anything). A CSP can
+        also legitimately vary by page or route on the same domain, so a single check does not
+        guarantee every page shares the same policy.
+      </p>
+      <h2>Building a CSP without breaking the site</h2>
+      <p>
+        Because a strict CSP can silently break legitimate functionality — a forgotten analytics
+        script domain, an inline style added by a third-party widget, a font served from a CDN not
+        yet listed — the safest rollout path is to deploy the policy first as
+        <code>Content-Security-Policy-Report-Only</code>, paired with a <code>report-uri</code> or
+        <code>report-to</code> endpoint, and observe real violation reports from actual traffic before
+        switching to full enforcement. This avoids the common failure mode of writing an overly
+        permissive policy (or leaning on <code>'unsafe-inline'</code> as a shortcut) just to get past
+        initial testing, which then never gets revisited.
+      </p>
+      <h2>Nonces and hashes as an alternative to unsafe-inline</h2>
+      <p>
+        Modern CSP deployments avoid <code>'unsafe-inline'</code> almost entirely by using per-request
+        cryptographic nonces (a random token added to both the CSP header and each trusted
+        <code>&lt;script nonce="..."&gt;</code> tag) or content hashes (a SHA-256 hash of a specific
+        inline script's exact contents, listed directly in the policy). Both approaches let specific,
+        known inline scripts run while still blocking any injected script an attacker adds, since the
+        attacker cannot predict the nonce for a future request or produce content matching an
+        allow-listed hash — achieving the flexibility of inline scripts without CSP's biggest
+        historical weakness.
+      </p>
+    </section>
+{% endif %}
+
+{% set faqs = [
+      ("Why does the tool flag 'unsafe-inline' as an issue?", "It allows inline scripts and event handlers to execute regardless of their origin, which removes much of CSP's protection against injected XSS payloads."),
+      ("Does a Content-Security-Policy-Report-Only header count as protection?", "No — it only logs violations to a reporting endpoint without blocking anything, so this tool treats it separately from an enforced policy."),
+      ("Can I have CSP in both a header and a meta tag?", "Yes, but this tool prioritizes the HTTP header when both are present, since it is applied earlier and cannot be bypassed by scripts that manipulate the DOM before the meta tag loads."),
+    ] %}
+    {% if mode == "form" %}
+<section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+{% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

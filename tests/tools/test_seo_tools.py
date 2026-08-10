@@ -35,8 +35,8 @@ def test_meta_tags_extracts_fields_and_flags_issues(mocker):
     assert result.data["title"] == "Título curto"
     assert result.data["h1_count"] == 2
     assert result.data["open_graph"] == {"title": "OG title"}
-    assert "Página sem meta description." in result.data["issues"]
-    assert "Página com mais de uma tag H1." in result.data["issues"]
+    assert "Page has no meta description." in result.data["issues"]
+    assert "Page has more than one H1 tag." in result.data["issues"]
 
 
 def test_meta_tags_rejects_non_html(mocker):

@@ -80,6 +80,16 @@ CATEGORIES: list[CategoryDefinition] = [
         sort_order=60,
     ),
     CategoryDefinition(
+        slug="performance",
+        name="Performance",
+        description=(
+            "Measure page speed, Core Web Vitals and server response time "
+            "to diagnose what is slowing a website down."
+        ),
+        icon="gauge",
+        sort_order=65,
+    ),
+    CategoryDefinition(
         slug="utils",
         name="Utils",
         description=(

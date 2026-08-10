@@ -185,9 +185,16 @@ class SafeHTTPClient:
         max_response_bytes: int | None = None,
         json: Any = None,
         content: bytes | str | None = None,
+        read_timeout_override: float | None = None,
     ) -> httpx.Response:
         response, _history = self.request_with_history(
-            method, url, headers=headers, max_response_bytes=max_response_bytes, json=json, content=content
+            method,
+            url,
+            headers=headers,
+            max_response_bytes=max_response_bytes,
+            json=json,
+            content=content,
+            read_timeout_override=read_timeout_override,
         )
         return response
 
@@ -200,6 +207,7 @@ class SafeHTTPClient:
         max_response_bytes: int | None = None,
         json: Any = None,
         content: bytes | str | None = None,
+        read_timeout_override: float | None = None,
     ) -> tuple[httpx.Response, list[dict]]:
         """Como `request()`, mas também devolve a cadeia de redirecionamentos
         seguidos manualmente (usado pelo Redirect Checker).
@@ -208,17 +216,24 @@ class SafeHTTPClient:
         medição no GlobalPing, usado pelo Traceroute) — mantidos como
         parâmetros opcionais para não afetar as ferramentas GET-only
         existentes. Um eventual redirect reenvia o mesmo corpo.
+
+        `read_timeout_override` permite que uma ferramenta específica que
+        sabe estar consultando uma API externa lenta (ex.: PageSpeed
+        Insights, que roda um Lighthouse completo) peça um timeout de
+        leitura maior só para aquela chamada, sem afetar o timeout padrão
+        (mais curto) usado por todas as outras ferramentas.
         """
         remaining_redirects = self._max_redirects
         current_url = url
         limit = max_response_bytes if max_response_bytes is not None else self._max_bytes
         request_headers = {"User-Agent": self._user_agent, **(headers or {})}
         history: list[dict] = []
+        read_timeout = read_timeout_override if read_timeout_override is not None else self._read_timeout
 
         while True:
             target = validate_url(current_url)
             transport = _PinnedTransport(target.ip, target.hostname, http2=self._http2)
-            timeout = httpx.Timeout(connect=self._connect_timeout, read=self._read_timeout, write=self._read_timeout, pool=self._connect_timeout)
+            timeout = httpx.Timeout(connect=self._connect_timeout, read=read_timeout, write=read_timeout, pool=self._connect_timeout)
 
             with httpx.Client(transport=transport, timeout=timeout, follow_redirects=False) as client:
                 response = self._send_with_size_limit(

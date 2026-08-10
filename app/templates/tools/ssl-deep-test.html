@@ -1,0 +1,212 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}SSL Deep Test{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Full TLS analysis of a domain: certificate details plus which TLS protocol versions (1.0 through 1.3) it accepts.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">SSL Deep Test</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      <p class="mt-2 text-xs text-slate-400">We connect on port 443 and probe each TLS protocol version separately.</p>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Run deep test</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-6">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-lg text-brand-900">{{ data.host }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          {% if data.is_expired %}<span class="badge-danger">Certificate expired</span>
+          {% elif data.expires_soon %}<span class="badge-warning">Expires in {{ data.days_remaining }} day(s)</span>
+          {% else %}<span class="badge-success">Valid for {{ data.days_remaining }} more day(s)</span>{% endif %}
+          {% if not data.is_trusted %}<span class="badge-danger">Untrusted chain</span>{% endif %}
+          {% if data.weak_protocols_enabled %}<span class="badge-danger">Weak protocols enabled</span>
+          {% else %}<span class="badge-success">No weak protocols</span>{% endif %}
+        </div>
+
+        <div>
+          <p class="mb-2 text-xs uppercase tracking-wide text-slate-400">Certificate</p>
+          <dl class="grid gap-4 sm:grid-cols-2">
+            <div><dt class="text-xs text-slate-400">Common name (CN)</dt><dd class="font-mono text-sm text-slate-700">{{ data.common_name or "—" }}</dd></div>
+            <div><dt class="text-xs text-slate-400">Issued by</dt><dd class="text-sm text-slate-700">{{ data.issuer_common_name or "—" }}{% if data.issuer_organization %} ({{ data.issuer_organization }}){% endif %}</dd></div>
+            <div><dt class="text-xs text-slate-400">Valid from</dt><dd class="text-sm text-slate-700">{{ data.not_before }}</dd></div>
+            <div><dt class="text-xs text-slate-400">Valid until</dt><dd class="text-sm text-slate-700">{{ data.not_after }}</dd></div>
+            <div><dt class="text-xs text-slate-400">Negotiated protocol</dt><dd class="text-sm text-slate-700">{{ data.protocol or "—" }}</dd></div>
+            <div><dt class="text-xs text-slate-400">Negotiated cipher</dt><dd class="font-mono text-xs text-slate-700">{{ data.cipher or "—" }}</dd></div>
+          </dl>
+          {% if data.subject_alt_names %}
+          <div class="mt-3">
+            <p class="mb-1 text-xs text-slate-400">Covered domains (SAN)</p>
+            <div class="flex flex-wrap gap-2">{% for san in data.subject_alt_names %}<span class="badge-neutral font-mono">{{ san }}</span>{% endfor %}</div>
+          </div>
+          {% endif %}
+        </div>
+
+        <div>
+          <p class="mb-2 text-xs uppercase tracking-wide text-slate-400">Protocol support</p>
+          <div class="overflow-hidden rounded-lg border border-slate-200">
+            <table class="w-full text-sm">
+              <thead class="bg-slate-50 text-left text-xs uppercase text-slate-400">
+                <tr><th class="px-4 py-2">Protocol</th><th class="px-4 py-2">Status</th><th class="px-4 py-2">Cipher</th></tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                {% for item in data.protocol_support %}
+                <tr>
+                  <td class="px-4 py-2 font-mono">{{ item.name }}</td>
+                  <td class="px-4 py-2">
+                    {% if item.supported %}
+                      <span class="badge-{{ 'danger' if item.name in data.weak_protocols_enabled else 'success' }}">Supported</span>
+                    {% else %}
+                      <span class="badge-neutral">Not supported</span>
+                    {% endif %}
+                  </td>
+                  <td class="px-4 py-2 font-mono text-xs text-slate-500">{{ item.cipher or "—" }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+<h2>What is SSL Deep Test?</h2>
+      <p>
+        SSL Deep Test goes beyond a simple certificate check. It connects to the target domain
+        on port 443 and performs two independent analyses: first, it retrieves and parses the TLS
+        certificate presented by the server — issuer, validity window, and the exact list of domains
+        it covers — reusing the same certificate-parsing logic as our SSL Certificate Checker. Second,
+        and more importantly, it opens a separate TLS handshake for each protocol version defined by
+        the TLS standard (TLS 1.0, 1.1, 1.2, and 1.3), forcing the client to offer only that single
+        version each time, to determine precisely which ones the server is willing to negotiate.
+        This is the same technique used by tools like SSL Labs to build a protocol support matrix,
+        and it reveals configuration weaknesses that a single ordinary connection would never expose,
+        because a normal browser or client always negotiates the newest protocol both sides support.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        The certificate section works exactly like our SSL Certificate Checker: watch for
+        <strong>expiration</strong> and for an <strong>untrusted chain</strong>, both of which trigger
+        browser warnings for real visitors. The protocol support table is the distinguishing part of
+        this report — each row shows whether the server accepted a full handshake using only that
+        specific TLS version. TLS 1.0 and TLS 1.1 are deprecated by every major browser vendor and by
+        the PCI Security Standards Council; if either shows as <strong>Supported</strong>, the server
+        is still willing to fall back to protocols with known cryptographic weaknesses (such as BEAST
+        and POODLE-adjacent issues) whenever an old or misconfigured client requests them. TLS 1.2 and
+        TLS 1.3 supported is the expected, healthy baseline for a modern server — TLS 1.3 in particular
+        removes an entire class of legacy cipher negotiation problems and reduces handshake latency.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        Security teams run this test before a PCI-DSS or SOC 2 audit, since auditors specifically
+        check for disabled legacy TLS versions on any host handling sensitive data. It is also used
+        after a web server or load balancer configuration change (Nginx, Apache, HAProxy, or a managed
+        load balancer) to confirm that a hardening change actually took effect on the live endpoint,
+        rather than trusting the configuration file alone — configuration drift between what is
+        written and what a server actually serves is a common source of unpleasant audit surprises.
+        Finally, it is useful when investigating compatibility complaints from very old client
+        software that may depend on a protocol version the server has since disabled.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        This tool reports protocol-version acceptance and the certificate seen on a normal port-443
+        connection; it does not attempt a full cipher-suite enumeration, does not test for specific
+        named vulnerabilities (such as Heartbleed or ROBOT), and does not evaluate HTTP-level security
+        headers — for that, use the dedicated Security Headers tool. Some servers apply different TLS
+        policies based on Server Name Indication (SNI) or client IP reputation; this test uses the
+        domain you provide as the SNI value, matching what a normal browser visit would present.
+      </p>
+      <h2>Disabling legacy TLS versions</h2>
+      <p>
+        If this report shows TLS 1.0 or TLS 1.1 as supported, the fix is almost always a short
+        configuration change rather than a code change: most web servers and load balancers expose a
+        directive to set a minimum TLS version (for example, <code>ssl_protocols</code> in Nginx or
+        <code>SSLProtocol</code> in Apache). Before disabling old protocols in a customer-facing
+        production environment, it is worth checking server-side access logs for the negotiated TLS
+        version of recent connections, since a small fraction of very old operating systems and
+        embedded devices may still depend on TLS 1.0 and would lose connectivity entirely once it is
+        turned off — a trade-off that is, in nearly all modern contexts, worth making in favor of
+        security.
+      </p>
+      <h2>Why protocol testing matters beyond the certificate</h2>
+      <p>
+        A perfectly valid, trusted certificate says nothing about which protocol versions the
+        underlying TLS stack will accept — the two are configured and audited independently. A server
+        can present an impeccable certificate from a trusted authority while still accepting decade-old
+        protocol versions with documented cryptographic weaknesses, because certificate issuance and
+        protocol negotiation are handled by different layers of the server stack. This is precisely
+        the gap SSL Deep Test is built to close: a single report that covers both dimensions of TLS
+        health, so neither is checked in isolation.
+      </p>
+    </section>
+{% endif %}
+
+{% set faqs = [
+      ("Why does the tool make several separate TLS connections?", "Each connection forces the client to offer only one protocol version, which is the only reliable way to determine whether the server accepts that specific version — a normal connection always negotiates the newest version both sides support."),
+      ("Is TLS 1.0/1.1 support always a critical problem?", "It's a serious weakness for any public-facing service handling sensitive data or subject to compliance standards like PCI-DSS, since both protocols have known cryptographic issues and are deprecated by all major browsers."),
+      ("Does this replace the SSL Certificate Checker?", "It includes the same certificate data plus protocol support testing, so it can fully replace it when you also need to know which TLS versions are accepted."),
+    ] %}
+    {% if mode == "form" %}
+<section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+{% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

@@ -1,0 +1,235 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, copy_button, form_error_banner %}
+
+{% block title %}Email Header Analyzer | {{ site_name }}{% endblock %}
+{% block meta_description %}Decode raw email headers: hop-by-hop routing, SPF/DKIM/DMARC authentication results and delivery timing.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Email Header Analyzer</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      Do not paste headers containing content you don't want processed — this tool only decodes
+      header fields, never authenticates or verifies signatures cryptographically, and results are
+      not publicly listed.
+    </div>
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Raw email header</label>
+      <textarea
+        id="input_value" name="input_value" required rows="14"
+        class="input font-mono text-xs"
+        placeholder="{{ tool.input_placeholder }}"
+      >{{ submitted_value }}</textarea>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Analyze header</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="text-sm font-medium text-brand-900">Analysis result</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.has_headers %}
+          <p class="badge-danger">No recognizable headers found</p>
+          {% if data.issues %}
+          <ul class="list-disc space-y-1 pl-5 text-sm text-slate-600">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+          {% endif %}
+        {% else %}
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="badge-{{ 'success' if data.overall_auth_status == 'pass' else ('danger' if data.overall_auth_status == 'fail' else 'neutral') }}">
+              Authentication: {{ data.overall_auth_status }}
+            </span>
+            <span class="badge-neutral">{{ data.hop_count }} hop(s)</span>
+          </div>
+
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p class="mb-1 text-xs text-slate-400">From</p>
+              <p class="break-all font-mono text-sm text-slate-700">{{ data.from_header or "—" }}</p>
+            </div>
+            <div>
+              <p class="mb-1 text-xs text-slate-400">To</p>
+              <p class="break-all font-mono text-sm text-slate-700">{{ data.to_header or "—" }}</p>
+            </div>
+            <div>
+              <p class="mb-1 text-xs text-slate-400">Subject</p>
+              <p class="break-all font-mono text-sm text-slate-700">{{ data.subject or "—" }}</p>
+            </div>
+            <div>
+              <p class="mb-1 text-xs text-slate-400">Return-Path</p>
+              <p class="break-all font-mono text-sm text-slate-700">{{ data.return_path or "—" }}</p>
+            </div>
+            <div>
+              <p class="mb-1 text-xs text-slate-400">Message-ID</p>
+              <p class="break-all font-mono text-sm text-slate-700">{{ data.message_id or "—" }}</p>
+            </div>
+            <div>
+              <p class="mb-1 text-xs text-slate-400">Date</p>
+              <p class="break-all font-mono text-sm text-slate-700">{{ data.date_header or "—" }}</p>
+            </div>
+          </div>
+
+          {% if data.authentication_results %}
+          <div>
+            <p class="mb-1 text-xs text-slate-400">Authentication-Results</p>
+            <div class="space-y-2">
+              {% for entry in data.authentication_results %}
+              <div class="rounded-lg bg-slate-50 p-3">
+                <div class="mb-1 flex flex-wrap gap-2 text-xs">
+                  <span class="badge-{{ 'success' if entry.spf == 'pass' else ('danger' if entry.spf == 'fail' else 'neutral') }}">spf={{ entry.spf or "n/a" }}</span>
+                  <span class="badge-{{ 'success' if entry.dkim == 'pass' else ('danger' if entry.dkim == 'fail' else 'neutral') }}">dkim={{ entry.dkim or "n/a" }}</span>
+                  <span class="badge-{{ 'success' if entry.dmarc == 'pass' else ('danger' if entry.dmarc == 'fail' else 'neutral') }}">dmarc={{ entry.dmarc or "n/a" }}</span>
+                </div>
+                <p class="break-all font-mono text-xs text-slate-500">{{ entry.raw }}</p>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          {% if data.hops %}
+          <div>
+            <p class="mb-2 text-xs text-slate-400">Delivery path (most recent hop first)</p>
+            <div class="space-y-2">
+              {% for hop in data.hops %}
+              <div class="rounded-lg border border-slate-200 p-3">
+                <div class="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span class="badge-neutral">#{{ hop.index + 1 }}</span>
+                  {% if hop.from_host %}<span>from <strong class="font-mono text-slate-700">{{ hop.from_host }}</strong></span>{% endif %}
+                  {% if hop.by_host %}<span>by <strong class="font-mono text-slate-700">{{ hop.by_host }}</strong></span>{% endif %}
+                  {% if hop.timestamp %}<span class="ml-auto font-mono">{{ hop.timestamp }}</span>{% endif %}
+                  {% if hop.delay_seconds is not none %}<span class="badge-neutral">+{{ hop.delay_seconds }}s</span>{% endif %}
+                </div>
+                <p class="break-all font-mono text-xs text-slate-400">{{ hop.raw }}</p>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+       <h2>What is the Email Header Analyzer?</h2>
+       <p>
+         Every email carries, beneath the subject and body a person normally sees, a stack of
+         technical headers written by every mail server the message passed through on its way from
+         sender to recipient — most importantly a chain of <code>Received</code> headers (one added
+         by each hop, newest on top) and, when the receiving server checked authentication, an
+         <code>Authentication-Results</code> header summarizing the SPF, DKIM and DMARC verdicts it
+         computed. This tool takes that raw header block, which you paste in after copying it from
+         your email client's "Show original" or "View source" option, and parses it entirely on our
+         server with no network calls of any kind — it reads only what is already written in the
+         text you provide, reconstructing the hop-by-hop delivery path with per-hop timing and
+         summarizing the authentication verdicts into a single overall status, so you don't have to
+         read dense, multi-line header text by hand.
+       </p>
+       <h2>How to interpret the result</h2>
+       <p>
+         The delivery path is listed most-recent-hop-first, matching how <code>Received</code>
+         headers are actually written (each server prepends its own line, so the top line was added
+         last, closest to final delivery). The delay shown on each hop is the time elapsed since the
+         previous, chronologically earlier hop — a long delay on one hop, compared to the others,
+         often points to where a message got stuck, whether due to greylisting, a queue backlog, or
+         a slow spam-filtering step. The overall authentication status is <code>pass</code> when
+         every mechanism found across all <code>Authentication-Results</code> headers reported pass,
+         <code>fail</code> when any of SPF, DKIM or DMARC explicitly failed (worth treating as a
+         signal of possible spoofing), <code>mixed</code> when results disagree without an outright
+         failure, and <code>unknown</code> when no <code>Authentication-Results</code> header was
+         present at all — which happens when the receiving server did not perform or record the
+         check, not necessarily when authentication was skipped entirely.
+       </p>
+       <h2>Common use cases</h2>
+       <p>
+         This tool is most often used to investigate a suspected phishing or spoofing attempt,
+         checking whether SPF/DKIM/DMARC actually failed on a suspicious message rather than relying
+         on the visible From address alone, which is trivial to forge. It is also used to debug
+         deliverability problems — comparing hop timestamps to spot an unexpectedly slow relay, or
+         confirming that a transactional email service is signing with the selector and domain you
+         expect — and to audit a message's full routing path when investigating a security incident,
+         since the chain of <code>Received</code> headers records every server the message actually
+         touched, including ones that never appear in any visible field.
+       </p>
+       <h2>Limitations</h2>
+       <p>
+         Header extraction here is intentionally lightweight, using pattern matching rather than a
+         full formal grammar of every mail transfer agent's header dialect, so unusual or
+         heavily-customized <code>Received</code> header formats may not yield a host or timestamp
+         even when a human could read one out manually — timestamps in particular are best-effort
+         and may be missing on headers that omit a trailing date. This tool also never performs any
+         cryptographic verification itself; it reports whatever verdict the receiving server already
+         recorded in <code>Authentication-Results</code>, it does not recompute or independently
+         confirm an SPF, DKIM or DMARC result. For that, use the dedicated SPF Checker, DKIM Checker
+         and DMARC Checker tools against the sending domain directly.
+       </p>
+       <h2>Privacy of pasted content</h2>
+       <p>
+         Email headers routinely contain real IP addresses, internal hostnames, and genuine email
+         addresses belonging to real people — information that should never be published or listed
+         publicly just because someone ran a diagnostic check on it. For that reason, unlike most
+         other tools on this site, results from the Email Header Analyzer are never turned into a
+         public result page and never appear in any "recent searches" listing; only you can see the
+         output of your own analysis, and it expires from short-term cache like any other result.
+       </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+       ("Where do I get the raw header of an email?", "Most email clients have a 'Show original' or 'View source' option (in Gmail: the three-dot menu on an open message → 'Show original'). Copy the entire block and paste it here."),
+       ("Is my pasted header content kept private?", "Yes. This tool never creates a public result page or lists your query in 'recent searches', since headers often contain real IPs and email addresses."),
+       ("Why does it say authentication status is 'unknown'?", "That means no Authentication-Results header was found in the pasted content — the receiving server either did not perform the check or did not record it in the header."),
+     ] %}
+     {% if mode == "form" %}
+ <section class="mt-10">
+       <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+       {{ faq_accordion(faqs) }}
+     </section>
+ {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

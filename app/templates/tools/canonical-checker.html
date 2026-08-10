@@ -1,0 +1,183 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Canonical URL Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check a page's canonical tag and detect missing, duplicate or misdirected canonicals.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Canonical URL Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Page URL</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check canonical</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="break-all font-mono text-sm text-brand-900">{{ data.url }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if data.canonical_count == 0 %}
+          <p class="badge-warning">No canonical tag found</p>
+        {% elif data.canonical_count > 1 %}
+          <p class="badge-danger">{{ data.canonical_count }} canonical tags found (invalid)</p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead>
+                <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                  <th class="py-2">Canonical URLs found</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for url in data.all_found %}
+                <tr class="border-b border-slate-100"><td class="py-2 break-all font-mono text-xs text-slate-600">{{ url }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="badge-{{ 'success' if data.is_self_referencing else 'warning' }}">
+              {{ 'Self-referencing canonical' if data.is_self_referencing else 'Canonical points elsewhere' }}
+            </span>
+          </div>
+          <p class="break-all rounded-lg bg-slate-50 p-3 font-mono text-xs text-slate-600">{{ data.canonical_url }}</p>
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+       <h2>What is a canonical tag?</h2>
+       <p>
+         A canonical tag is an HTML element, <code>&lt;link rel="canonical" href="..."&gt;</code>,
+         placed in the <code>&lt;head&gt;</code> of a page to tell search engines which URL should be
+         treated as the authoritative, "master" version of that content. Canonicalization matters because
+         the same content is very often reachable through more than one URL — with and without
+         trailing slash, with tracking parameters, through HTTP and HTTPS, via www and non-www hosts,
+         or through faceted navigation and sorting parameters on e-commerce category pages. Without a
+         clear signal, a search engine has to guess which of these variants deserves to rank, and it may
+         split ranking signals like backlinks and engagement across several URLs instead of consolidating
+         them onto one, which weakens the page's ability to compete in search results. The
+         {{ site_name }} Canonical URL Checker fetches the page you submit, looks for every
+         <code>&lt;link rel="canonical"&gt;</code> tag present in the HTML, and reports whether the
+         setup follows recommended practice.
+       </p>
+       <h2>How to interpret the result</h2>
+       <p>
+         When exactly one canonical tag is found, the tool checks whether it points back to the same URL
+         that was requested (a "self-referencing" canonical) or to a different URL. A self-referencing
+         canonical is the normal, expected state for most standalone pages, and is itself considered good
+         practice even when there is no known duplicate — it removes any ambiguity for crawlers. A
+         canonical pointing to a different URL is not automatically wrong: it is exactly how you tell
+         search engines to consolidate a duplicate or near-duplicate page (for example, a printer-friendly
+         version, a paginated listing, or a URL variant with tracking parameters) into the "real" page.
+         The tool simply flags this so you can confirm it was intentional. Finding zero canonical tags
+         means the page leaves the decision entirely to the search engine's own heuristics, which is
+         risky for content with known duplicates. Finding more than one canonical tag is always an error:
+         per the specification only the first one encountered is considered, and having several is a sign
+         of a templating bug, a plugin conflict, or manual and automated tags colliding on the same page.
+       </p>
+       <h2>Common use cases</h2>
+       <p>
+         SEO teams run this check after a site migration or a CMS change to confirm that canonical tags
+         survived the move and still point at the correct final URLs, since template changes are a common
+         source of dropped or duplicated canonical tags. E-commerce sites use it on category and filtered
+         listing pages, where the same set of products can be reached through many sort-order and filter
+         combinations, to verify that all of those variants canonicalize back to the clean, primary
+         listing URL rather than being left to compete against each other. It is also useful when
+         auditing a competitor's site structure, when debugging why a page is not being indexed as
+         expected, and as a routine item in technical SEO audits alongside checks like meta tags,
+         robots.txt, and sitemap validation.
+       </p>
+       <h2>Limitations</h2>
+       <p>
+         This tool only reads the canonical tag declared in the raw HTML response; it does not execute
+         JavaScript, so a canonical tag injected client-side by a single-page application after the
+         initial load will not be seen. It also does not verify whether the canonical target URL actually
+         returns a 200 response, nor whether it is blocked by robots.txt or a noindex tag — a canonical
+         pointing to a blocked or broken URL is a real but separate problem, best checked with the
+         Broken Link Checker or Robots.txt Checker. Search engines also treat the canonical tag as a
+         strong hint rather than an absolute directive: in cases of conflicting signals (such as internal
+         links, sitemaps, and redirects pointing elsewhere), Google may choose a different URL than the
+         one declared as canonical.
+       </p>
+       <h2>Canonical tags versus redirects</h2>
+       <p>
+         A frequent point of confusion is when to use a canonical tag versus a 301 redirect. A redirect is
+         appropriate when the duplicate URL should no longer be reachable at all — users and crawlers are
+         sent straight to the destination, and the old URL effectively stops existing as a separate page.
+         A canonical tag is appropriate when both URLs need to remain independently accessible — for
+         example, a product page reachable under two different category paths — but you still want search
+         engines to treat them as one entity for ranking purposes. Using a canonical tag where a redirect
+         would be more appropriate can leave low-value duplicate URLs crawlable indefinitely, wasting
+         crawl budget on large sites; using a redirect where a canonical would be more appropriate can
+         break legitimate use cases that depend on both URLs being independently reachable.
+       </p>
+    </section>
+{% endif %}
+
+{% set faqs = [
+       ("Is a self-referencing canonical necessary if there's no duplicate content?", "It is not strictly required, but it is considered best practice on every indexable page — it removes any ambiguity for search engines and costs nothing to implement."),
+       ("What happens if I have two canonical tags on the same page?", "Per the specification, search engines should only honor the first one found and ignore the rest, but this is undefined behavior in practice and should be fixed — it usually indicates a templating or plugin conflict."),
+       ("Does a canonical tag guarantee my preferred URL will be indexed?", "No. It is a strong hint, not a directive. Search engines can choose a different URL as canonical if other signals — internal links, sitemaps, redirects — point elsewhere."),
+     ] %}
+     {% if mode == "form" %}
+ <section class="mt-10">
+       <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+       {{ faq_accordion(faqs) }}
+     </section>
+ {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

@@ -1,0 +1,180 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}CORS Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Probe an endpoint's CORS headers and flag dangerous misconfigurations like wildcard origins combined with credentials.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">CORS Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">URL</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      <p class="mt-2 text-xs text-slate-400">We send a probe request with a transparent test Origin header (https://cors-probe.analista.to).</p>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check CORS</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="truncate font-mono text-sm text-brand-900">{{ data.url }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.has_cors %}
+          <p class="badge-neutral">No CORS headers present</p>
+        {% else %}
+          <div class="flex flex-wrap items-center gap-2">
+            {% if data.issues %}<span class="badge-danger">Misconfiguration detected</span>{% else %}<span class="badge-success">No dangerous misconfiguration detected</span>{% endif %}
+            {% if data.is_wildcard %}<span class="badge-neutral">Wildcard origin (*)</span>{% endif %}
+            {% if data.reflects_arbitrary_origin %}<span class="badge-warning">Reflects arbitrary origin</span>{% endif %}
+          </div>
+          <dl class="grid gap-4 sm:grid-cols-2">
+            <div><dt class="text-xs text-slate-400">Access-Control-Allow-Origin</dt><dd class="break-all font-mono text-sm text-slate-700">{{ data.allow_origin }}</dd></div>
+            <div><dt class="text-xs text-slate-400">Access-Control-Allow-Credentials</dt><dd class="font-mono text-sm text-slate-700">{{ data.allow_credentials or "—" }}</dd></div>
+            <div><dt class="text-xs text-slate-400">Access-Control-Allow-Methods</dt><dd class="break-all font-mono text-xs text-slate-700">{{ data.allow_methods or "—" }}</dd></div>
+            <div><dt class="text-xs text-slate-400">Access-Control-Allow-Headers</dt><dd class="break-all font-mono text-xs text-slate-700">{{ data.allow_headers or "—" }}</dd></div>
+          </dl>
+          <p class="text-xs text-slate-400">Probe Origin used: <span class="font-mono">{{ data.probe_origin }}</span></p>
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+<h2>What is CORS?</h2>
+      <p>
+        Cross-Origin Resource Sharing (CORS) is the browser mechanism that decides whether
+        JavaScript running on one origin (say, <code>https://app.example.com</code>) is allowed to
+        read the response of a request it made to a different origin (say,
+        <code>https://api.example.org</code>). By default, browsers block this kind of cross-origin
+        read under the same-origin policy; CORS is the standardized way for a server to explicitly
+        opt back in, via response headers, and tell the browser which origins, methods, and headers
+        it trusts. This tool sends a probe request to the URL you provide with a distinctive
+        <code>Origin</code> header (<code>https://cors-probe.analista.to</code>, a domain we control
+        and use only for this transparent test — not a spoofed or attacker-like value) and inspects
+        exactly how the server responds.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        If no <code>Access-Control-Allow-Origin</code> header is returned at all, the endpoint simply
+        does not enable CORS for cross-origin JavaScript reads — this is the default, safe posture for
+        most APIs that are not meant to be called directly from browser code on other sites. When the
+        header is present, this tool checks for two well-known danger patterns. First, a wildcard
+        (<code>*</code>) combined with <code>Access-Control-Allow-Credentials: true</code> is actually
+        invalid per the Fetch/CORS specification and real browsers refuse to honor it — but its
+        presence in server output is still a strong signal of a misconfiguration attempt, often from
+        a framework default enabled without review. Second, and far more dangerous in practice, is a
+        server that <strong>reflects</strong> whatever Origin it receives back verbatim in the
+        response while also setting <code>Allow-Credentials: true</code> — this combination is valid
+        per spec and browsers will honor it, meaning literally any website on the internet can make
+        an authenticated, credentialed request to that endpoint on behalf of a visitor who is logged
+        in, and read the response.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        API and backend teams use this tool to verify that a CORS policy intended to allow only a
+        specific set of trusted frontend origins was not accidentally implemented as a blanket
+        origin-reflection pattern — a very common mistake in hand-rolled CORS middleware, since naive
+        implementations often just echo back whatever <code>Origin</code> header the browser sent
+        without checking it against an allowlist. It is also used during security reviews of
+        third-party APIs before integrating with them, and to confirm that a public, unauthenticated
+        API intentionally exposing itself with a wildcard origin is not also, by mistake, sending
+        <code>Allow-Credentials: true</code>.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        This tool sends a single, simple GET probe with an <code>Origin</code> header — it does not
+        send a CORS preflight (<code>OPTIONS</code>) request, so it will not show
+        <code>Access-Control-Allow-Methods</code> or <code>Access-Control-Allow-Headers</code> values
+        that a server only returns in response to a preflight for non-simple requests (such as those
+        using custom headers or methods like <code>PUT</code>/<code>DELETE</code>). It also does not
+        test authenticated requests with real cookies, since doing so would require a logged-in
+        session specific to the target site, which this tool intentionally does not have or attempt
+        to obtain.
+      </p>
+      <h2>Origin reflection versus a real allowlist</h2>
+      <p>
+        The safe way to support multiple trusted frontend origins is to maintain an explicit allowlist
+        on the server and, for each incoming request, check the <code>Origin</code> header against
+        that list before deciding what to send back in
+        <code>Access-Control-Allow-Origin</code> — reflecting the exact matched origin only when it is
+        found on the list, and omitting the header entirely otherwise. The dangerous shortcut this
+        tool is built to catch is code that reflects <em>any</em> Origin unconditionally, which looks
+        identical to a correct allowlist implementation in casual testing (since it "works" for the
+        developer's own origin) but silently accepts requests from every other origin as well.
+      </p>
+      <h2>Why credentials change everything</h2>
+      <p>
+        Without credentials, a permissive CORS policy mostly just exposes data that is already
+        public — a wildcard origin API serving read-only public data is a completely normal and
+        intentional design. The moment <code>Allow-Credentials: true</code> enters the picture,
+        cross-origin requests can carry the victim's cookies and browser-managed authentication state,
+        turning a permissive origin policy into a direct path for any third-party site to act as the
+        logged-in user against that API — which is why this specific combination is treated as a
+        critical finding rather than a stylistic concern.
+      </p>
+    </section>
+{% endif %}
+
+{% set faqs = [
+      ("Why does the tool use a specific test Origin instead of the real caller's?", "Using a fixed, transparent, and clearly labeled test domain lets us reliably detect whether the server reflects arbitrary origins, without impersonating any real third party."),
+      ("Is a wildcard Access-Control-Allow-Origin always bad?", "Not by itself — it is a normal and safe choice for public, non-authenticated APIs. It becomes dangerous specifically when combined with Access-Control-Allow-Credentials: true."),
+      ("Why doesn't this tool show preflight response headers?", "It sends a simple GET probe rather than an OPTIONS preflight, since many endpoints only return Allow-Methods/Allow-Headers in response to an actual preflight for non-simple requests."),
+    ] %}
+    {% if mode == "form" %}
+<section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+{% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

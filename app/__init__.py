@@ -53,11 +53,13 @@ def _register_blueprints(app: Flask) -> None:
     from app.blueprints.live import live_bp
     from app.blueprints.main import main_bp
     from app.blueprints.public_pages import public_pages_bp
+    from app.blueprints.api import api_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(live_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(admin_bp, url_prefix=app.config["ADMIN_URL_PREFIX"])
+    app.register_blueprint(api_bp, url_prefix="/api/v1")
     # Catch-all de páginas públicas de resultado — registrado por último para
     # não competir com os prefixos mais específicos acima.
     app.register_blueprint(public_pages_bp)

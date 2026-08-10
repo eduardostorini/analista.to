@@ -1,0 +1,190 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Broken Link Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Scan a page's links and report which ones return broken (4xx/5xx) responses.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">Broken Link Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Page URL</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      <p class="mt-1 text-xs text-slate-400">Checks only the links found on this single page (not a full-site crawl), and is capped to the first 15 links within a time budget.</p>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Scan links</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="break-all font-mono text-sm text-brand-900">{{ data.url }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <span class="badge-neutral">{{ data.total_links_found }} link(s) found</span>
+          <span class="badge-neutral">{{ data.links_checked }} checked</span>
+          <span class="badge-{{ 'danger' if data.broken_count else 'success' }}">{{ data.broken_count }} broken</span>
+          {% if data.truncated %}<span class="badge-warning">partial scan</span>{% endif %}
+        </div>
+
+        {% if data.results %}
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
+                <th class="py-2 pr-4">URL</th>
+                <th class="py-2 pr-4">Status</th>
+                <th class="py-2 pr-4">Result</th>
+                <th class="py-2">Scope</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for link in data.results %}
+              <tr class="border-b border-slate-100 align-top">
+                <td class="py-2 pr-4 break-all font-mono text-xs text-slate-600">{{ link.url }}</td>
+                <td class="py-2 pr-4 text-slate-700">{{ link.status_code if link.status_code is not none else "—" }}</td>
+                <td class="py-2 pr-4">
+                  <span class="badge-{{ 'success' if link.category == 'ok' else ('danger' if link.category == 'broken' else 'warning') }}">{{ link.category }}</span>
+                </td>
+                <td class="py-2 text-xs text-slate-500">{{ "internal" if link.is_internal else "external" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="badge-neutral">No checkable links found on this page.</p>
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+       <h2>What is a broken link check?</h2>
+       <p>
+         A broken link is a hyperlink that, when followed, no longer leads to a working page — the
+         server responds with a client error such as 404 Not Found, or a server error such as 500
+         Internal Server Error, instead of returning the expected content. Links break for many mundane
+         reasons: a page was deleted or moved without a redirect, a typo crept into the href attribute, an
+         external site the page linked to was reorganized or taken offline, or a domain expired. Broken
+         links degrade the experience for real visitors, who hit a dead end instead of the content they
+         expected, and they also waste the crawl budget search engines allocate to a site, since crawlers
+         follow links to discover and re-evaluate pages. The {{ site_name }} Broken Link Checker fetches
+         the page you submit, extracts every outbound hyperlink it finds, and checks each one to report
+         which are healthy and which are broken.
+       </p>
+       <h2>How to interpret the result</h2>
+       <p>
+         Each row in the result table shows one link found on the page, the HTTP status code its
+         destination returned, and a category: "ok" for a normal 2xx success response, "redirect" for a
+         3xx response that forwards to another URL, "broken" for a 4xx or 5xx error response, "blocked"
+         for a link the tool declined to follow because it resolved to a private or otherwise disallowed
+         network address, and "error" for a link that could not be reached at all due to a timeout,
+         connection failure, or similar network issue. The "scope" column distinguishes internal links
+         (pointing to the same host as the page you checked) from external links (pointing elsewhere) —
+         internal broken links are usually a more urgent fix, since they are entirely within your control,
+         while external broken links depend on a third-party site and may resolve themselves, or may need
+         to be updated or removed on your end.
+       </p>
+       <h2>Common use cases</h2>
+       <p>
+         Content and editorial teams run this check on important landing pages and cornerstone articles
+         periodically, since links that were valid when a page was published can silently rot over
+         months or years as linked resources move or disappear. Web developers use it after a site
+         migration or a large content restructuring to catch internal links that were not updated to
+         match new URL patterns. SEO practitioners use it as part of a broader technical audit, since a
+         page riddled with broken internal links signals poor maintenance to both users and search
+         engines, and can waste crawl budget on large sites. It is also useful before a scheduled content
+         refresh, to identify which outbound citations and resource links on an older page need to be
+         updated or removed before republishing.
+       </p>
+       <h2>Limitations</h2>
+       <p>
+         This tool checks only the links found on the single page you submit — it is not a full-site
+         crawler, and it will not discover or check links on other pages of the site unless you submit
+         each page individually. To keep response times reasonable and to avoid becoming a vector for
+         abuse (issuing large numbers of outbound requests on someone else's behalf), the scan is capped
+         to the first 15 links found and to a fixed time budget; on pages with many links, the result will
+         indicate a partial scan and only the earliest links encountered in the HTML will have been
+         checked. This tool also uses lightweight HEAD requests (falling back to GET only when a server
+         rejects HEAD) rather than rendering the destination page, so it cannot detect "soft 404s" — pages
+         that return a 200 OK status but display a human-readable "page not found" message instead of a
+         proper error code.
+       </p>
+       <h2>Why some links show as blocked</h2>
+       <p>
+         For safety, this tool never follows a link whose destination resolves to a private, loopback,
+         link-local, or otherwise internal network address — the same protection that governs every fetch
+         this platform performs on a user-supplied URL. A link like this being present on a real public
+         page is uncommon but not impossible: it can happen with a stale internal URL accidentally left
+         in published content, a broken CMS template that generates an internal path by mistake, or a
+         link intended only for an internal audience. A "blocked" result does not necessarily mean the
+         destination is broken — the tool simply never attempted to reach it — but it is usually still
+         worth investigating, since a public page linking to an internal-only address is rarely
+         intentional.
+       </p>
+    </section>
+{% endif %}
+
+{% set faqs = [
+       ("Does this tool crawl my entire site?", "No. It checks only the links found on the single page you submit. For a full-site link audit, run this tool against each important page individually or use a dedicated site-wide crawler."),
+       ("Why are only 15 links checked?", "The scan is capped in both link count and elapsed time to keep results fast and to prevent the tool from being used to send large volumes of requests to third-party sites. If a page has more links than the cap, the result is marked as a partial scan."),
+       ("What does a 'blocked' result mean?", "It means the link resolved to a private, internal, or otherwise disallowed network address, and the tool refused to follow it for safety reasons — it does not necessarily mean the destination itself is broken."),
+     ] %}
+     {% if mode == "form" %}
+ <section class="mt-10">
+       <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+       {{ faq_accordion(faqs) }}
+     </section>
+ {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

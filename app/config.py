@@ -82,6 +82,10 @@ class BaseConfig:
                 "task": "app.tasks.maintenance_tasks.cleanup_expired_searches",
                 "schedule": 21600.0,
             },
+            "check-monitoring-domains": {
+                "task": "app.tasks.monitoring_tasks.run_periodic_checks",
+                "schedule": 300.0,  # Run monitoring scanner task every 5 minutes
+            },
         },
     }
 
@@ -140,6 +144,17 @@ class BaseConfig:
     SUBDOMAIN_FALLBACK_API_URL = os.environ.get(
         "SUBDOMAIN_FALLBACK_API_URL", "https://api.hackertarget.com/hostsearch/?q={domain}"
     )
+    # Google PageSpeed Insights (Core Web Vitals / Lighthouse). Funciona sem
+    # chave em volume baixo (cota compartilhada); definir uma chave própria
+    # evita rate limiting em produção. Ver https://developers.google.com/speed/docs/insights/v5/get-started
+    GOOGLE_PAGESPEED_API_URL = os.environ.get(
+        "GOOGLE_PAGESPEED_API_URL", "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+    )
+    GOOGLE_PAGESPEED_API_KEY = os.environ.get("GOOGLE_PAGESPEED_API_KEY", "")
+    # Mantido abaixo do soft_time_limit (45s) da task run_search (app/tasks/search_tasks.py)
+    # para que o próprio PageSpeed Checker devolva um erro claro antes do worker
+    # matar a task — ver app/tools/performance/pagespeed_checker.py.
+    PAGESPEED_READ_TIMEOUT_SECONDS = _int(os.environ.get("PAGESPEED_READ_TIMEOUT_SECONDS"), 35)
 
     # --- Admin ------------------------------------------------------------------
     ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@analista.to")

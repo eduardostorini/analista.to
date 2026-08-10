@@ -36,7 +36,7 @@ def test_login_with_wrong_password_fails(client, app):
     )
     assert response.status_code == 200
     assert b"Dashboard" not in response.data
-    assert b"E-mail ou senha" in response.data
+    assert b"Invalid email or password" in response.data
 
 
 def test_login_success_reaches_dashboard(client, app):

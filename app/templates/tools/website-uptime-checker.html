@@ -1,0 +1,157 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}Website Uptime Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check whether a website is currently reachable, its HTTP status code, and how fast it responds — a real, live connectivity check.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<header class="mb-8 max-w-2xl">
+  <h1 class="text-3xl">Website Uptime Checker</h1>
+  <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+</header>
+
+{{ form_error_banner(form_error) }}
+
+{% if mode == "form" %}
+<form method="post" class="card mb-8 max-w-xl space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">URL</label>
+  <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+  {{ captcha_widget(captcha_provider) }}
+  <button type="submit" class="btn-primary w-full sm:w-auto">Check uptime</button>
+</form>
+{% endif %}
+
+{% if mode == "pending" %}<div class="mb-8 max-w-xl">{{ status_bar(search) }}</div>{% endif %}
+
+{% if mode == "failed" %}
+<div class="card mb-8 max-w-xl border-rose-200 bg-rose-50">
+  <p class="badge-danger mb-2">Failed</p>
+  <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+</div>
+{% endif %}
+
+{% if mode == "result" and result %}
+  {% set data = result.normalized_result %}
+  <div id="result-content" class="mb-10 max-w-xl space-y-4">
+    <div class="card space-y-3">
+      <div class="flex items-center justify-between">
+        <p class="truncate font-mono text-sm text-brand-900">{{ data.url }}</p>
+        <div class="flex items-center gap-3">
+          <span class="badge-{{ 'success' if data.is_up and data.is_healthy else 'danger' if not data.is_up else 'warning' }}">
+            {{ 'UP' if data.is_up else 'DOWN' }}{% if data.status_code %} — HTTP {{ data.status_code }}{% endif %}
+          </span>
+          {{ copy_button("#result-content") }}
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div class="rounded-lg bg-slate-50 p-3">
+          <p class="text-xs text-slate-400">Response time</p>
+          <p class="font-mono text-slate-700">{{ data.response_time_ms }} ms</p>
+        </div>
+        <div class="rounded-lg bg-slate-50 p-3">
+          <p class="text-xs text-slate-400">Status code</p>
+          <p class="font-mono text-slate-700">{{ data.status_code or '—' }}</p>
+        </div>
+      </div>
+      {% if data.error %}<p class="break-all font-mono text-xs text-slate-500">{{ data.error }}</p>{% endif %}
+    </div>
+
+    {% if data.issues %}
+    <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+      <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+      <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% if mode == "form" %}
+<section class="prose-tool max-w-3xl space-y-4">
+  <h2>What is an uptime check?</h2>
+  <p>
+    An uptime check is a single, live measurement of whether a website responds to an HTTP request
+    right now, and how long it takes to do so. This tool sends one real GET request to the URL you
+    provide — through the same SSRF-safe, DNS-validated network path used by every other tool on
+    this platform — and reports whether a response was received, what HTTP status code came back, and
+    the round-trip time in milliseconds. It is intentionally a single point-in-time snapshot rather
+    than a continuous monitor: for ongoing tracking with alerts when a site goes down, a scheduled
+    monitoring feature (checking on a recurring interval and notifying you of state changes) is a
+    separate, more appropriate tool than a one-off checker like this one.
+  </p>
+  <h2>How to interpret the result</h2>
+  <p>
+    A result of <strong>UP</strong> means the server accepted the connection and returned an HTTP
+    response of some kind — even an error status code like 404 or 500 still counts as "up" from a
+    pure connectivity standpoint, because the server is reachable and responding; the separate
+    "healthy" indicator distinguishes a working page (2xx/3xx) from one returning an error. A result
+    of <strong>DOWN</strong> means no response was received at all within the timeout window — this
+    can mean the server is offline, the DNS name doesn't resolve, a firewall is dropping the
+    connection, or the server is simply too slow to respond in time. The response time reported is
+    the full round trip: DNS resolution, TCP/TLS handshake, and the time the server took to send back
+    a response — a consistently slow response time (multiple seconds) is often a warning sign even
+    when the site is technically "up".
+  </p>
+  <h2>Common use cases</h2>
+  <p>
+    This tool is useful right after a deploy or DNS change to confirm a site actually came back
+    online, to quickly verify whether an outage report from a user is accurate before escalating,
+    to spot-check a site's response time from this server's network location, and as a quick
+    sanity check before diagnosing more specific problems with other tools (DNS Lookup, SSL
+    Certificate Checker, HTTP Headers) once you've confirmed the site is reachable at all.
+  </p>
+  <h2>Limitations</h2>
+  <p>
+    A single check from a single network location cannot tell you whether a site is down for
+    everyone, or just for some users — regional outages, ISP-specific routing problems, and CDN edge
+    node issues can all cause a site to be reachable from one location and not another. This tool
+    also does not retry automatically; a single dropped packet or transient network blip could
+    register as "down" even though the site is generally healthy. For a definitive uptime picture,
+    checks from multiple geographic locations over time are needed, which is a materially different
+    (and heavier) kind of tool than a single on-demand check.
+  </p>
+  <h2>Why "up" is not the same as "healthy"</h2>
+  <p>
+    It is a common misconception that a website is either simply "up" or "down." In practice, a
+    server can be fully reachable and respond quickly while still returning an error to every
+    visitor — a misconfigured origin, a failed deploy, or a database connection issue can all cause
+    a server to answer every request with an HTTP 500 while remaining perfectly "up" at the network
+    level. Because of this, treating connectivity and application health as two separate signals — as
+    this tool does — gives a more accurate picture than a binary "up or down" verdict: a site that
+    responds instantly with HTTP 503 is up but not healthy, and knowing the difference changes what
+    you should investigate next.
+  </p>
+</section>
+{% endif %}
+
+{% set faqs = [
+  ("Does an UP result guarantee the site is working correctly?", "No. UP only means the server responded to the request. A site can be UP while returning an error page (500, 503) to every visitor — check the status code and the 'healthy' indicator for that."),
+  ("Why did the check report DOWN when I can open the site in my browser?", "The check runs from this server's network location and blocks requests to private/internal addresses for safety. A site that is genuinely reachable publicly should not report DOWN, but transient network issues or aggressive bot-blocking on the target site can occasionally cause a false DOWN."),
+  ("Can I monitor a site continuously with this tool?", "This tool performs a single on-demand check. Continuous monitoring with alerts on state changes is a separate, dedicated feature."),
+] %}
+{% if mode == "form" %}
+<section class="mt-10 max-w-3xl">
+  <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+  {{ faq_accordion(faqs) }}
+</section>
+{% endif %}
+
+<section class="mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
+  <div>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+    {{ related_tools_list(related_tools) }}
+  </div>
+  <div>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+    {{ recent_searches_list(tool, recent_searches) }}
+  </div>
+</section>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

@@ -1,0 +1,165 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}TLS-RPT Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check whether a domain has SMTP TLS reporting (TLS-RPT) configured and where failure reports are sent.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">TLS-RPT Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check TLS-RPT</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-lg text-brand-900">{{ data.domain }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.has_record %}
+          <p class="badge-danger">No TLS-RPT record found</p>
+        {% else %}
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="badge-success">TLS-RPT record found</span>
+            <span class="badge-{{ 'success' if data.report_uri else 'danger' }}">{{ data.report_uri | length }} report destination(s)</span>
+          </div>
+          <p class="break-all rounded-lg bg-slate-50 p-3 font-mono text-xs text-slate-600">{{ data.record }}</p>
+          {% if data.report_uri %}
+          <div>
+            <p class="mb-1 text-xs text-slate-400">Report destinations (rua)</p>
+            <ul class="space-y-1">
+              {% for uri in data.report_uri %}<li class="break-all font-mono text-sm text-slate-700">{{ uri }}</li>{% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+       <h2>What is TLS-RPT?</h2>
+       <p>
+         TLS-RPT (SMTP TLS Reporting, RFC 8460) is a companion mechanism to MTA-STS and DANE that
+         gives a domain owner visibility into failures that occur when other mail servers try to
+         negotiate a secure TLS connection to deliver mail. Without TLS-RPT, a domain that enforces
+         a strict transport policy has no way of knowing when a legitimate sending server fails to
+         connect — the sender's own logs may show the failure, but the receiving domain's operators
+         are otherwise blind to it, which makes rolling out strict transport policies risky without
+         a feedback loop. TLS-RPT is published as a DNS TXT record at
+         <code>_smtp._tls.&lt;domain&gt;</code>, starting with <code>v=TLSRPTv1</code>, and its
+         single meaningful tag is <code>rua=</code>, a comma-separated list of one or more URIs
+         (typically a <code>mailto:</code> address or an <code>https:</code> endpoint) where
+         cooperating senders periodically deliver aggregated JSON reports describing every TLS
+         negotiation attempt against the domain's mail servers, successful or not.
+       </p>
+       <h2>How to interpret the result</h2>
+       <p>
+         If no TLS-RPT record exists, the domain will not receive any reports about failed TLS
+         connections to its mail servers — this is a gap worth closing before or alongside enabling
+         MTA-STS enforcement, since it removes the only visibility a domain owner has into whether
+         a strict transport policy is actually breaking legitimate mail delivery. If a record exists
+         but has no <code>rua=</code> tag, it is syntactically present but functionally useless,
+         since senders have nowhere to deliver reports to. A properly configured record lists at
+         least one reachable destination — most commonly a dedicated mailbox or a third-party TLS
+         reporting service endpoint, since the raw JSON reports are not meant to be read manually at
+         any meaningful scale.
+       </p>
+       <h2>Common use cases</h2>
+       <p>
+         This tool is used before and during an MTA-STS rollout, to confirm reporting is in place so
+         that switching from <code>testing</code> to <code>enforce</code> mode does not happen
+         blind. It is also used when auditing a domain's overall mail transport security posture,
+         and to diagnose bounce or delay complaints from partner organizations that may be failing
+         TLS negotiation against the domain's mail servers for reasons that would otherwise only
+         surface in aggregate reports.
+       </p>
+       <h2>Limitations</h2>
+       <p>
+         This tool only confirms that a syntactically valid TLS-RPT record exists and where reports
+         are supposed to be sent — it cannot fetch or interpret the aggregate reports themselves,
+         which are delivered directly by cooperating senders (like Gmail and Outlook) to the
+         configured <code>rua=</code> address on their own schedule, typically daily. Reviewing the
+         actual content of those reports requires either a mailbox capable of parsing the gzipped
+         JSON attachments or a dedicated TLS reporting service subscribed to the same address.
+       </p>
+       <h2>TLS-RPT complements MTA-STS and DANE</h2>
+       <p>
+         TLS-RPT does not enforce anything on its own — it is purely a reporting mechanism, and its
+         value comes entirely from being paired with a transport security policy that can actually
+         fail, namely MTA-STS or DANE (DNSSEC-based TLSA records). A domain can technically publish
+         TLS-RPT without either of those in place, but the reports would then only ever describe
+         plain opportunistic TLS negotiation issues, which is far less actionable. The recommended
+         approach is to configure TLS-RPT first, confirm reports are flowing to a monitored address,
+         then deploy MTA-STS starting in testing mode, and finally move to enforce once the reports
+         show no unexpected legitimate failures — use the MTA-STS Checker to track that rollout
+         alongside this tool.
+       </p>
+    </section>
+    {% endif %}
+
+    {% set faqs = [
+       ("Do I need TLS-RPT if I don't use MTA-STS?", "TLS-RPT still reports opportunistic STARTTLS failures even without MTA-STS, but it is most valuable when paired with an enforced transport policy that can actually reject connections."),
+       ("What format are the reports delivered in?", "Cooperating senders deliver gzip-compressed JSON reports, typically once a day, either to a mailto: address or an https: endpoint, as specified in the rua= tag."),
+       ("Can I have more than one rua= destination?", "Yes — the rua= tag accepts a comma-separated list of URIs, so reports can be sent to a mailbox and a monitoring service endpoint simultaneously."),
+     ] %}
+     {% if mode == "form" %}
+ <section class="mt-10">
+       <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+       {{ faq_accordion(faqs) }}
+     </section>
+ {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

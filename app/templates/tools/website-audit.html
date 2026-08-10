@@ -1,0 +1,175 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}One-Click Website Audit{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Run a complete site audit checking DNS, SPF, DMARC, SSL, HTTP Security Headers, and SEO elements.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">One-Click Website Audit</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain Name</label>
+        <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+        <p class="mt-1 text-xs text-slate-400">Examples: google.com, github.com, yoursite.com</p>
+      </div>
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Run Full Audit</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}
+      {{ status_bar(search) }}
+    {% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The audit could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div>
+            <p class="text-xs text-slate-400">Domain analyzed</p>
+            <p class="font-mono text-lg font-semibold text-brand-900">{{ data.domain }}</p>
+          </div>
+          <div class="text-right">
+            <span class="inline-block rounded-full px-3 py-1 text-sm font-semibold 
+              {% if data.score >= 80 %} bg-emerald-100 text-emerald-800
+              {% elif data.score >= 50 %} bg-amber-100 text-amber-800
+              {% else %} bg-rose-100 text-rose-800 {% endif %}">
+              Score: {{ data.score }}/100
+            </span>
+          </div>
+        </div>
+
+        {% if not data.exists %}
+          <p class="badge-warning">Domain with no active DNS delegation</p>
+        {% else %}
+          <div>
+            <h3 class="text-sm font-semibold text-slate-700 mb-3">Scores by Category</h3>
+            <div class="grid gap-3 sm:grid-cols-4">
+              <div class="rounded-lg border border-slate-100 bg-slate-50 p-3 text-center">
+                <span class="block text-xs text-slate-400 uppercase">DNS</span>
+                <span class="text-lg font-semibold text-slate-700">{{ data.scores.dns }}/20</span>
+              </div>
+              <div class="rounded-lg border border-slate-100 bg-slate-50 p-3 text-center">
+                <span class="block text-xs text-slate-400 uppercase">Email Auth</span>
+                <span class="text-lg font-semibold text-slate-700">{{ data.scores.email }}/25</span>
+              </div>
+              <div class="rounded-lg border border-slate-100 bg-slate-50 p-3 text-center">
+                <span class="block text-xs text-slate-400 uppercase">Security & SSL</span>
+                <span class="text-lg font-semibold text-slate-700">{{ data.scores.security }}/35</span>
+              </div>
+              <div class="rounded-lg border border-slate-100 bg-slate-50 p-3 text-center">
+                <span class="block text-xs text-slate-400 uppercase">SEO & HTTP</span>
+                <span class="text-lg font-semibold text-slate-700">{{ data.scores.seo }}/20</span>
+              </div>
+            </div>
+          </div>
+
+          {% if data.issues %}
+          <div class="border-t border-slate-100 pt-4">
+            <h3 class="text-sm font-semibold text-slate-700 mb-3">Attention Points ({{ data.issues|length }})</h3>
+            <ul class="space-y-2">
+              {% for issue in data.issues %}
+              <li class="flex items-start gap-2 text-sm text-slate-600">
+                <span class="inline-block rounded px-1.5 py-0.5 text-xs font-semibold uppercase mt-0.5
+                  {% if issue.level == 'Critical' %} bg-rose-100 text-rose-800
+                  {% elif issue.level == 'High' %} bg-amber-100 text-amber-800
+                  {% else %} bg-slate-100 text-slate-700 {% endif %}">
+                  {{ issue.level }}
+                </span>
+                <span>[{{ issue.category | upper }}] {{ issue.text }}</span>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% else %}
+          <p class="badge-success text-center">No issues detected! Your configurations are solid.</p>
+          {% endif %}
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+    <section class="prose-tool mt-10 space-y-4">
+      <h2>What is the One-Click Website Audit?</h2>
+      <p>
+        The One-Click Website Audit consolidates DNS, E-mail configuration (SPF, DMARC),
+        SSL/TLS certificates, security headers, and technical SEO indicators into a single structured
+        evaluation. This check gives site owners, developers, and administrators an overview of their
+        online presence's health. The audit scans key security configurations, validates record delegation patterns,
+        and analyzes front-end performance factors to isolate potential weaknesses. Running a website audit
+        manually can take hours of querying multiple command line tools; this dashboard brings everything
+        into a clean, unified portal instantly.
+      </p>
+      <h2>How is the score calculated?</h2>
+      <p>
+        The audit uses a weighted scoring mechanism out of 100 points maximum:
+      </p>
+      <ul>
+        <li><strong>Security & SSL (35 points):</strong> Assesses whether there is a valid SSL certificate, if old protocols like TLS 1.0 or 1.1 are disabled, and checks HTTP security headers (HSTS, CSP, etc.). Keeping these protocols secure prevents man-in-the-middle attacks and data interception. It also checks if the certificate is trusted by mainstream roots.</li>
+        <li><strong>E-mail Authentication (25 points):</strong> Verifies SPF and DMARC settings to help ensure unauthorized servers cannot send email using your domain. A proper email setup is the first defense against brand spoofing and phishing attacks. It checks alignment properties and whether aggregate reports are enabled.</li>
+        <li><strong>DNS & Domain (20 points):</strong> Confirms the presence of essential host configurations, MX records, and delegating nameservers. Stable name resolution forms the core foundation of all network services, websites, and APIs.</li>
+        <li><strong>SEO & HTTP (20 points):</strong> Checks basic metadata elements like titles, descriptions, heading order, and robots.txt files. These elements guide search crawlers to correctly catalog and index your web pages.</li>
+      </ul>
+      <h2>Why does this audit matter?</h2>
+      <p>
+        Weak configurations in any of these segments can lead to search ranking drops, security vulnerabilities,
+        or email deliverability issues. Regular checks help ensure that your domain configuration meets modern web standards.
+        In many cases, simple errors in DNS or minor syntax mistakes in security headers go unnoticed for months,
+        harming organic visibility and exposing applications to attacks. By running a unified audit, you get a clear checklist
+        of items to resolve, ordered by criticality. Domain security and visibility should never be left to chance.
+      </p>
+      <h2>How to interpret the recommendations</h2>
+      <p>
+        The recommendations in this report are grouped by severity level (Critical, High, Medium, Low) and category.
+        Critical items typically indicate that your site is unreachable, has an expired certificate, or lacks essential DNS resolution.
+        High items represent significant security risks, such as legacy TLS protocols, or missing email authentication.
+        Medium items indicate optimization opportunities, like absent security headers.
+        Low items correspond to minor SEO elements. Resolving these issues sequentially is the best path to achieving a 100/100 score.
+      </p>
+      <h2>Best practices for continuous optimization</h2>
+      <p>
+        A website audit is not a one-time task but a continuous cycle of improvements. As search engine algorithms
+        evolve and security compliance protocols get updated, your settings must be revised. It is highly recommended to run this
+        audit monthly or right after performing infrastructure modifications. Ensure your teams align on security headers and
+        keep track of domain and SSL expiration dates to avoid costly downtime.
+      </p>
+    </section>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% endblock %}

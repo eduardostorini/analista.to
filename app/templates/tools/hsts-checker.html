@@ -1,0 +1,177 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}HSTS Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Check whether a domain sends the Strict-Transport-Security header and how it's configured (max-age, subdomains, preload).{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<div class="grid gap-8 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <header class="mb-6">
+      <h1 class="text-3xl">HSTS Checker</h1>
+      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+    </header>
+
+    {{ form_error_banner(form_error) }}
+
+    {% if mode == "form" %}
+    <form method="post" class="card space-y-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
+      <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+      {{ captcha_widget(captcha_provider) }}
+      <button type="submit" class="btn-primary w-full sm:w-auto">Check HSTS</button>
+    </form>
+    {% endif %}
+
+    {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
+
+    {% if mode == "failed" %}
+    <div class="card border-rose-200 bg-rose-50">
+      <p class="badge-danger mb-2">Failed</p>
+      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+    </div>
+    {% endif %}
+
+    {% if mode == "result" and result %}
+      {% set data = result.normalized_result %}
+      <div id="result-content" class="card space-y-4">
+        <div class="flex items-center justify-between">
+          <p class="font-mono text-lg text-brand-900">{{ data.domain }}</p>
+          {{ copy_button("#result-content") }}
+        </div>
+
+        {% if not data.has_hsts %}
+          <p class="badge-danger">No HSTS header</p>
+        {% else %}
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="badge-success">HSTS enabled</span>
+            {% if data.includes_subdomains %}<span class="badge-neutral">includeSubDomains</span>{% endif %}
+            {% if data.preload_directive %}<span class="badge-neutral">preload directive</span>{% endif %}
+            {% if data.preload_eligible_heuristic %}<span class="badge-warning">Heuristically preload-eligible</span>{% endif %}
+          </div>
+          <p class="break-all rounded-lg bg-slate-50 p-3 font-mono text-xs text-slate-600">{{ data.header_value }}</p>
+          <dl class="grid gap-4 sm:grid-cols-2">
+            <div><dt class="text-xs text-slate-400">max-age</dt><dd class="text-sm text-slate-700">{{ data.max_age }} seconds{% if data.max_age %} (~{{ (data.max_age / 86400) | round(1) }} days){% endif %}</dd></div>
+            <div><dt class="text-xs text-slate-400">HTTP → HTTPS redirect</dt><dd class="text-sm text-slate-700">{% if data.http_redirects_to_https is none %}Unknown{% elif data.http_redirects_to_https %}Yes{% else %}No{% endif %}</dd></div>
+          </dl>
+          <p class="text-xs text-slate-400">
+            Preload eligibility shown above is a heuristic based on max-age, includeSubDomains, and
+            the preload directive only — it is <strong>not</strong> a verified check against the
+            official hstspreload.org submission list.
+          </p>
+        {% endif %}
+
+        {% if data.issues %}
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+          <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if mode == "form" %}
+<section class="prose-tool mt-10 space-y-4">
+<h2>What is HSTS?</h2>
+      <p>
+        HTTP Strict Transport Security (HSTS) is a response header, defined in RFC 6797, that
+        instructs a browser to only ever contact a domain over HTTPS for a specified period of time
+        — even if the user types a plain <code>http://</code> address, clicks an old bookmarked
+        link, or follows a link from an insecure page. Without HSTS, that first request still goes
+        out over plain HTTP before any redirect can happen, leaving a brief but real window in which
+        a network attacker positioned between the user and the server (for example, on public Wi-Fi)
+        can intercept or downgrade the connection before HTTPS is ever established. This tool fetches
+        the domain over HTTPS, reads the <code>Strict-Transport-Security</code> header it returns,
+        and breaks down its directives so you can confirm the policy is actually configured the way
+        you intend.
+      </p>
+      <h2>How to interpret the result</h2>
+      <p>
+        The <code>max-age</code> directive, in seconds, tells the browser how long to remember to
+        enforce HTTPS-only for this domain after the current visit — a short value re-exposes users
+        to the downgrade window sooner, which is why a duration of at least six months, and ideally a
+        full year, is recommended. <code>includeSubDomains</code> extends that same enforcement to
+        every subdomain of the site, which matters because an attacker who can get a victim to visit
+        even one insecure subdomain could otherwise still intercept cookies scoped to the parent
+        domain. The <code>preload</code> directive is a signal of intent to be included in browser
+        preload lists (see below) but, by itself, does nothing — inclusion requires a separate manual
+        submission and review process.
+      </p>
+      <h2>Common use cases</h2>
+      <p>
+        This tool is used to confirm that HSTS was actually deployed correctly after a configuration
+        change, to audit third-party or partner domains before a security review, and to diagnose
+        why a domain still appears vulnerable to protocol-downgrade findings in a penetration test
+        report despite HTTPS being available. It is also a useful first step before considering
+        submission to the official HSTS preload list, since the list's minimum technical bar (a long
+        max-age, includeSubDomains, and the preload directive, all served correctly on the apex
+        domain) can be checked here first.
+      </p>
+      <h2>Limitations</h2>
+      <p>
+        The "heuristically preload-eligible" indicator in this report checks only the syntactic
+        conditions publicly documented for preload list submission — it does <strong>not</strong>
+        query the real hstspreload.org list, does not verify that every subdomain actually serves a
+        valid HTTPS certificate (a hard requirement for real submission), and does not guarantee
+        acceptance. Treat it strictly as a starting-point signal, and always verify current
+        eligibility directly on hstspreload.org before submitting a domain, since browsers ship the
+        real preload list independently of what any third-party tool reports.
+      </p>
+      <h2>The HSTS preload list</h2>
+      <p>
+        Even a long max-age does not protect the very first connection a browser ever makes to a
+        domain it has never visited before — that first request is inherently unprotected because
+        the browser has no prior HSTS policy stored for it yet. The preload list solves this "trust
+        on first use" gap: major browsers ship a hardcoded list of domains, maintained by Google and
+        used by Chrome, Firefox, Safari, and Edge, for which HTTPS is enforced from the very first
+        connection, before any header is ever received. Submission is done manually at
+        hstspreload.org and requires the domain (and, per the includeSubDomains requirement, every
+        subdomain) to serve a valid certificate — a decision that is difficult to reverse quickly, since
+        removal from the list can take months to propagate through browser release cycles.
+      </p>
+      <h2>Rolling out HSTS safely</h2>
+      <p>
+        Because HSTS is remembered by the browser for the full max-age duration, a mistake made while
+        HTTPS is not yet fully reliable across every subdomain can lock out real users until the
+        policy expires. The safe rollout pattern is to start with a short max-age (for example, a few
+        minutes to hours) while confirming every subdomain in scope serves valid HTTPS, then
+        progressively increase it toward the one-year value recommended for preload eligibility, only
+        adding <code>includeSubDomains</code> once every subdomain has been verified.
+      </p>
+    </section>
+{% endif %}
+
+{% set faqs = [
+      ("Does HSTS replace an HTTP-to-HTTPS redirect?", "No, both should be used together — the redirect handles the very first insecure request, and HSTS ensures the browser skips plain HTTP entirely on every subsequent visit within max-age."),
+      ("Is my domain automatically on the preload list if this shows 'eligible'?", "No. This is only a heuristic check of the header's syntax — actual inclusion requires manual submission and review at hstspreload.org."),
+      ("What max-age should I use?", "A value of at least 15552000 (6 months) is the minimum reasonable baseline; 31536000 (1 year) or more is recommended, especially if you plan to pursue preload list submission."),
+    ] %}
+    {% if mode == "form" %}
+<section class="mt-10">
+      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+      {{ faq_accordion(faqs) }}
+    </section>
+{% endif %}
+  </div>
+
+  <aside class="space-y-8">
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+      {{ related_tools_list(related_tools) }}
+    </section>
+    <section>
+      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+      {{ recent_searches_list(tool, recent_searches) }}
+    </section>
+  </aside>
+</div>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

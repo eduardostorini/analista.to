@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from app.tools.dns.dmarc_lookup import DmarcLookupTool
 from app.tools.email.spf_checker import SpfCheckerTool
+
+# DMARC Checker tests live in tests/tools/test_email_auth_extra_tools.py,
+# alongside the DKIM Checker and Email Header Analyzer built in the same batch.
 
 
 def test_spf_checker_no_record(mocker):
@@ -24,7 +26,7 @@ def test_spf_checker_counts_lookups_and_flags_permissive_all(mocker):
     result = tool.execute("example.com")
     assert result.data["lookup_count"] == 4
     assert result.data["all_qualifier"] == "+"
-    assert any("qualquer servidor" in issue for issue in result.data["issues"])
+    assert any("any server" in issue for issue in result.data["issues"])
 
 
 def test_spf_checker_flags_too_many_lookups(mocker):
@@ -35,40 +37,4 @@ def test_spf_checker_flags_too_many_lookups(mocker):
     tool = SpfCheckerTool()
     result = tool.execute("example.com")
     assert result.data["lookup_count"] == 12
-    assert any("acima do limite" in issue for issue in result.data["issues"])
-
-
-def test_dmarc_lookup_no_record(mocker):
-    mocker.patch("app.tools.dns.dmarc_lookup.domain_exists", return_value=True)
-    mocker.patch("app.tools.dns.dmarc_lookup.query_txt_clean", return_value=[])
-
-    tool = DmarcLookupTool()
-    result = tool.execute("example.com")
-    assert result.data["has_dmarc"] is False
-
-
-def test_dmarc_lookup_parses_tags(mocker):
-    mocker.patch("app.tools.dns.dmarc_lookup.domain_exists", return_value=True)
-    mocker.patch(
-        "app.tools.dns.dmarc_lookup.query_txt_clean",
-        return_value=["v=DMARC1; p=reject; pct=100; rua=mailto:dmarc@example.com"],
-    )
-
-    tool = DmarcLookupTool()
-    result = tool.execute("example.com")
-    assert result.data["policy"] == "reject"
-    assert result.data["aggregate_reports_to"] == "mailto:dmarc@example.com"
-    assert result.data["issues"] == []
-
-
-def test_dmarc_lookup_flags_missing_rua_and_invalid_policy(mocker):
-    mocker.patch("app.tools.dns.dmarc_lookup.domain_exists", return_value=True)
-    mocker.patch(
-        "app.tools.dns.dmarc_lookup.query_txt_clean",
-        return_value=["v=DMARC1; p=invalid"],
-    )
-
-    tool = DmarcLookupTool()
-    result = tool.execute("example.com")
-    assert any("inválida" in issue for issue in result.data["issues"])
-    assert any("rua=" in issue for issue in result.data["issues"])
+    assert any("above the limit" in issue for issue in result.data["issues"])

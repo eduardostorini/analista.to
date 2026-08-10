@@ -1,0 +1,194 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+
+{% block title %}PageSpeed & Core Web Vitals Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
+{% block meta_description %}Run a real Google PageSpeed Insights (Lighthouse) analysis of a URL and see its Core Web Vitals, lab metrics and prioritized performance opportunities.{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+
+<header class="mb-8 max-w-2xl">
+  <h1 class="text-3xl">PageSpeed & Core Web Vitals Checker</h1>
+  <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+  <p class="mt-2 text-xs text-slate-400">Powered by the Google PageSpeed Insights API (mobile, performance category). This can take up to 30 seconds to run.</p>
+</header>
+
+{{ form_error_banner(form_error) }}
+
+{% if mode == "form" %}
+<form method="post" class="card mb-8 max-w-xl space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">URL</label>
+  <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+  {{ captcha_widget(captcha_provider) }}
+  <button type="submit" class="btn-primary w-full sm:w-auto">Run analysis</button>
+</form>
+{% endif %}
+
+{% if mode == "pending" %}<div class="mb-8 max-w-xl">{{ status_bar(search) }}</div>{% endif %}
+
+{% if mode == "failed" %}
+<div class="card mb-8 max-w-xl border-rose-200 bg-rose-50">
+  <p class="badge-danger mb-2">Failed</p>
+  <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
+</div>
+{% endif %}
+
+{% if mode == "result" and result %}
+  {% set data = result.normalized_result %}
+  <div id="result-content" class="mb-10 max-w-3xl space-y-4">
+    <div class="card flex items-center justify-between">
+      <div>
+        <p class="truncate font-mono text-sm text-brand-900">{{ data.url }}</p>
+        <p class="text-xs text-slate-400">Strategy: {{ data.strategy }} · Source: {{ data.source }}</p>
+      </div>
+      <div class="flex items-center gap-3">
+        {% if data.performance_score is not none %}
+        <span class="badge-{{ 'success' if data.performance_score >= 90 else 'warning' if data.performance_score >= 50 else 'danger' }}">
+          {{ data.performance_score }}/100
+        </span>
+        {% endif %}
+        {{ copy_button("#result-content") }}
+      </div>
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-3">
+      <div class="rounded-lg bg-slate-50 p-3">
+        <p class="text-xs text-slate-400">LCP (lab)</p>
+        <p class="font-mono text-slate-700">{{ '%.0f'|format(data.lab_metrics.lcp_ms) + ' ms' if data.lab_metrics.lcp_ms is not none else '—' }}</p>
+      </div>
+      <div class="rounded-lg bg-slate-50 p-3">
+        <p class="text-xs text-slate-400">CLS (lab)</p>
+        <p class="font-mono text-slate-700">{{ '%.2f'|format(data.lab_metrics.cls) if data.lab_metrics.cls is not none else '—' }}</p>
+      </div>
+      <div class="rounded-lg bg-slate-50 p-3">
+        <p class="text-xs text-slate-400">Total Blocking Time</p>
+        <p class="font-mono text-slate-700">{{ '%.0f'|format(data.lab_metrics.tbt_ms) + ' ms' if data.lab_metrics.tbt_ms is not none else '—' }}</p>
+      </div>
+    </div>
+
+    {% if data.field_data_available and data.field_metrics %}
+    <div class="rounded-lg border border-slate-200 bg-white p-3">
+      <p class="mb-2 text-sm font-semibold text-slate-700">Real-user field data (CrUX)</p>
+      <div class="grid gap-3 sm:grid-cols-3 text-sm">
+        {% for label, metric in [("LCP", data.field_metrics.lcp), ("CLS", data.field_metrics.cls), ("INP", data.field_metrics.inp)] %}
+        {% if metric %}
+        <div>
+          <span class="text-slate-500">{{ label }}:</span>
+          <span class="badge-{{ 'success' if metric.category == 'FAST' else 'warning' if metric.category == 'AVERAGE' else 'danger' }}">{{ metric.category }}</span>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if data.opportunities %}
+    <div class="rounded-lg border border-slate-200 bg-white p-3">
+      <p class="mb-2 text-sm font-semibold text-slate-700">Top opportunities</p>
+      <ul class="space-y-2 text-sm">
+        {% for opp in data.opportunities %}
+        <li class="border-b border-slate-100 pb-2 last:border-0">
+          <p class="font-medium text-slate-700">{{ opp.title }}{% if opp.estimated_savings_ms %} — ~{{ '%.0f'|format(opp.estimated_savings_ms) }}ms potential savings{% endif %}</p>
+          <p class="text-xs text-slate-500">{{ opp.description }}</p>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    {% if data.issues %}
+    <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+      <p class="mb-2 text-sm font-semibold text-amber-800">Points of attention</p>
+      <ul class="list-disc space-y-1 pl-5 text-sm text-amber-700">{% for issue in data.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% if mode == "form" %}
+<section class="prose-tool max-w-3xl space-y-4">
+  <h2>What are Core Web Vitals?</h2>
+  <p>
+    Core Web Vitals are a set of metrics defined by Google to measure the real user experience of
+    loading and interacting with a web page: Largest Contentful Paint (LCP) measures how long it
+    takes for the largest visible element to render, Cumulative Layout Shift (CLS) measures visual
+    stability (how much content unexpectedly moves around while loading), and Interaction to Next
+    Paint (INP) measures responsiveness to user input. This tool runs the same Lighthouse engine
+    used by Google's own PageSpeed Insights product against your URL, on a simulated mobile device
+    and network, and reports both lab metrics (from the simulated run) and, when available, real-user
+    field data aggregated from the Chrome User Experience Report (CrUX).
+  </p>
+  <h2>How to interpret the result</h2>
+  <p>
+    The performance score (0–100) is a weighted combination of several lab metrics and is a useful
+    single-number summary, but the individual metrics below it are what actually drive user
+    experience and search ranking signals. An LCP above 2.5 seconds, a CLS above 0.1, or a Total
+    Blocking Time above 200ms are each individually flagged because they cross Google's documented
+    "needs improvement" thresholds. Field data, when available, reflects what real visitors
+    experienced over the past 28 days and is generally more trustworthy than a single lab run, which
+    only reflects one simulated device and network condition — a page can score well in the lab while
+    real users on slower devices or networks have a noticeably worse experience.
+  </p>
+  <h2>Common use cases</h2>
+  <p>
+    This tool is used to validate that a performance optimization actually moved the needle before
+    and after a deploy, to investigate a drop in Google Search ranking that may correlate with a
+    Core Web Vitals regression, to prioritize which of several possible optimizations (image
+    compression, render-blocking script removal, font loading strategy) will have the largest
+    measurable impact using the "estimated savings" figures, and to get a second opinion independent
+    of browser DevTools when debugging perceived slowness reported by users.
+  </p>
+  <h2>Limitations</h2>
+  <p>
+    Field data is only available for URLs with sufficient real-user traffic in the CrUX dataset —
+    low-traffic pages will show lab data only, which is clearly indicated in the result. Lab results
+    can also vary run-to-run due to the inherent variability of network simulation and server load at
+    the moment of the test; a single run should be treated as a representative sample, not an
+    absolute number, and this tool intentionally caches results for two hours to avoid over-querying
+    the same URL. Google's PageSpeed Insights API also shares a public quota when no API key is
+    configured — during periods of high demand a request may time out, in which case the tool
+    reports this clearly rather than fabricating a score.
+  </p>
+  <h2>Mobile vs. desktop</h2>
+  <p>
+    This tool always analyzes the mobile experience, since Google's indexing and ranking are
+    mobile-first and mobile devices typically have less CPU power and less reliable network
+    conditions than desktops — a page that performs well on mobile will almost always also perform
+    well on desktop, but the reverse is frequently not true. If you need a desktop-specific analysis,
+    running Lighthouse directly in Chrome DevTools with the desktop device preset is currently the
+    most direct way to get that view; a dedicated desktop strategy option for this tool may be added
+    in a future update.
+  </p>
+</section>
+{% endif %}
+
+{% set faqs = [
+  ("Why is there no field data for my URL?", "Field data comes from the Chrome User Experience Report and requires a minimum amount of real-user traffic over the past 28 days. Low-traffic or brand-new pages will show lab data only."),
+  ("Why did my score change between two runs without any code changes?", "Lab results have natural run-to-run variance from network simulation and server load at the moment of the test. Treat a single score as a representative sample rather than an exact number."),
+  ("Does a 100/100 score guarantee a fast experience for every visitor?", "No — it reflects one simulated mobile run. Always check the field data section (when available) to see what real visitors on varied devices and networks actually experienced."),
+] %}
+{% if mode == "form" %}
+<section class="mt-10 max-w-3xl">
+  <h2 class="mb-4 text-xl">Frequently asked questions</h2>
+  {{ faq_accordion(faqs) }}
+</section>
+{% endif %}
+
+<section class="mt-10 grid max-w-3xl gap-8 sm:grid-cols-2">
+  <div>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
+    {{ related_tools_list(related_tools) }}
+  </div>
+  <div>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
+    {{ recent_searches_list(tool, recent_searches) }}
+  </div>
+</section>
+
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+{% endblock %}

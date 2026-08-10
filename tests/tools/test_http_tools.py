@@ -11,7 +11,7 @@ _REQUEST = httpx.Request("GET", "https://example.com/")
 
 def test_http_headers_lists_notable_headers(mocker):
     mock_client = mocker.patch("app.tools.http.http_headers.SafeHTTPClient")
-    mock_client.return_value.get.return_value = httpx.Response(
+    mock_client.return_value.request.return_value = httpx.Response(
         200,
         headers={"Server": "nginx", "Content-Type": "text/html", "X-Custom": "1"},
         content=b"ok",

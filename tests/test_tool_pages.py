@@ -29,8 +29,10 @@ def _content_word_count(template_source: str) -> int:
     return len(text.split())
 
 
-def test_registry_has_fifteen_mvp_tools():
-    assert len(registry.all()) == 15
+def test_registry_has_a_minimum_set_of_tools():
+    # Sanity guard against an empty/broken registry — not a fixed ceiling.
+    # The registry grows over time as new tools are added (see docs/adding-a-tool.md).
+    assert len(registry.all()) >= 15
 
 
 @pytest.mark.parametrize("tool", registry.all() if registry.all() else [None], ids=lambda t: t.slug if t else "no-tools")
