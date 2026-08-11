@@ -1,8 +1,8 @@
 {% extends "layout/base.html" %}
-{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, copy_button, form_error_banner %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, faq_accordion, faq_schema, related_tools_list, recent_searches_list, form_error_banner %}
 
-{% block title %}DNS Propagation Checker{% if submitted_value %} — {{ submitted_value }}{% endif %} | {{ site_name }}{% endblock %}
-{% block meta_description %}Check whether a DNS change has propagated across major public resolvers worldwide, including Google, Cloudflare, Quad9 and OpenDNS.{% endblock %}
+{% block title %}DNS Propagation Checker — Verifique a Propagação DNS | Analista{% endblock %}
+{% block meta_description %}Verifique a propagação DNS de um domínio em diferentes servidores DNS. Consulte registros A, AAAA, MX, CNAME, NS, TXT, SOA e CAA gratuitamente.{% endblock %}
 {% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
 {% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
 
@@ -11,198 +11,98 @@
 {{ breadcrumbs(crumbs) }}
 
 <div class="grid gap-8 lg:grid-cols-3">
-  <div class="lg:col-span-2">
+  <main class="lg:col-span-2">
     <header class="mb-6">
       <h1 class="text-3xl">DNS Propagation Checker</h1>
-      <p class="mt-2 text-slate-600">{{ tool.description }}</p>
+      <p class="mt-2 text-slate-600">Compare a resolução de um registro em dez servidores DNS públicos, sem atribuir localizações geográficas fictícias.</p>
     </header>
 
     {{ form_error_banner(form_error) }}
 
     {% if mode == "form" %}
-    <form method="post" class="card space-y-4">
+    <form method="post" class="card space-y-4" x-data="{ submitting: false }" @submit="submitting = true">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div>
-        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domain</label>
-        <input id="input_value" name="input_value" type="text" required class="input" placeholder="{{ tool.input_placeholder }}" value="{{ submitted_value }}">
+        <label for="input_value" class="mb-1 block text-sm font-medium text-slate-700">Domínio ou hostname</label>
+        <input id="input_value" name="input_value" type="text" maxlength="2048" required class="input" placeholder="exemplo.com.br" value="{{ submitted_value }}" autocomplete="url">
+        <p class="mt-1 text-xs text-slate-400">URLs completas também são aceitas; protocolo, caminho e parâmetros serão removidos.</p>
       </div>
       <div>
-        <label for="record_type" class="mb-1 block text-sm font-medium text-slate-700">Record type</label>
+        <label for="record_type" class="mb-1 block text-sm font-medium text-slate-700">Tipo de registro DNS</label>
         <select id="record_type" name="record_type" class="input">
-          <option value="A" selected>A</option>
-          <option value="AAAA">AAAA</option>
-          <option value="CNAME">CNAME</option>
-          <option value="MX">MX</option>
-          <option value="TXT">TXT</option>
-          <option value="NS">NS</option>
+          {% for type in ["A", "AAAA", "CNAME", "MX", "NS", "TXT", "SOA", "CAA"] %}
+          <option value="{{ type }}" {{ 'selected' if type == 'A' }}>{{ type }}</option>
+          {% endfor %}
         </select>
-        <p class="mt-1 text-xs text-slate-400">Pick the record type you recently changed to check how far it has propagated.</p>
       </div>
       {{ captcha_widget(captcha_provider) }}
-      <button type="submit" class="btn-primary w-full sm:w-auto">Check propagation</button>
+      <button type="submit" class="btn-primary w-full sm:w-auto" :disabled="submitting">
+        <span x-show="!submitting">Verificar Propagação DNS</span>
+        <span x-show="submitting" x-cloak>Consultando servidores DNS...</span>
+      </button>
+      <div x-show="submitting" x-cloak class="animate-pulse space-y-2" role="status">
+        <div class="h-2 rounded bg-brand-100"></div><div class="h-10 rounded bg-slate-100"></div>
+      </div>
     </form>
     {% endif %}
 
     {% if mode == "pending" %}{{ status_bar(search) }}{% endif %}
-
-    {% if mode == "failed" %}
-    <div class="card border-rose-200 bg-rose-50">
-      <p class="badge-danger mb-2">Failed</p>
-      <p class="text-sm text-rose-700">{{ result.error_message if result else "The query could not be completed." }}</p>
-    </div>
-    {% endif %}
+    {% if mode == "failed" %}<div class="card border-rose-200 bg-rose-50 text-rose-700">{{ result.error_message if result else "Não foi possível concluir a consulta." }}</div>{% endif %}
 
     {% if mode == "result" and result %}
-      {% set data = result.normalized_result %}
-      <div id="result-content" class="card space-y-4">
-        <div class="flex items-center justify-between">
-          <p class="font-mono text-lg text-brand-900">{{ data.domain }} <span class="text-sm text-slate-400">({{ data.record_type }})</span></p>
-          {{ copy_button("#result-content") }}
+    {% set data = result.normalized_result %}
+    <section id="result-content" class="space-y-6">
+      <div class="card space-y-5">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div><p class="text-sm text-slate-500">Propagação DNS de</p><h2 class="font-mono text-xl text-brand-900">{{ data.domain }}</h2><p class="text-sm">Registro consultado: <strong>{{ data.record_type }}</strong></p></div>
+          <button type="button" class="btn-secondary" onclick="navigator.clipboard.writeText(window.location.href); this.textContent='Link copiado'">Copiar link</button>
         </div>
-
-        <div class="flex flex-wrap items-center gap-3">
-          <span class="badge-{{ 'success' if data.propagated else 'warning' }}">
-            {{ 'Fully propagated' if data.propagated else 'Propagation in progress' }}
-          </span>
-          <span class="badge-neutral">{{ data.distinct_answer_count }} distinct answer set(s)</span>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-lg bg-slate-50 p-3"><p class="text-xs text-slate-500">Resolvers</p><strong>{{ data.resolver_count }}</strong></div>
+          <div class="rounded-lg bg-slate-50 p-3"><p class="text-xs text-slate-500">Respostas</p><strong>{{ data.response_count }}</strong></div>
+          <div class="rounded-lg bg-slate-50 p-3"><p class="text-xs text-slate-500">Resposta predominante</p><strong>{{ data.matching_count }}</strong></div>
+          <div class="rounded-lg bg-slate-50 p-3"><p class="text-xs text-slate-500">Tempo médio</p><strong>{{ data.average_response_time_ms ~ ' ms' if data.average_response_time_ms is not none else '—' }}</strong></div>
         </div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-sm">
-            <thead>
-              <tr class="border-b border-slate-200 text-xs uppercase text-slate-400">
-                <th class="py-2 pr-4">Resolver</th>
-                <th class="py-2 pr-4">IP</th>
-                <th class="py-2 pr-4">Country</th>
-                <th class="py-2 pr-4">Answer</th>
-                <th class="py-2 pr-4">Time</th>
-                <th class="py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for r in data.resolvers %}
-              <tr class="border-b border-slate-100 align-top">
-                <td class="py-2 pr-4 font-medium text-slate-700">{{ r.provider }}</td>
-                <td class="py-2 pr-4 font-mono text-xs text-slate-500">{{ r.resolver_ip }}</td>
-                <td class="py-2 pr-4 text-slate-500">{{ r.country }}</td>
-                <td class="py-2 pr-4 font-mono text-xs text-slate-600 break-all">
-                  {% if r.values %}{{ r.values | join(', ') }}{% else %}—{% endif %}
-                </td>
-                <td class="py-2 pr-4 text-slate-500">{{ r.response_time_ms }} ms</td>
-                <td class="py-2">
-                  <span class="badge-{{ 'success' if r.status == 'ok' else ('neutral' if r.status == 'no_record' else 'danger') }}">{{ r.status }}</span>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
+        <div class="flex flex-wrap items-center gap-3"><span class="badge-{{ 'success' if data.overall_status == 'propagated' else ('warning' if data.overall_status == 'partial' else 'danger') }}">{{ data.status_label }}</span><strong>DNS Propagation Score: {{ data.score }} / 100</strong></div>
+        <div><div class="mb-2 flex justify-between text-sm"><span>{{ data.matching_count }} de {{ data.resolver_count }} resolvers apresentam o mesmo registro.</span><span>{{ data.score }}%</span></div><div class="h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-brand-600" style="width: {{ data.score }}%"></div></div><p class="mt-2 text-xs text-slate-500">O score mede a consistência entre os resolvers consultados; não representa uma porcentagem da Internet.</p></div>
       </div>
+
+      <div class="card">
+        <h2 class="mb-4 text-xl">Respostas encontradas</h2>
+        <div class="space-y-3">{% for group in data.answer_groups %}<div class="rounded-lg border border-slate-200 p-3"><div class="font-mono text-sm break-all">{% for value in group["values"] %}<div>{{ value }}</div>{% endfor %}</div><p class="mt-1 text-xs text-slate-500">Encontrado em {{ group.resolver_count }} resolver{{ 'es' if group.resolver_count != 1 }}.</p></div>{% else %}<p class="text-slate-500">Nenhuma resposta DNS foi recebida.</p>{% endfor %}</div>
+      </div>
+
+      <div class="card overflow-hidden">
+        <h2 class="mb-4 text-xl">Resultado por resolver</h2>
+        <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b text-xs uppercase text-slate-400"><th class="py-2 pr-3">Resolver</th><th class="py-2 pr-3">Servidor</th><th class="py-2 pr-3">Resultado</th><th class="py-2 pr-3" title="TTL indica por quanto tempo este registro pode permanecer armazenado em cache pelos servidores DNS.">TTL ⓘ</th><th class="py-2 pr-3">Tempo</th><th class="py-2">Status</th></tr></thead>
+        <tbody>{% for r in data.resolvers %}<tr class="border-b align-top"><td class="py-3 pr-3 font-medium">{{ r.provider }}</td><td class="py-3 pr-3 font-mono text-xs">{{ r.server }}<div class="text-slate-400">{{ r.resolver_ip }}</div></td><td class="max-w-md py-3 pr-3 font-mono text-xs break-all">{% if r["values"] %}{% for value in r["values"] %}<div>{{ value }}</div>{% endfor %}{% else %}<span class="font-sans text-slate-500">{{ r.status_message }}</span>{% endif %}</td><td class="py-3 pr-3">{{ r.ttl if r.ttl is not none else '—' }}</td><td class="py-3 pr-3">{{ r.response_time_ms ~ ' ms' if r.response_time_ms is not none else 'timeout' }}</td><td class="py-3"><span class="badge-{{ 'success' if r.matches_majority else ('warning' if r.status == 'ok' else 'danger') }}">{{ '✓ Consistente' if r.matches_majority else ('⚠ Divergente' if r.status == 'ok' else r.status|upper) }}</span></td></tr>{% endfor %}</tbody></table></div>
+      </div>
+
+      <div class="card"><h2 class="mb-2 text-xl">O que significa este resultado?</h2><p class="text-slate-600">{{ data.explanation }}</p></div>
+      <a href="{{ url_for('main.category_or_tool_page', slug=tool.slug, value=data.domain) }}" class="btn-primary inline-flex">Verificar novamente</a>
+    </section>
     {% endif %}
 
     {% if mode == "form" %}
-<section class="prose-tool mt-10 space-y-4">
-      <h2>What is DNS propagation?</h2>
-      <p>
-        DNS propagation is the process by which a change made to a domain's DNS records —
-        a new A record pointing to a different server, an updated MX record for a mail
-        migration, or a modified TXT record for a verification token — spreads across the
-        thousands of independent recursive resolvers that internet service providers,
-        corporate networks, and public DNS services around the world use to answer
-        queries. DNS is a heavily cached, distributed system by design: every record has a
-        time-to-live (TTL) value that tells resolvers how long they are allowed to keep
-        answering from their local cache before they must ask the authoritative
-        nameservers again. Because different resolvers cache the old value at different
-        moments and with different TTLs, a single DNS change is never visible everywhere
-        at once — it becomes visible gradually, resolver by resolver, as each one's cached
-        copy of the record expires. This tool queries a fixed set of major public
-        resolvers directly, bypassing your own device's DNS cache, so you can see exactly
-        which of them are already serving the new value and which are still serving
-        the old one.
-      </p>
-      <h2>How to interpret the result</h2>
-      <p>
-        Each row in the results table represents one independent public resolver —
-        Google Public DNS, Cloudflare, Quad9, OpenDNS, Comodo Secure DNS, and
-        Level3/CenturyLink — queried directly on port 53 with a short timeout. A resolver
-        marked <code>ok</code> answered the query and returned the values shown; a
-        resolver marked <code>no_record</code> answered but has no record of that type for
-        the domain (which may be expected, or may indicate the record was removed); and a
-        resolver marked <code>error</code> could not be reached or timed out within the
-        query window, which is usually a transient network issue rather than a DNS
-        problem. When every resolver that answered successfully agrees on the exact same
-        set of values, the change is reported as "fully propagated." When resolvers
-        disagree — some still returning the old value, others already returning the new
-        one — the change is still "in progress," and you should expect full consistency
-        once every resolver's cached TTL has expired.
-      </p>
-      <h2>Common use cases</h2>
-      <p>
-        This tool is most useful right after making a DNS change that needs to be visible
-        globally before you can safely proceed with a dependent step: migrating a website
-        to new hosting and waiting for the A record to point everywhere to the new server
-        before decommissioning the old one, cutting over email delivery to a new provider
-        by watching the MX record propagate before disabling the old mailboxes, or
-        confirming a domain ownership verification TXT record has reached the resolver a
-        third-party service will use to check it. It is also useful for diagnosing reports
-        from users in different regions who claim to see different content or receive
-        email inconsistently after a change — comparing the answers from resolvers with
-        different countries of operation can reveal whether the discrepancy is a genuine
-        propagation delay or a misconfiguration specific to one authoritative nameserver.
-      </p>
-      <h2>Limitations</h2>
-      <p>
-        This tool reflects the state of eight major public resolvers at the moment of the
-        query, not the literally billions of resolver caches operated by every ISP and
-        corporate network worldwide — some private resolvers may lag behind or ahead of
-        the public ones shown here, particularly if they use unusually long negative-caching
-        or minimum TTL overrides. A high TTL on the record being replaced will naturally
-        slow down propagation regardless of what any checker reports, since resolvers are
-        not required to discard a cached answer before its TTL expires. Results are cached
-        briefly on our end to keep response times fast and avoid overloading the public
-        resolvers with repeated identical queries, so re-running the check seconds apart
-        may return the same cached result rather than a fresh one.
-      </p>
-      <h2>Reducing propagation delay before a change</h2>
-      <p>
-        The most effective way to make a future DNS change propagate quickly is to lower
-        the TTL of the record well in advance — ideally 24 to 48 hours before the actual
-        change — so that by the time you make the switch, resolvers worldwide are already
-        refreshing that record frequently and will pick up the new value almost
-        immediately. Making the change first and lowering the TTL afterward has no effect,
-        because resolvers that already cached the old record at the old (long) TTL will
-        keep serving it for the full duration regardless of what the TTL says in the new,
-        not-yet-fetched record. Planning ahead this way is standard practice for any
-        DNS cutover where downtime or inconsistency needs to be minimized.
-      </p>
+    <section class="prose-tool mt-10 space-y-4">
+      <h2>O que é propagação DNS?</h2><p>Propagação DNS é o período em que resolvers recursivos atualizam suas cópias em cache depois de uma alteração na zona autoritativa. A ferramenta consulta cada serviço público diretamente; ela não simula países nem mede toda a Internet.</p>
+      <h2>Quanto tempo uma alteração pode levar?</h2><p>O tempo depende principalmente do TTL anterior. Um resolver que guardou a resposta antiga pode usá-la até esse prazo expirar. Por isso uma mudança pode aparecer em minutos para alguns serviços e levar horas para outros.</p>
+      <h2>O que é TTL?</h2><p>TTL, ou time to live, informa por quantos segundos uma resposta DNS pode permanecer em cache. Reduzir o TTL com antecedência ajuda em migrações; reduzi-lo somente depois da troca não elimina caches já criados.</p>
+      <h2>Resolver recursivo e nameserver autoritativo</h2><p>O nameserver autoritativo publica a configuração oficial da zona. O resolver recursivo consulta essa fonte quando necessário e armazena a resposta para atender usuários. Resolvers podem divergir temporariamente por terem preenchido seus caches em momentos diferentes.</p>
+      <h2>Como saber se a alteração terminou?</h2><p>Consulte exatamente o hostname e o tipo alterados. Alta consistência é um bom sinal, mas confirme também a resposta nos nameservers autoritativos e considere o TTL anterior antes de desativar a infraestrutura antiga.</p>
+      <p>Continue a investigação com <a href="{{ url_for('main.category_or_tool_page', slug='dns-lookup') }}">DNS Lookup</a>, <a href="{{ url_for('main.category_or_tool_page', slug='reverse-nameserver-lookup') }}">Reverse Nameserver Lookup</a>, <a href="{{ url_for('main.category_or_tool_page', slug='traceroute') }}">Traceroute</a>, <a href="{{ url_for('main.category_or_tool_page', slug='nameserver-health-check') }}">DNS Health Check</a>, <a href="{{ url_for('main.category_or_tool_page', slug='mx-lookup') }}">MX Lookup</a> e <a href="{{ url_for('main.category_or_tool_page', slug='dnssec-checker') }}">DNSSEC Checker</a>.</p>
+      <h2>How to interpret resolver differences</h2><p>A difference between two public resolvers does not automatically indicate an outage or an incorrect authoritative zone. Each recursive service can have a response cached from a different moment, apply its own cache policy, or reach another authoritative server in a distributed deployment. Compare the returned value, response status, and resolver location. Then query the authoritative nameservers directly. If authoritative servers disagree, correct that inconsistency before waiting for recursive caches because time alone will not repair conflicting source data.</p>
+      <h2>Common migration problems</h2><p>DNS migrations often fail because the previous TTL was still high when an address changed, an old provider continued answering authoritatively, glue records were not updated, or only one record type was reviewed. IPv4 and IPv6 can diverge: a correct A record does not compensate for a stale AAAA record. Mail migrations need MX, SPF, DKIM, DMARC, and related records checked independently. Keep the former service available through at least the previous TTL window, and avoid repeated emergency edits that obscure which answer is expected.</p>
+      <h2>Testing safely and accurately</h2><p>Accurate DNS troubleshooting depends on repeatable observations from clearly identified sources. This tool validates CAPTCHA on the backend and applies rate limits before contacting public resolver endpoints. Every request uses a bounded timeout, and an unavailable resolver is reported separately from a valid DNS answer. The checker cannot observe every ISP, enterprise cache, or device on the Internet, so its resolver sample is evidence rather than a universal census. During a production incident, record the time, hostname, record type, expected value, authoritative result, and affected client network. Those details make comparisons meaningful and prevent a transient cache difference from being mistaken for permanent propagation failure.</p>
     </section>
+    {% set faqs = [("O score mostra quanto da Internet recebeu a mudança?", "Não. Ele representa apenas a consistência entre os dez resolvers consultados."), ("Por que respostas múltiplas podem mudar de ordem?", "A ordem não tem significado para a comparação; os valores são normalizados e ordenados."), ("Um timeout significa que meu domínio está fora do ar?", "Não necessariamente. O resolver específico pode estar indisponível ou inacessível a partir do servidor da ferramenta.")] %}
+    <section class="mt-10"><h2 class="mb-4 text-xl">Perguntas frequentes</h2>{{ faq_accordion(faqs) }}</section>
     {% endif %}
-
-    {% set faqs = [
-      ("How long does DNS propagation usually take?", "Typically anywhere from a few minutes to 48 hours, depending mostly on the TTL of the previous record — resolvers will not discard a cached value before its TTL expires, so a long-lived old TTL is the most common cause of slow propagation."),
-      ("Why do some resolvers show different results than others?", "Each resolver caches DNS records independently and refreshes them at different times based on the record's TTL. Seeing different answers across resolvers during propagation is completely normal and expected."),
-      ("Does this tool check my own ISP's resolver?", "No, it queries a fixed set of major public resolvers (Google, Cloudflare, Quad9, OpenDNS and others) directly, not your local ISP's resolver, since public resolvers give a more representative global picture."),
-    ] %}
-    {% if mode == "form" %}
-    <section class="mt-10">
-      <h2 class="mb-4 text-xl">Frequently asked questions</h2>
-      {{ faq_accordion(faqs) }}
-    </section>
-    {% endif %}
-  </div>
-
-  <aside class="space-y-8">
-    <section>
-      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Related tools</h2>
-      {{ related_tools_list(related_tools) }}
-    </section>
-    <section>
-      <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Recent public queries</h2>
-      {{ recent_searches_list(tool, recent_searches) }}
-    </section>
-  </aside>
+  </main>
+  <aside class="space-y-8"><section><h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Ferramentas relacionadas</h2>{{ related_tools_list(related_tools) }}</section><section><h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Consultas públicas recentes</h2>{{ recent_searches_list(tool, recent_searches) }}</section></aside>
 </div>
 
 {{ breadcrumbs_schema(crumbs, site_url) }}
 {% if mode == "form" %}{{ faq_schema(faqs) }}{% endif %}
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"DNS Propagation Checker","url":{{ canonical_url|tojson }},"applicationCategory":"NetworkApplication","operatingSystem":"Web","offers":{"@type":"Offer","price":"0","priceCurrency":"BRL"}}</script>
 {% endblock %}

@@ -105,6 +105,10 @@ class BaseConfig:
     RATE_LIMIT_NETWORK_TOOLS_PER_MINUTE = _int(os.environ.get("RATE_LIMIT_NETWORK_TOOLS_PER_MINUTE"), 5)
     RATE_LIMIT_GLOBAL_PER_MINUTE = _int(os.environ.get("RATE_LIMIT_GLOBAL_PER_MINUTE"), 600)
 
+    # --- DNS Propagation Checker -------------------------------------------
+    DNS_PROPAGATION_TIMEOUT_SECONDS = _int(os.environ.get("DNS_PROPAGATION_TIMEOUT_SECONDS"), 3)
+    DNS_PROPAGATION_CACHE_TTL_SECONDS = _int(os.environ.get("DNS_PROPAGATION_CACHE_TTL_SECONDS"), 60)
+
     # --- Requisições externas / SSRF -------------------------------------------
     OUTBOUND_USER_AGENT = os.environ.get(
         "OUTBOUND_USER_AGENT", "AnalistaToBot/1.0 (+https://analista.to/sobre/bot)"
@@ -120,6 +124,9 @@ class BaseConfig:
     # portas "filtradas" (sem resposta) que só resolvem no timeout individual.
     PORT_SCAN_TIMEOUT_MS = _int(os.environ.get("PORT_SCAN_TIMEOUT_MS"), 1500)
     PORT_SCAN_MAX_WORKERS = _int(os.environ.get("PORT_SCAN_MAX_WORKERS"), 40)
+    TCP_SAFE_PORTS = {int(p) for p in _list(os.environ.get(
+        "TCP_SAFE_PORTS", "21,22,25,53,80,110,143,443,465,587,993,995,3306,5432,6379,8080,8443"
+    ))}
 
     # --- Blocklist Lookup (DNSBL/RBL) -----------------------------------------------
     # DNSBL zones costumam responder mais devagar que um connect TCP direto —
@@ -130,8 +137,10 @@ class BaseConfig:
     # --- Fontes de dados de ferramentas específicas -----------------------------
     IP_GEOLOCATION_API_URL = os.environ.get(
         "IP_GEOLOCATION_API_URL",
-        "http://ip-api.com/json/{ip}?fields=status,message,country,countryCode,regionName,city,lat,lon,isp,org,as,query",
+        "http://ip-api.com/json/{ip}?fields=status,message,country,countryCode,regionName,city,timezone,lat,lon,isp,org,as,proxy,hosting,mobile,query",
     )
+    TOR_EXIT_LIST_URL = os.environ.get("TOR_EXIT_LIST_URL", "https://check.torproject.org/torbulkexitlist")
+    TOR_EXIT_LIST_CACHE_SECONDS = _int(os.environ.get("TOR_EXIT_LIST_CACHE_SECONDS"), 3600)
     REVERSE_IP_LOOKUP_API_URL = os.environ.get(
         "REVERSE_IP_LOOKUP_API_URL", "https://api.hackertarget.com/reverseiplookup/?q={ip}"
     )
@@ -177,13 +186,14 @@ class BaseConfig:
     # --- Observabilidade -----------------------------------------------------------
     METRICS_ENABLED = _bool(os.environ.get("METRICS_ENABLED"), True)
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
+    DMARC_REPORT_MAX_BYTES = _int(os.environ.get("DMARC_REPORT_MAX_BYTES"), 10 * 1024 * 1024)
 
     # --- Cookies / segurança ---------------------------------------------------------
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     PERMANENT_SESSION_LIFETIME = timedelta(hours=12)
     WTF_CSRF_TIME_LIMIT = None
-    MAX_CONTENT_LENGTH = 256 * 1024  # formulários são pequenos; sem upload de arquivos
+    MAX_CONTENT_LENGTH = DMARC_REPORT_MAX_BYTES + 256 * 1024
 
     DEBUG = False
     TESTING = False

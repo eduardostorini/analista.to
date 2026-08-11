@@ -12,7 +12,7 @@ import datetime as dt
 import re
 from pathlib import Path
 
-from flask import Blueprint, Response, abort, current_app, render_template, send_file, url_for
+from flask import Blueprint, Response, abort, current_app, redirect, render_template, send_file, url_for
 
 from app.blueprints.main.context import build_tool_context
 from app.extensions import db
@@ -100,6 +100,31 @@ def public_result_page(prefix: str, slug: str):
     dinamicamente com o status atual — a mesma URL funciona do envio do
     formulário até o resultado final.
     """
+    # Compatibility for links produced briefly by the extended email tools
+    # before each tool received its own unambiguous result prefix.
+    if prefix == "email":
+        upgrade_tools = [t for t in registry.all() if t.public_url_prefix.startswith("email/")]
+        tool_slugs = [t.slug for t in upgrade_tools]
+        candidates = (
+            db.session.query(Search)
+            .join(Tool)
+            .filter(Tool.slug.in_(tool_slugs))
+            .order_by(Search.created_at.desc())
+            .limit(100)
+            .all()
+        )
+        exact = next((search for search in candidates if search.normalized_input == slug), None)
+        matched = next(
+            ((t, search) for search in candidates for t in upgrade_tools
+             if t.slug == search.tool.slug and search is (exact or search)
+             and t.public_slug(search.normalized_input) == slug),
+            None,
+        )
+        if matched:
+            matched_tool, _search = matched
+            return redirect(url_for("public_pages.public_result_page",
+                                    prefix=matched_tool.public_url_prefix, slug=slug), code=301)
+
     tool = next((t for t in registry.all() if t.public_url_prefix == prefix), None)
     if tool is None and prefix == "email/dmarc":
         return redirect(url_for("public_pages.public_result_page", prefix="dns/dmarc", slug=slug), code=301)

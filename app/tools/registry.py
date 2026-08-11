@@ -68,6 +68,15 @@ def load_tools() -> ToolRegistry:
     from app.tools.domain.subdomain_finder import SubdomainFinderTool
     from app.tools.domain.website_hosting import WebsiteHostingTool
     from app.tools.domain.whois_rdap import WhoisRdapTool
+    from app.tools.domain.domain_ip_upgrade import CidrCalculatorTool, IpConverterTool, IpRangeLookupTool, Ipv6LookupTool
+    from app.tools.domain.domain_network_upgrade import (
+        AsnIpRangesTool, AsnLookupTool, CdnCheckerTool, CloudProviderCheckerTool,
+        DomainAgeTool, DomainAvailabilityTool, DomainExpirationTool, DomainHealthCheckTool,
+        DomainIpHistoryTool, HttpHeadersCheckerTool, HttpStatusTool, IpGeolocationTool,
+        IpNeighborsTool, IpReputationTool, IpToAsnTool, NameserverHistoryTool,
+        NetworkRouteAnalyzerTool, ProxyVpnCheckerTool, SslCertificateCheckerTool,
+        TcpConnectionTool, TlsCheckerTool, TorExitNodeTool, WebServerCheckerTool,
+    )
     from app.tools.email.blocklist_lookup import BlocklistLookupTool
     from app.tools.email.spf_checker import SpfCheckerTool
     from app.tools.email.dkim_checker import DkimCheckerTool
@@ -75,6 +84,14 @@ def load_tools() -> ToolRegistry:
     from app.tools.email.mta_sts_checker import MtaStsCheckerTool
     from app.tools.email.tls_rpt_checker import TlsRptCheckerTool
     from app.tools.email.smtp_server_test import SmtpServerTestTool
+    from app.tools.email.upgrade_tools import (
+        ArcAnalyzerTool, BimiCheckerTool, DaneTlsaCheckerTool, DmarcCheckerTool,
+        DmarcReportAnalyzerTool, EmailAuthenticationAnalyzerTool,
+        EmailDeliverabilityTestTool, EmailHealthCheckTool,
+        MailServerHealthCheckTool, OpenRelayTestTool, PtrCheckerTool,
+        SmtpCapabilitiesCheckerTool, SmtpDeliveryTestTool,
+        SmtpPortCheckerTool, SmtpTlsCheckerTool,
+    )
     from app.tools.http.brotli_checker import BrotliCheckerTool
     from app.tools.http.http_headers import HttpHeadersTool
     from app.tools.http.http_version_checker import HttpVersionCheckerTool
@@ -118,6 +135,33 @@ def load_tools() -> ToolRegistry:
         ReverseIpLookupTool,
         SubdomainFinderTool,
         WebsiteHostingTool,
+        DomainAvailabilityTool,
+        DomainExpirationTool,
+        DomainAgeTool,
+        DomainHealthCheckTool,
+        IpGeolocationTool,
+        IpReputationTool,
+        IpRangeLookupTool,
+        Ipv6LookupTool,
+        IpConverterTool,
+        TorExitNodeTool,
+        ProxyVpnCheckerTool,
+        AsnLookupTool,
+        IpToAsnTool,
+        AsnIpRangesTool,
+        CidrCalculatorTool,
+        NetworkRouteAnalyzerTool,
+        IpNeighborsTool,
+        WebServerCheckerTool,
+        CdnCheckerTool,
+        CloudProviderCheckerTool,
+        HttpStatusTool,
+        HttpHeadersCheckerTool,
+        TcpConnectionTool,
+        SslCertificateCheckerTool,
+        TlsCheckerTool,
+        DomainIpHistoryTool,
+        NameserverHistoryTool,
         MetaTagsTool,
         RobotsCheckerTool,
         SitemapCheckerTool,
@@ -147,6 +191,21 @@ def load_tools() -> ToolRegistry:
         TlsRptCheckerTool,
         SmtpServerTestTool,
         BlocklistLookupTool,
+        SmtpDeliveryTestTool,
+        DmarcCheckerTool,
+        EmailHealthCheckTool,
+        SmtpTlsCheckerTool,
+        PtrCheckerTool,
+        BimiCheckerTool,
+        SmtpCapabilitiesCheckerTool,
+        SmtpPortCheckerTool,
+        OpenRelayTestTool,
+        DaneTlsaCheckerTool,
+        ArcAnalyzerTool,
+        DmarcReportAnalyzerTool,
+        EmailDeliverabilityTestTool,
+        EmailAuthenticationAnalyzerTool,
+        MailServerHealthCheckTool,
         PageSpeedCheckerTool,
         QrCodeGeneratorTool,
         HashGeneratorTool,

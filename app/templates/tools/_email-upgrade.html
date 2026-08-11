@@ -1,0 +1,88 @@
+{% extends "layout/base.html" %}
+{% from "tools/_tool_macros.html" import breadcrumbs, breadcrumbs_schema, captcha_widget, status_bar, related_tools_list, recent_searches_list, form_error_banner %}
+{% block title %}{{ tool.name }} | {{ site_name }}{% endblock %}
+{% block meta_description %}{{ tool.short_description }}{% endblock %}
+{% block canonical %}<link rel="canonical" href="{{ canonical_url }}">{% endblock %}
+{% block robots_meta %}<meta name="robots" content="{{ 'index, follow' if robots_index else 'noindex, follow' }}">{% endblock %}
+{% block content %}
+{% set crumbs = [("Home", url_for('main.home')), (category.name, url_for('main.category_or_tool_page', slug=category.slug)), (tool.name, None)] %}
+{{ breadcrumbs(crumbs) }}
+<div class="grid gap-8 lg:grid-cols-3"><main class="lg:col-span-2">
+<header class="mb-6"><h1 class="text-3xl">{{ tool.name }}</h1><p class="mt-2 text-slate-600">{{ tool.description or tool.short_description }}</p></header>
+{{ form_error_banner(form_error) }}
+{% if mode == 'form' %}<form method="post"{% if tool.slug == 'dmarc-report-analyzer' %} enctype="multipart/form-data"{% endif %} class="card space-y-4">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{% if tool.slug == 'dmarc-report-analyzer' %}
+<label for="report_file" class="block text-sm font-medium">DMARC aggregate report</label>
+<input id="report_file" name="report_file" type="file" required accept=".xml,.gz,.xml.gz,.zip,application/xml,application/gzip,application/zip" class="input">
+<p class="text-xs text-slate-500">Accepted formats: .xml, .xml.gz and .zip. Maximum size: 10 MB.</p>
+{% else %}
+<label for="input_value" class="block text-sm font-medium">{{ 'Headers or report content' if tool.input_type.value == 'text' else ('IP address' if tool.input_type.value == 'ip' else 'Domain or SMTP hostname') }}</label>
+{% if tool.input_type.value == 'text' %}<textarea id="input_value" name="input_value" required class="input min-h-52" placeholder="{{ tool.input_placeholder }}">{{ submitted_value }}</textarea>
+{% else %}<input id="input_value" name="input_value" required class="input" value="{{ submitted_value }}" placeholder="{{ tool.input_placeholder }}">{% endif %}
+{% endif %}
+{{ captcha_widget(captcha_provider) }}<button class="btn-primary" type="submit">Run check</button></form>{% endif %}
+{% if mode == 'pending' %}{{ status_bar(search) }}{% endif %}
+{% if mode == 'failed' %}<section class="card border-rose-200 bg-rose-50"><h2 class="font-semibold">Check failed</h2><p>{{ result.error_message }}</p></section>{% endif %}
+{% if mode == 'result' and result %}<section class="card space-y-4"><h2 class="text-xl">Result</h2><p>{{ result.summary }}</p>
+{% set data=result.normalized_result %}{% if data.score is defined %}<div class="text-3xl font-semibold">{{ data.score }} / 100</div>{% endif %}
+{% if tool.slug == 'smtp-port-checker' and data.ports %}
+<div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+  <p class="text-xs uppercase tracking-wide text-slate-500">Tested mail server</p>
+  <p class="mt-1 break-all font-mono text-sm font-semibold text-slate-800">{{ data.host }}</p>
+</div>
+<div class="overflow-x-auto rounded-lg border border-slate-200">
+  <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+    <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-3">Port</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Banner</th><th class="px-4 py-3">TLS</th><th class="px-4 py-3">Time</th><th class="px-4 py-3">Details</th></tr></thead>
+    <tbody class="divide-y divide-slate-100 bg-white">
+    {% for port, check in data.ports.items() %}
+      {% set failed = check.status is defined and check.status == 'error' %}
+      <tr><td class="px-4 py-3 font-mono font-semibold">{{ port }}</td>
+      <td class="px-4 py-3"><span class="{{ 'badge-danger' if failed else 'badge-success' }}">{{ 'Closed / timed out' if failed else 'Open' }}</span></td>
+      <td class="max-w-xs px-4 py-3 font-mono text-xs">{{ check.banner or '—' }}</td>
+      <td class="px-4 py-3">{{ check.tls.version if check.tls else '—' }}</td>
+      <td class="px-4 py-3">{{ (check.elapsed_ms|string + ' ms') if check.elapsed_ms is defined else '—' }}</td>
+      <td class="px-4 py-3 text-slate-600">{{ check.message or ('Connection established' if not failed else 'Connection failed') }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+  A timeout means the server did not complete the connection from this network within the configured limit. It does not always mean the port is permanently closed; outbound SMTP traffic may also be filtered by the hosting provider or firewall.
+</div>
+{% endif %}
+{% if tool.slug == 'smtp-capabilities-checker' %}
+<div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+  <p class="text-xs uppercase tracking-wide text-slate-500">Tested endpoint</p>
+  <p class="mt-1 font-mono text-sm font-semibold">{{ data.host }}:{{ data.port }}</p>
+</div>
+{% if data.status == 'unreachable' %}
+<div class="rounded-lg border border-amber-200 bg-amber-50 p-4"><p class="badge-danger mb-2">Connection {{ data.reason }}</p><p class="text-sm text-amber-800">{{ data.message }}</p><p class="mt-2 text-xs text-amber-700">The remote port may be filtered, unavailable, or blocked for outbound SMTP by this server's hosting network.</p></div>
+{% else %}
+<div class="overflow-x-auto rounded-lg border border-slate-200"><table class="min-w-full divide-y divide-slate-200 text-sm"><thead class="bg-slate-50"><tr><th class="px-4 py-3 text-left">Capability</th><th class="px-4 py-3 text-left">Value</th></tr></thead><tbody class="divide-y divide-slate-100 bg-white">
+{% for capability, value in data.capabilities.items() %}<tr><td class="px-4 py-3 font-mono font-semibold">{{ capability }}</td><td class="px-4 py-3 font-mono text-xs">{{ value if value is not sameas true else 'Supported' }}</td></tr>{% else %}<tr><td colspan="2" class="px-4 py-4 text-slate-500">No EHLO capabilities were returned.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endif %}
+{% endif %}
+<details><summary class="cursor-pointer font-medium">View technical details</summary><pre class="mt-3 overflow-auto rounded bg-slate-950 p-4 text-xs text-slate-100">{{ data|tojson(indent=2) }}</pre></details></section>{% endif %}
+{% if mode == 'form' %}{% block seo_content %}<section class="prose-tool mt-10 space-y-4">
+<h2>About the {{ tool.name }}</h2>
+<p>The {{ tool.name }} helps administrators investigate a focused part of an email system without requiring command-line access to a mail server. {{ tool.short_description }} It converts protocol and DNS evidence into a concise summary while keeping the underlying technical response available for review. This distinction matters because email delivery is a chain of independent systems: DNS publishes routing and authentication policy, SMTP transfers a message, TLS protects a connection, and receiving providers apply their own filtering decisions. A successful check at one layer does not prove that every other layer is healthy.</p>
+<p>Enter the requested domain, host, IP address, or message headers exactly as they are used in production. The checker validates the input before starting any external operation. When a domain is accepted, internationalized names are normalized safely and DNS queries use bounded timeouts. SMTP-oriented checks resolve the destination first and refuse loopback, private, link-local, multicast, reserved, and cloud metadata addresses. Only the documented SMTP ports can be reached. These safeguards reduce abuse and prevent the diagnostic interface from becoming a general-purpose network proxy.</p>
+<h2>How to read the results</h2>
+<p>Begin with the summary and score, when a score is available, then open the technical details. A pass means that the observed server or record satisfied the condition tested during this run. A warning identifies a configuration that may deserve attention but is not necessarily broken. A failure means that the expected evidence was missing, malformed, rejected, or unreachable. Temporary DNS and SMTP errors should be tested again before changing production configuration because remote services can be unavailable for reasons outside the domain owner’s control.</p>
+<p>Scores are technical indicators rather than promises. They are designed to make several findings easier to compare, but they do not predict user engagement, reputation, inbox placement, or the behavior of every receiving provider. In particular, an SMTP 250 response only confirms that a server accepted a command or message at that stage. It does not prove final delivery, inbox placement, reading, or the absence of later spam filtering. Use the original response codes and records in the technical section when diagnosing a specific incident.</p>
+<h2>Recommended investigation workflow</h2>
+<p>For a complete review, start with MX routing and verify that every advertised mail exchanger is intentional. Continue with SPF, DKIM, and DMARC so that sending authorization, cryptographic signatures, visible From alignment, enforcement policy, and reporting are considered together. Review PTR and forward-confirmed reverse DNS for outbound hosts. Then inspect SMTP connectivity, EHLO capabilities, STARTTLS, certificate identity, supported TLS versions, MTA-STS, TLS reporting, and DANE where it is deployed. BIMI should be reviewed only after DMARC enforcement is established, because a logo record does not replace authentication.</p>
+<p>Message-header tools answer a different question from domain checkers. They describe what happened to one message as it moved between servers. Authentication-Results, Received-SPF, ARC sets, Return-Path, From, and Received fields can reveal alignment failures or conflicting assessments. Results inserted by an untrusted system must not be treated as authoritative merely because they appear in a header. Prefer the assessment added by the final trusted receiving environment and compare it with the raw routing chain.</p>
+<h2>Privacy, abuse prevention, and limitations</h2>
+<p>Every execution requires a CAPTCHA that is verified by the backend before DNS, TCP, TLS, SMTP, parsing, or other analysis begins. Per-tool rate limits remain active independently of CAPTCHA validation. Operations have explicit timeouts so a slow destination cannot occupy a worker indefinitely. Pasted headers and other potentially sensitive message data are marked private and are not intended for public index pages. SMTP credentials, CAPTCHA tokens, authentication payloads, and secrets must never appear in public history, analytics, exception metadata, URLs, or application logs.</p>
+<p>The checker reports only evidence it can observe. DNS caches may briefly return older records after a change. Firewalls can make an available server appear unreachable from a particular network. SMTP capabilities may differ by source address, port, or authentication state. Some receiving providers intentionally provide limited explanations for anti-abuse reasons. Therefore, treat each finding as one reproducible data point, document the exact time and target, and corroborate important conclusions with provider logs and a second test.</p>
+<h2>Frequently asked questions</h2>
+<h3>Does a passing result guarantee inbox placement?</h3><p>No. It confirms only the technical conditions described by this tool. Content, recipient engagement, sending history, reputation, provider policy, and filtering can still affect placement.</p>
+<h3>Should I publish or change records immediately?</h3><p>Review the detailed evidence first and confirm dependencies with the teams or providers that send mail for the domain. Authentication changes can disrupt legitimate sources when deployed without an inventory.</p>
+<h3>Why can a repeated test produce a different answer?</h3><p>DNS propagation, load-balanced hosts, transient network failures, certificate renewal, greylisting, and server policy can all change the observation. Repeat the test and compare timestamps before escalating.</p>
+</section>{% endblock %}{% endif %}
+</main><aside class="space-y-8"><section><h2 class="mb-3 text-sm font-semibold uppercase text-slate-400">Related tools</h2>{{ related_tools_list(related_tools) }}</section><section><h2 class="mb-3 text-sm font-semibold uppercase text-slate-400">Recent public queries</h2>{{ recent_searches_list(tool,recent_searches) }}</section></aside></div>
+{{ breadcrumbs_schema(crumbs, site_url) }}
+{% endblock %}

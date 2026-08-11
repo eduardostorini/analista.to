@@ -63,7 +63,9 @@ def test_dns_propagation_all_resolvers_agree(mocker):
     assert result.success is True
     assert result.data["propagated"] is True
     assert result.data["distinct_answer_count"] == 1
-    assert len(result.data["resolvers"]) == 8
+    assert len(result.data["resolvers"]) == 10
+    assert result.data["score"] == 100
+    assert result.data["status_label"] == "DNS propagado"
 
 
 def test_dns_propagation_resolvers_disagree(mocker):
@@ -106,7 +108,7 @@ def test_dns_propagation_handles_no_successful_resolvers(mocker):
 
     assert result.data["propagated"] is False
     assert result.data["distinct_answer_count"] == 0
-    assert "0/8" in result.summary
+    assert "0 de 10" in result.summary
 
 
 def test_dns_propagation_query_resolver_classifies_statuses(mocker):
@@ -121,6 +123,39 @@ def test_dns_propagation_query_resolver_classifies_statuses(mocker):
     result = _query_resolver("Google", "8.8.8.8", "US", "nonexistent.example", "A")
     assert result["status"] == "no_record"
     assert result["values"] == []
+
+
+def test_dns_propagation_supports_soa_and_caa_and_strips_url():
+    tool = DnsPropagationCheckerTool()
+    assert tool.normalize_input(tool.validate_input("SOA::https://www.example.com/path?q=1")) == "SOA::www.example.com"
+    assert tool.validate_input("CAA::example.com") == "CAA::example.com"
+
+
+def test_dns_propagation_ignores_answer_order_when_scoring(mocker):
+    def fake_query(provider, ip, country, domain, record_type):
+        values = ["192.0.2.2", "192.0.2.1"] if ip.endswith("1") else ["192.0.2.1", "192.0.2.2"]
+        return {"provider": provider, "resolver_ip": ip, "server": ip, "values": sorted(values),
+                "ttl": 300, "response_time_ms": 10, "status": "ok", "status_message": "", "cached": False}
+
+    mocker.patch("app.tools.dns.dns_propagation_checker._query_resolver", side_effect=fake_query)
+    result = DnsPropagationCheckerTool().execute("A::example.com")
+    assert result.data["score"] == 100
+    assert result.data["distinct_answer_count"] == 1
+
+
+def test_dns_propagation_partial_score(mocker):
+    calls = {"count": 0}
+    def fake_query(provider, ip, country, domain, record_type):
+        calls["count"] += 1
+        values = ["192.0.2.1"] if calls["count"] <= 8 else ["192.0.2.2"]
+        return {"provider": provider, "resolver_ip": ip, "server": ip, "values": values,
+                "ttl": 60, "response_time_ms": 20, "status": "ok", "status_message": "", "cached": False}
+
+    mocker.patch("app.tools.dns.dns_propagation_checker._query_resolver", side_effect=fake_query)
+    result = DnsPropagationCheckerTool().execute("A::example.com")
+    assert result.data["score"] == 80
+    assert result.data["status_label"] == "DNS propagado"
+    assert len(result.data["answer_groups"]) == 2
 
 
 # ---------------------------------------------------------------------------

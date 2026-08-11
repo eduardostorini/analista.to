@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import secrets as _secrets
+from types import SimpleNamespace
 
-from flask import abort, redirect, render_template, request, session, url_for
+from flask import abort, current_app, redirect, render_template, request, session, url_for
 
 from app.blueprints.main import main_bp
 from app.blueprints.main.context import build_tool_context
@@ -142,6 +143,8 @@ def category_or_tool_page(slug: str):
         abort(404)
 
     if request.method == "POST":
+        if tool.slug == "dmarc-report-analyzer":
+            return _handle_dmarc_report_upload(tool, tool_row)
         return _handle_submit(tool, tool_row)
 
     context = build_tool_context(tool, tool_row)
@@ -163,7 +166,13 @@ def _handle_submit(tool, tool_row: Tool):
             verify_captcha(request.form.to_dict())
         except CaptchaError as exc:
             _record_abuse(tool_row, ip_hash, AbuseEventType.CAPTCHA_FAILED, {"reason": exc.reason})
-            return _render_form_error(tool, tool_row, raw_input, str(exc))
+            if tool.category_slug == "domain-ip":
+                message = "CAPTCHA validation failed. Please try again."
+            elif tool.category_slug == "email" or tool.slug == "dns-propagation-checker":
+                message = "Não foi possível validar o CAPTCHA. Tente novamente."
+            else:
+                message = str(exc)
+            return _render_form_error(tool, tool_row, raw_input, message)
 
     try:
         enforce_rate_limits(
@@ -192,6 +201,50 @@ def _handle_submit(tool, tool_row: Tool):
     return redirect(url_for("public_pages.public_result_page", prefix=tool.public_url_prefix, slug=slug))
 
 
+def _handle_dmarc_report_upload(tool, tool_row: Tool):
+    """Analyze an uploaded aggregate report entirely in memory."""
+    from app.services.email_upgrade import parse_dmarc_report
+
+    ip_hash = hash_ip(_client_ip())
+    if is_blocked(ip_hash):
+        abort(403)
+    try:
+        verify_captcha(request.form.to_dict())
+    except CaptchaError as exc:
+        _record_abuse(tool_row, ip_hash, AbuseEventType.CAPTCHA_FAILED, {"reason": exc.reason})
+        return _render_form_error(tool, tool_row, "", "Não foi possível validar o CAPTCHA. Tente novamente.")
+
+    upload = request.files.get("report_file")
+    filename = (upload.filename if upload else "") or ""
+    if not upload or not filename.lower().endswith((".xml", ".xml.gz", ".zip")):
+        return _render_form_error(tool, tool_row, "", "Upload a .xml, .xml.gz or .zip report.")
+    try:
+        enforce_rate_limits(
+            tool_slug=tool.slug, tool_rate_limit=tool_row.rate_limit, ip_hash=ip_hash,
+            input_hash=compute_input_hash(filename.lower()), session_id=_session_id(),
+        )
+    except RateLimitExceededError as exc:
+        _record_abuse(tool_row, ip_hash, AbuseEventType.RATE_LIMIT_EXCEEDED, {"scope": exc.scope})
+        abort(429)
+
+    limit = current_app.config["DMARC_REPORT_MAX_BYTES"]
+    payload = upload.stream.read(limit + 1)
+    if len(payload) > limit:
+        return _render_form_error(tool, tool_row, "", f"Report exceeds the {limit // (1024 * 1024)} MB limit.")
+    try:
+        data = parse_dmarc_report(payload, filename)
+    except Exception:
+        return _render_form_error(tool, tool_row, "", "The uploaded file is not a valid DMARC aggregate report.")
+
+    result = SimpleNamespace(
+        summary=f"Analyzed {data['total']} message(s) from {len(data['rows'])} source record(s).",
+        normalized_result=data, error_message=None,
+    )
+    context = build_tool_context(tool, tool_row)
+    context.update(mode="result", search=None, result=result, submitted_value="")
+    return render_template(tool.template_name, **context)
+
+
 def _record_abuse(tool_row: Tool, ip_hash: str, event_type: AbuseEventType, details: dict) -> None:
     db.session.add(AbuseEvent(ip_hash=ip_hash, tool_id=tool_row.id, event_type=event_type, details=details))
     db.session.commit()
@@ -199,5 +252,6 @@ def _record_abuse(tool_row: Tool, ip_hash: str, event_type: AbuseEventType, deta
 
 def _render_form_error(tool, tool_row: Tool, raw_input: str, message: str):
     context = build_tool_context(tool, tool_row)
-    context.update(mode="form", search=None, result=None, submitted_value=raw_input, form_error=message)
+    submitted_value = raw_input.partition("::")[2] if tool.secondary_input_field and "::" in raw_input else raw_input
+    context.update(mode="form", search=None, result=None, submitted_value=submitted_value, form_error=message)
     return render_template(tool.template_name, **context), 400
