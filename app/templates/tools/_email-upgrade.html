@@ -26,6 +26,24 @@
 {% if mode == 'failed' %}<section class="card border-rose-200 bg-rose-50"><h2 class="font-semibold">Check failed</h2><p>{{ result.error_message }}</p></section>{% endif %}
 {% if mode == 'result' and result %}<section class="card space-y-4"><h2 class="text-xl">Result</h2><p>{{ result.summary }}</p>
 {% set data=result.normalized_result %}{% if data.score is defined %}<div class="text-3xl font-semibold">{{ data.score }} / 100</div>{% endif %}
+{% if tool.slug == 'bimi-checker' and data.logo_url %}
+<div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+  <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">BIMI logo preview</p>
+  <div class="flex min-h-52 items-center justify-center rounded-lg border border-slate-200 bg-white p-6">
+    <img
+      src="{{ data.logo_url }}"
+      alt="BIMI logo published by {{ data.domain }}"
+      loading="lazy"
+      decoding="async"
+      referrerpolicy="no-referrer"
+      class="max-h-48 max-w-full object-contain"
+    >
+  </div>
+  <p class="mt-3 break-all text-xs text-slate-500">
+    Published logo: <a href="{{ data.logo_url }}" target="_blank" rel="noopener noreferrer">{{ data.logo_url }}</a>
+  </p>
+</div>
+{% endif %}
 {% if tool.slug == 'smtp-port-checker' and data.ports %}
 <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
   <p class="text-xs uppercase tracking-wide text-slate-500">Tested mail server</p>

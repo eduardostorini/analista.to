@@ -29,5 +29,8 @@ def configure_logging(level: str = "INFO") -> None:
     root.handlers = [handler]
     root.setLevel(level)
 
-    for noisy in ("werkzeug", "gunicorn.access"):
+    # httpx logs complete request URLs at INFO. Some APIs (including
+    # PageSpeed Insights) authenticate through a query parameter, so logging
+    # those URLs would expose credentials.
+    for noisy in ("werkzeug", "gunicorn.access", "httpx", "httpcore"):
         logging.getLogger(noisy).setLevel(logging.WARNING)

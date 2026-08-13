@@ -28,7 +28,7 @@ class HstsCheckerTool(BaseTool):
     public_url_prefix = "ssl/hsts"
     ttl_seconds = 3600
     rate_limit_per_minute = 8
-    analyzer_version = 1
+    analyzer_version = 2
 
     def validate_input(self, raw_input: str) -> str:
         return raw_input
@@ -39,7 +39,9 @@ class HstsCheckerTool(BaseTool):
     def execute(self, normalized_input: str) -> ToolResult:
         https_url = f"https://{normalized_input}/"
         try:
-            response = SafeHTTPClient().request("GET", https_url, max_response_bytes=65536)
+            response = SafeHTTPClient().request(
+                "GET", https_url, max_response_bytes=65536, read_response_body=False
+            )
         except Exception as exc:
             raise ToolExecutionError(
                 f"Could not connect to {normalized_input} over HTTPS: {exc}", "https_connection_failed"
@@ -51,7 +53,7 @@ class HstsCheckerTool(BaseTool):
         try:
             http_url = f"http://{normalized_input}/"
             _http_response, history = SafeHTTPClient().request_with_history(
-                "GET", http_url, max_response_bytes=65536
+                "GET", http_url, max_response_bytes=65536, read_response_body=False
             )
             http_redirects_to_https = any(
                 (entry.get("url") or "").startswith("https://") for entry in history

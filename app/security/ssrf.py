@@ -186,6 +186,7 @@ class SafeHTTPClient:
         json: Any = None,
         content: bytes | str | None = None,
         read_timeout_override: float | None = None,
+        read_response_body: bool = True,
     ) -> httpx.Response:
         response, _history = self.request_with_history(
             method,
@@ -195,6 +196,7 @@ class SafeHTTPClient:
             json=json,
             content=content,
             read_timeout_override=read_timeout_override,
+            read_response_body=read_response_body,
         )
         return response
 
@@ -208,6 +210,7 @@ class SafeHTTPClient:
         json: Any = None,
         content: bytes | str | None = None,
         read_timeout_override: float | None = None,
+        read_response_body: bool = True,
     ) -> tuple[httpx.Response, list[dict]]:
         """Como `request()`, mas também devolve a cadeia de redirecionamentos
         seguidos manualmente (usado pelo Redirect Checker).
@@ -237,7 +240,8 @@ class SafeHTTPClient:
 
             with httpx.Client(transport=transport, timeout=timeout, follow_redirects=False) as client:
                 response = self._send_with_size_limit(
-                    client, method, target.url, request_headers, limit=limit, json=json, content=content
+                    client, method, target.url, request_headers, limit=limit, json=json, content=content,
+                    read_response_body=read_response_body,
                 )
 
             if response.is_redirect and remaining_redirects > 0:
@@ -264,8 +268,18 @@ class SafeHTTPClient:
         limit: int,
         json: Any = None,
         content: bytes | str | None = None,
+        read_response_body: bool = True,
     ) -> httpx.Response:
         with client.stream(method, url, headers=headers, json=json, content=content) as response:
+            if not read_response_body:
+                return httpx.Response(
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    content=b"",
+                    request=response.request,
+                    extensions={"http_version": response.extensions.get("http_version", b"HTTP/1.1")},
+                )
+
             content_length = response.headers.get("content-length")
             if content_length and int(content_length) > limit:
                     raise ResponseTooLargeError(

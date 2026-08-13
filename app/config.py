@@ -101,6 +101,7 @@ class BaseConfig:
     MATH_CHALLENGE_MAX_ATTEMPTS = _int(os.environ.get("MATH_CHALLENGE_MAX_ATTEMPTS"), 5)
 
     # --- Rate limiting --------------------------------------------------------
+    RATE_LIMIT_ENABLED = _bool(os.environ.get("RATE_LIMIT_ENABLED"), True)
     RATE_LIMIT_DEFAULT_PER_MINUTE = _int(os.environ.get("RATE_LIMIT_DEFAULT_PER_MINUTE"), 10)
     RATE_LIMIT_NETWORK_TOOLS_PER_MINUTE = _int(os.environ.get("RATE_LIMIT_NETWORK_TOOLS_PER_MINUTE"), 5)
     RATE_LIMIT_GLOBAL_PER_MINUTE = _int(os.environ.get("RATE_LIMIT_GLOBAL_PER_MINUTE"), 600)
@@ -159,7 +160,8 @@ class BaseConfig:
     GOOGLE_PAGESPEED_API_URL = os.environ.get(
         "GOOGLE_PAGESPEED_API_URL", "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
     )
-    GOOGLE_PAGESPEED_API_KEY = os.environ.get("GOOGLE_PAGESPEED_API_KEY", "")
+    # `PAGESPEED` is kept as a backwards-compatible local alias.
+    GOOGLE_PAGESPEED_API_KEY = os.environ.get("GOOGLE_PAGESPEED_API_KEY") or os.environ.get("PAGESPEED", "")
     # Mantido abaixo do soft_time_limit (45s) da task run_search (app/tasks/search_tasks.py)
     # para que o próprio PageSpeed Checker devolva um erro claro antes do worker
     # matar a task — ver app/tools/performance/pagespeed_checker.py.
@@ -218,6 +220,7 @@ class ProductionConfig(BaseConfig):
 class TestingConfig(BaseConfig):
     TESTING = True
     DEBUG = True
+    RATE_LIMIT_ENABLED = True
     SESSION_COOKIE_SECURE = False
     WTF_CSRF_ENABLED = False
     SQLALCHEMY_DATABASE_URI = os.environ.get(

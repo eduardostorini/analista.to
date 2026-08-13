@@ -5,6 +5,21 @@ import pytest
 from app.security.rate_limit import RateLimitExceededError, RateLimitRule, RateLimiter, enforce_rate_limits
 
 
+def test_enforce_rate_limits_can_be_disabled(app, mocker, monkeypatch):
+    monkeypatch.setitem(app.config, "RATE_LIMIT_ENABLED", False)
+    check = mocker.patch("app.security.rate_limit.RateLimiter.check")
+
+    enforce_rate_limits(
+        tool_slug="ip-geolocation",
+        tool_rate_limit=1,
+        ip_hash="ip-hash",
+        input_hash="input-hash",
+        session_id="session-id",
+    )
+
+    check.assert_not_called()
+
+
 def test_rate_limiter_allows_up_to_limit():
     limiter = RateLimiter()
     rule = RateLimitRule("test", "unit-test-key-1", limit=3)

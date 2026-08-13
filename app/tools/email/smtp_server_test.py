@@ -21,7 +21,6 @@ from app.models.enums import InputType
 from app.security.ssrf import resolve_host_ips
 from app.tools.base import BaseTool, ToolResult
 from app.tools.dns_utils import query_records
-from app.tools.exceptions import ToolExecutionError
 from app.tools.validators import validate_and_normalize_domain
 
 _SMTP_PORT = 25
@@ -163,7 +162,7 @@ class SmtpServerTestTool(BaseTool):
     public_url_prefix = "email/smtp-test"
     ttl_seconds = 1800
     rate_limit_per_minute = 5
-    analyzer_version = 1
+    analyzer_version = 2
 
     def validate_input(self, raw_input: str) -> str:
         return raw_input
@@ -195,9 +194,39 @@ class SmtpServerTestTool(BaseTool):
         try:
             probe = _probe_mx_host(ip, mx_host)
         except (socket.timeout, ConnectionRefusedError, OSError, ssl.SSLError) as exc:
-            raise ToolExecutionError(
-                f"Could not complete SMTP test against {mx_host}: {exc}", "smtp_connection_failed"
-            ) from exc
+            if isinstance(exc, (socket.timeout, TimeoutError)):
+                connection_status = "timeout"
+                detail = (
+                    "The SMTP server did not respond on port 25 before the connection timeout. "
+                    "The port may be filtered by the local network, hosting provider, or remote server."
+                )
+            elif isinstance(exc, ConnectionRefusedError):
+                connection_status = "refused"
+                detail = "The SMTP server actively refused the connection on port 25."
+            else:
+                connection_status = "connection_error"
+                detail = f"The SMTP connection could not be completed: {exc}"
+
+            return ToolResult(
+                success=True,
+                summary=f"Could not connect to {mx_host} ({ip}) on port 25: {connection_status}.",
+                data={
+                    "domain": normalized_input,
+                    "has_mx": True,
+                    "mx_host": mx_host,
+                    "mx_priority": mx_priority,
+                    "ip": ip,
+                    "connected": False,
+                    "connection_status": connection_status,
+                    "banner": None,
+                    "supports_starttls": False,
+                    "starttls_negotiated": False,
+                    "tls_protocol": None,
+                    "tls_cipher": None,
+                    "capabilities": [],
+                    "issues": [detail],
+                },
+            )
 
         supports_starttls = probe["supports_starttls"]
         issues: list[str] = []
@@ -213,6 +242,7 @@ class SmtpServerTestTool(BaseTool):
             "mx_priority": mx_priority,
             "ip": ip,
             "connected": True,
+            "connection_status": "connected",
             "banner": probe["banner"],
             "supports_starttls": supports_starttls,
             "starttls_negotiated": probe["starttls_negotiated"],

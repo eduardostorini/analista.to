@@ -1,9 +1,11 @@
 """Network-backed Domain & IP tools. All outbound targets use SSRF-safe services."""
 from __future__ import annotations
 import ipaddress
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import current_app
 
 from app.models.enums import InputType
+from app.security.ssrf import resolve_host_ips
 from app.services.domain_ip_service import (asn_lookup,asn_prefixes,detect_infrastructure,domain_dates,
  geolocate_ip,http_probe,normalize_asn,rdap_ip,tcp_connect,tls_probe,tor_exit_status)
 from app.tools.base import BaseTool,ToolResult
@@ -43,7 +45,18 @@ class AsnLookupTool(BaseTool):
   data=asn_lookup(v); return ToolResult(True,f"ASN lookup completed for {v}.",data)
 
 class IpToAsnTool(_Ip):
- slug="ip-to-asn"; name="IP to ASN Lookup"; short_description="Identify the ASN and announced prefix for an IPv4 or IPv6 address."; description=short_description; public_url_prefix="ip/asn"
+ slug="ip-to-asn"; name="IP to ASN Lookup"; short_description="Identify the ASN and announced prefix for a domain, IPv4, or IPv6 address."; description=short_description; public_url_prefix="ip/asn"; input_type=InputType.TEXT; input_placeholder="Domain or IP (example.com or 8.8.8.8)"; analyzer_version=2
+ def validate_input(self,v):
+  value=(v or "").strip()
+  if not value:raise ToolValidationError("Enter a domain or IP address.")
+  try:return str(ipaddress.ip_address(value))
+  except ValueError:return normalize_domain(clean_domain_input(value))
+ def normalize_input(self,v):
+  try:return str(ipaddress.ip_address(v))
+  except ValueError:
+   ips=resolve_host_ips(v)
+   chosen=next((ip for ip in ips if ip.version == 4),ips[0])
+   return str(chosen)
  def execute(self,v): return ToolResult(True,f"ASN lookup completed for {v}.",asn_lookup(v))
 class AsnIpRangesTool(AsnLookupTool):
  slug="asn-ip-ranges"; name="ASN to IP Ranges"; short_description="List IPv4 and IPv6 prefixes announced by an autonomous system."; description=short_description; input_placeholder="AS13335"; public_url_prefix="network/asn-prefixes"
@@ -55,7 +68,18 @@ class AsnIpRangesTool(AsnLookupTool):
   rows=asn_prefixes(v); return ToolResult(True,f"Found {len(rows)} announced prefix(es) for {v}.",{"asn":v,"prefixes":rows,"count":len(rows)})
 
 class IpGeolocationTool(_Ip):
- slug="ip-geolocation"; name="IP Geolocation"; short_description="Estimate the country, region, city and network associated with an IP."; description=short_description; public_url_prefix="ip/geolocation"
+ slug="ip-geolocation"; name="IP Geolocation"; short_description="Estimate the country, region, city and network associated with a domain or IP."; description=short_description; public_url_prefix="ip/geolocation"; input_type=InputType.TEXT; input_placeholder="Domain or IP (example.com or 8.8.8.8)"; analyzer_version=2
+ def validate_input(self,v):
+  value=(v or "").strip()
+  if not value:raise ToolValidationError("Enter a domain or IP address.")
+  try:return str(ipaddress.ip_address(value))
+  except ValueError:return normalize_domain(clean_domain_input(value))
+ def normalize_input(self,v):
+  try:return str(ipaddress.ip_address(v))
+  except ValueError:
+   ips=resolve_host_ips(v)
+   chosen=next((ip for ip in ips if ip.version == 4),ips[0])
+   return str(chosen)
  def execute(self,v):
   ip=ipaddress.ip_address(v)
   if not ip.is_global:return ToolResult(True,"Private and special-purpose addresses cannot be geolocated.",{"ip":v,"is_global":False,"geolocation":None})
@@ -131,7 +155,18 @@ class SslCertificateCheckerTool(_Domain):
  def execute(self,v):return SslCertificateTool().execute(v)
 
 class IpReputationTool(_Ip):
- slug="ip-reputation-checker"; name="IP Reputation Checker"; short_description="Assess multiple network reputation signals without treating one weak signal as proof."; description=short_description; public_url_prefix="ip/reputation"; rate_limit_per_minute=1
+ slug="ip-reputation-checker"; name="IP Reputation Checker"; short_description="Assess multiple network reputation signals for a domain or IP without treating one weak signal as proof."; description=short_description; public_url_prefix="ip/reputation"; rate_limit_per_minute=1; input_type=InputType.TEXT; input_placeholder="Domain or IP (example.com or 8.8.8.8)"; analyzer_version=2
+ def validate_input(self,v):
+  value=(v or "").strip()
+  if not value:raise ToolValidationError("Enter a domain or IP address.")
+  try:return str(ipaddress.ip_address(value))
+  except ValueError:return normalize_domain(clean_domain_input(value))
+ def normalize_input(self,v):
+  try:return str(ipaddress.ip_address(v))
+  except ValueError:
+   ips=resolve_host_ips(v)
+   chosen=next((ip for ip in ips if ip.version == 4),ips[0])
+   return str(chosen)
  def execute(self,v):
   # DNSBL implementation accepts a hostname; a reverse-DNS-safe literal is
   # handled here through a small adapter to avoid duplicating 60-zone logic.
@@ -154,13 +189,35 @@ class IpReputationTool(_Ip):
   return ToolResult(True,f"Technical reputation score: {score}/100.",{"ip":v,"score":score,"signals":signals,"rdap":rdap,"dnsbl":dnsbl,"tor":tor,"sources":sources,"methodology":"Starts at 100; subtracts up to 60 for DNSBL evidence, 15 for current Tor exit status, and 10 for a datacenter naming signal. No single weak signal establishes malicious activity."})
 
 class TorExitNodeTool(_Ip):
- slug="tor-exit-node-checker"; name="Tor Exit Node Checker"; short_description="Check an IP against a cached Tor exit-node data source when configured."; description=short_description; public_url_prefix="ip/tor-exit"
+ slug="tor-exit-node-checker"; name="Tor Exit Node Checker"; short_description="Check a domain or IP against a cached Tor exit-node data source when configured."; description=short_description; public_url_prefix="ip/tor-exit"; input_type=InputType.TEXT; input_placeholder="Domain or IP (example.com or 8.8.8.8)"; analyzer_version=2
+ def validate_input(self,v):
+  value=(v or "").strip()
+  if not value:raise ToolValidationError("Enter a domain or IP address.")
+  try:return str(ipaddress.ip_address(value))
+  except ValueError:return normalize_domain(clean_domain_input(value))
+ def normalize_input(self,v):
+  try:return str(ipaddress.ip_address(v))
+  except ValueError:
+   ips=resolve_host_ips(v)
+   chosen=next((ip for ip in ips if ip.version == 4),ips[0])
+   return str(chosen)
  def execute(self,v):
   try:data=tor_exit_status(v,current_app.config["TOR_EXIT_LIST_URL"],current_app.config["TOR_EXIT_LIST_CACHE_SECONDS"]);data["available"]=True
   except Exception:data={"ip":v,"tor_exit":None,"available":False,"message":"The cached Tor exit-node source is temporarily unavailable."}
   return ToolResult(True,"Tor exit status: "+("Yes" if data.get("tor_exit") else "No" if data.get("tor_exit") is False else "Unknown")+".",data)
 class ProxyVpnCheckerTool(_Ip):
- slug="proxy-vpn-checker"; name="Proxy / VPN Checker"; short_description="Assess possible proxy, VPN, Tor, hosting and access-network indicators."; description=short_description; public_url_prefix="ip/proxy-vpn"
+ slug="proxy-vpn-checker"; name="Proxy / VPN Checker"; short_description="Assess possible proxy, VPN, Tor, hosting and access-network indicators for a domain or IP."; description=short_description; public_url_prefix="ip/proxy-vpn"; input_type=InputType.TEXT; input_placeholder="Domain or IP (example.com or 8.8.8.8)"; analyzer_version=2
+ def validate_input(self,v):
+  value=(v or "").strip()
+  if not value:raise ToolValidationError("Enter a domain or IP address.")
+  try:return str(ipaddress.ip_address(value))
+  except ValueError:return normalize_domain(clean_domain_input(value))
+ def normalize_input(self,v):
+  try:return str(ipaddress.ip_address(v))
+  except ValueError:
+   ips=resolve_host_ips(v)
+   chosen=next((ip for ip in ips if ip.version == 4),ips[0])
+   return str(chosen)
  def execute(self,v):
   try:rdap=rdap_ip(v)
   except Exception:rdap=None
@@ -173,18 +230,36 @@ class ProxyVpnCheckerTool(_Ip):
   return ToolResult(True,"Network indicators analyzed.",{"ip":v,"proxy":"possible" if proxy else "not_detected","vpn":"possible" if proxy or hosting else "unknown","tor":tor_value if tor_value is not None else "unknown","hosting_provider":hosting,"residential":"possible" if not hosting and not mobile else "unknown","mobile":mobile,"datacenter":hosting,"confidence":"medium" if geo else "low","sources":[x for x in ("IP geolocation" if geo else None,"RDAP" if rdap else None,"Tor Project" if tor else None) if x]})
 
 class NetworkRouteAnalyzerTool(_Domain):
- slug="network-route-analyzer"; name="Network Route Analyzer"; short_description="Trace the route to a host and enrich real hop data when sources are available."; description=short_description; public_url_prefix="network/route"; rate_limit_per_minute=1; ttl_seconds=0
+ slug="network-route-analyzer"; name="Network Route Analyzer"; short_description="Trace the route to a host and enrich real hop data when sources are available."; description=short_description; public_url_prefix="network/route"; rate_limit_per_minute=1; ttl_seconds=0; analyzer_version=2
  def execute(self,v):
   base=TracerouteTool().execute(v); data=base.data
+  unique_ips=list(dict.fromkeys(hop.get("ip_address") for hop in data.get("hops",[]) if hop.get("ip_address")))
+  networks={ip:None for ip in unique_ips}
+  if unique_ips:
+   with ThreadPoolExecutor(max_workers=min(6,len(unique_ips)),thread_name_prefix="route-rdap") as executor:
+    futures={executor.submit(rdap_ip,ip):ip for ip in unique_ips}
+    for future in as_completed(futures):
+     ip=futures[future]
+     try:networks[ip]=future.result()
+     except Exception:networks[ip]=None
   for hop in data.get("hops",[]):
    ip=hop.get("ip_address")
-   if ip:
-    try:hop["network"]=rdap_ip(ip)
-    except Exception:hop["network"]=None
+   if ip:hop["network"]=networks.get(ip)
   return ToolResult(True,base.summary,data)
 
 class IpNeighborsTool(_Ip):
- slug="ip-neighbors"; name="IP Neighbors"; short_description="Show bounded network and shared-hosting signals around an IP address."; description=short_description; public_url_prefix="ip/neighbors"
+ slug="ip-neighbors"; name="IP Neighbors"; short_description="Show bounded network and shared-hosting signals around a domain or IP address."; description=short_description; public_url_prefix="ip/neighbors"; input_type=InputType.TEXT; input_placeholder="Domain or IP (example.com or 8.8.8.8)"; analyzer_version=2
+ def validate_input(self,v):
+  value=(v or "").strip()
+  if not value:raise ToolValidationError("Enter a domain or IP address.")
+  try:return str(ipaddress.ip_address(value))
+  except ValueError:return normalize_domain(clean_domain_input(value))
+ def normalize_input(self,v):
+  try:return str(ipaddress.ip_address(v))
+  except ValueError:
+   ips=resolve_host_ips(v)
+   chosen=next((ip for ip in ips if ip.version == 4),ips[0])
+   return str(chosen)
  def execute(self,v):
   try:network=rdap_ip(v)
   except Exception:network=None

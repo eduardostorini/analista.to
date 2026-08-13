@@ -232,10 +232,8 @@ def test_smtp_server_test_flags_missing_starttls(mocker):
     mock_sock.sendall.assert_any_call(b"QUIT\r\n")
 
 
-def test_smtp_server_test_connection_failure_raises_tool_execution_error(mocker):
+def test_smtp_server_test_connection_timeout_returns_diagnostic_result(mocker):
     import socket as socket_module
-
-    from app.tools.exceptions import ToolExecutionError
 
     mocker.patch(
         "app.tools.email.smtp_server_test.query_records",
@@ -251,8 +249,10 @@ def test_smtp_server_test_connection_failure_raises_tool_execution_error(mocker)
     )
 
     tool = SmtpServerTestTool()
-    try:
-        tool.execute("example.com")
-        assert False, "expected ToolExecutionError"
-    except ToolExecutionError as exc:
-        assert exc.error_code == "smtp_connection_failed"
+    result = tool.execute("example.com")
+
+    assert result.success is True
+    assert result.data["has_mx"] is True
+    assert result.data["connected"] is False
+    assert result.data["connection_status"] == "timeout"
+    assert any("filtered" in issue for issue in result.data["issues"])

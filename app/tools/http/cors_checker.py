@@ -23,7 +23,7 @@ class CorsCheckerTool(BaseTool):
     public_url_prefix = "http/cors"
     ttl_seconds = 3600
     rate_limit_per_minute = 8
-    analyzer_version = 1
+    analyzer_version = 2
 
     def validate_input(self, raw_input: str) -> str:
         return clean_url_input(raw_input)
@@ -33,7 +33,11 @@ class CorsCheckerTool(BaseTool):
 
     def execute(self, normalized_input: str) -> ToolResult:
         response = SafeHTTPClient().request(
-            "GET", normalized_input, headers={"Origin": _PROBE_ORIGIN}, max_response_bytes=65536
+            "GET",
+            normalized_input,
+            headers={"Origin": _PROBE_ORIGIN},
+            max_response_bytes=65536,
+            read_response_body=False,
         )
 
         acao = response.headers.get("access-control-allow-origin")

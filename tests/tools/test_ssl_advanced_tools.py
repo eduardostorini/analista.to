@@ -167,6 +167,8 @@ def test_hsts_checker_reports_full_config(mocker):
     assert result.data["preload_list_verified"] is False
     assert result.data["http_redirects_to_https"] is True
     assert result.data["issues"] == []
+    assert mock_client.return_value.request.call_args.kwargs["read_response_body"] is False
+    assert mock_client.return_value.request_with_history.call_args.kwargs["read_response_body"] is False
 
 
 def test_hsts_checker_missing_header(mocker):
@@ -294,6 +296,7 @@ def test_cors_checker_no_cors_headers(mocker):
 
     assert result.data["has_cors"] is False
     assert result.data["issues"]
+    assert mock_client.return_value.request.call_args.kwargs["read_response_body"] is False
 
 
 def test_cors_checker_flags_wildcard_with_credentials(mocker):

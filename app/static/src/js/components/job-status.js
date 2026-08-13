@@ -30,6 +30,7 @@ export function jobStatus() {
     _eventSource: null,
     _pollTimer: null,
     _sseFailures: 0,
+    _redirectTimer: null,
 
     init() {
       this.jobId = this.$el.dataset.jobId;
@@ -118,8 +119,21 @@ export function jobStatus() {
           clearTimeout(this._pollTimer);
           this._pollTimer = null;
         }
-        this.$dispatch("analisa:job-complete", { jobId: this.jobId, status: this.status });
+        this._redirectToResult();
       }
+    },
+
+    _redirectToResult() {
+      if (this._redirectTimer) return;
+
+      // Do not rely exclusively on an Alpine custom event here. If that event
+      // is missed during component initialization, the progress bar reaches
+      // 100% but the pending page never transitions to the rendered result.
+      this._redirectTimer = setTimeout(() => {
+        window.location.reload();
+      }, 600);
+
+      this.$dispatch("analisa:job-complete", { jobId: this.jobId, status: this.status });
     },
 
     _closeSource() {
@@ -132,6 +146,7 @@ export function jobStatus() {
     destroy() {
       this._closeSource();
       if (this._pollTimer) clearTimeout(this._pollTimer);
+      if (this._redirectTimer) clearTimeout(this._redirectTimer);
     },
   };
 }

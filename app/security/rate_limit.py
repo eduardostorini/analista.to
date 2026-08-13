@@ -52,6 +52,9 @@ class RateLimiter:
 
 def enforce_rate_limits(*, tool_slug: str, tool_rate_limit: int, ip_hash: str, input_hash: str, session_id: str) -> None:
     cfg = current_app.config
+    if not cfg["RATE_LIMIT_ENABLED"]:
+        return
+
     limiter = RateLimiter()
 
     limiter.check(RateLimitRule("global", "global", cfg["RATE_LIMIT_GLOBAL_PER_MINUTE"]))

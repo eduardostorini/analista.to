@@ -53,6 +53,15 @@
 
         {% if not data.has_mx %}
           <p class="badge-danger">No MX records — no mail server to test</p>
+        {% elif not data.connected %}
+          <div class="rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <p class="font-medium text-amber-900">SMTP connection {{ data.connection_status|replace('_', ' ') }}</p>
+            <p class="mt-1 text-sm text-amber-800">
+              The test could not establish a connection to
+              <span class="font-mono">{{ data.mx_host }}:25</span>
+              (<span class="font-mono">{{ data.ip }}</span>).
+            </p>
+          </div>
         {% else %}
           <div class="flex flex-wrap items-center gap-3">
             <span class="badge-neutral font-mono">{{ data.mx_host }} (priority {{ data.mx_priority }})</span>
